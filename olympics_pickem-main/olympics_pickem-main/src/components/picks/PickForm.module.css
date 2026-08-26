@@ -1,0 +1,354 @@
+.card {
+  padding: calc(var(--spacing-xl) + var(--spacing-sm)) var(--spacing-md) var(--spacing-md);
+  position: relative;
+}
+
+.time {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  margin: 0;
+  max-width: calc(100% - 140px);
+}
+
+.vs {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.error {
+  padding: var(--spacing-sm);
+  background-color: rgba(220, 53, 69, 0.1);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* Team Selection Styles */
+.teamSelection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.pointsHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-width: 36px;
+}
+
+.teamButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 80px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.teamButton:hover {
+  border-color: var(--color-primary);
+  background: var(--bg-primary);
+}
+
+.teamButton.selected {
+  border-color: var(--color-primary);
+  background: rgba(var(--color-primary-rgb, 37, 99, 235), 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb, 37, 99, 235), 0.2);
+}
+
+.teamButtonName {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+/* Confidence Section */
+.confidenceSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.confidenceLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.slider {
+  width: 100%;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.status {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.iconCluster {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.savedGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
+}
+
+.savedIcon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.savedIcon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.savedLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.iconButton {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.iconButton:hover:not(:disabled) {
+  color: var(--color-error);
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Locked State */
+.locked {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background-color: var(--color-gray-100);
+  border-radius: var(--border-radius);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.lockIcon {
+  font-size: var(--font-size-base);
+}
+
+.lockedHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lockedLabel {
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.lockedStatus {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-gray-200);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.lockedLive {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-error);
+}
+
+.lockedFinal {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-primary);
+}
+
+.lockedMatchup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-gray-50);
+  border-radius: var(--border-radius-sm);
+  color: var(--text);
+}
+
+.lockedTeam {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.lockedTeam span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lockedScore {
+  font-weight: 700;
+  color: var(--text);
+  min-width: 40px;
+  text-align: center;
+}
+
+.lockedWinner {
+  color: var(--text);
+}
+
+.submittedPick {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm);
+  background-color: var(--color-gray-50);
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.submittedTeam {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.submittedConfidence {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.winPoints {
+  color: var(--color-success);
+}
+
+.losePoints {
+  color: var(--color-error);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .locked {
+    background-color: var(--color-gray-800);
+  }
+
+  .lockedStatus {
+    background: var(--color-gray-700);
+    color: var(--text-muted);
+  }
+
+  .lockedMatchup {
+    background: var(--color-gray-800);
+  }
+
+  .submittedPick {
+    background-color: var(--color-gray-800);
+  }
+
+  .teamButton {
+    background: var(--color-gray-800);
+  }
+
+  .teamButton:hover {
+    background: var(--color-gray-700);
+  }
+
+  .teamButton.selected {
+    background: rgba(var(--color-primary-rgb, 37, 99, 235), 0.2);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 400px) {
+  .pointsHint {
+    min-width: 28px;
+    font-size: 10px;
+  }
+
+  .teamButton {
+    min-width: 70px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+}

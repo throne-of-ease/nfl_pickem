@@ -1,0 +1,59 @@
+[
+  {
+    "week": 1,
+    "games": [
+      { "id": 401772718, "date": "2025-09-07T17:00Z", "home": "NO", "away": "ARI", "status": "final", "winner": "ARI", "homeScore": 20, "awayScore": 27 },
+      { "id": 401772918, "date": "2025-09-08T20:25Z", "home": "BUF", "away": "BAL", "status": "final", "winner": "BAL", "homeScore": 23, "awayScore": 20 },
+      { "id": 401772828, "date": "2025-09-07T17:00Z", "home": "JAX", "away": "CAR", "status": "final", "winner": "JAX", "homeScore": 24, "awayScore": 17 },
+      { "id": 401772829, "date": "2025-09-07T17:00Z", "home": "CLE", "away": "CIN", "status": "final", "winner": "CIN", "homeScore": 13, "awayScore": 20 },
+      { "id": 401772510, "date": "2025-09-05T20:20Z", "home": "PHI", "away": "DAL", "status": "final", "winner": "DAL", "homeScore": 28, "awayScore": 31 },
+      { "id": 401772719, "date": "2025-09-07T17:00Z", "home": "ATL", "away": "PIT", "status": "final", "winner": "PIT", "homeScore": 10, "awayScore": 17 },
+      { "id": 401772720, "date": "2025-09-07T17:00Z", "home": "CHI", "away": "TEN", "status": "final", "winner": "CHI", "homeScore": 21, "awayScore": 14 },
+      { "id": 401772721, "date": "2025-09-07T17:00Z", "home": "DEN", "away": "LV", "status": "final", "winner": "LV", "homeScore": 17, "awayScore": 24 },
+      { "id": 401772722, "date": "2025-09-07T17:00Z", "home": "HOU", "away": "IND", "status": "final", "winner": "HOU", "homeScore": 30, "awayScore": 27 },
+      { "id": 401772723, "date": "2025-09-07T17:00Z", "home": "LAC", "away": "KC", "status": "final", "winner": "KC", "homeScore": 20, "awayScore": 34 },
+      { "id": 401772724, "date": "2025-09-07T17:00Z", "home": "MIA", "away": "JAX", "status": "final", "winner": "MIA", "homeScore": 27, "awayScore": 24 },
+      { "id": 401772725, "date": "2025-09-07T17:00Z", "home": "MIN", "away": "DET", "status": "final", "winner": "DET", "homeScore": 17, "awayScore": 21 },
+      { "id": 401772726, "date": "2025-09-07T17:00Z", "home": "NE", "away": "NYJ", "status": "final", "winner": "NYJ", "homeScore": 13, "awayScore": 16 },
+      { "id": 401772727, "date": "2025-09-07T17:00Z", "home": "NYG", "away": "WAS", "status": "final", "winner": "NYG", "homeScore": 24, "awayScore": 17 }
+    ]
+  },
+  {
+    "week": 2,
+    "games": [
+      { "id": 401772728, "date": "2025-09-14T17:00Z", "home": "BAL", "away": "CIN", "status": "final", "winner": "BAL", "homeScore": 27, "awayScore": 24 },
+      { "id": 401772729, "date": "2025-09-14T17:00Z", "home": "BUF", "away": "MIA", "status": "final", "winner": "BUF", "homeScore": 31, "awayScore": 28 },
+      { "id": 401772730, "date": "2025-09-14T17:00Z", "home": "CAR", "away": "TB", "status": "final", "winner": "TB", "homeScore": 17, "awayScore": 20 },
+      { "id": 401772731, "date": "2025-09-14T17:00Z", "home": "CHI", "away": "GB", "status": "final", "winner": "GB", "homeScore": 20, "awayScore": 27 },
+      { "id": 401772732, "date": "2025-09-14T17:00Z", "home": "CLE", "away": "PIT", "status": "final", "winner": "CLE", "homeScore": 24, "awayScore": 21 },
+      { "id": 401772733, "date": "2025-09-14T17:00Z", "home": "DAL", "away": "PHI", "status": "final", "winner": "DAL", "homeScore": 30, "awayScore": 27 },
+      { "id": 401772734, "date": "2025-09-14T17:00Z", "home": "DEN", "away": "NYJ", "status": "final", "winner": "NYJ", "homeScore": 13, "awayScore": 17 },
+      { "id": 401772735, "date": "2025-09-14T17:00Z", "home": "DET", "away": "MIN", "status": "final", "winner": "DET", "homeScore": 28, "awayScore": 24 },
+      { "id": 401772736, "date": "2025-09-14T17:00Z", "home": "HOU", "away": "JAX", "status": "final", "winner": "HOU", "homeScore": 27, "awayScore": 20 },
+      { "id": 401772737, "date": "2025-09-14T17:00Z", "home": "IND", "away": "TEN", "status": "final", "winner": "IND", "homeScore": 24, "awayScore": 17 },
+      { "id": 401772738, "date": "2025-09-14T17:00Z", "home": "KC", "away": "LAC", "status": "final", "winner": "KC", "homeScore": 34, "awayScore": 20 },
+      { "id": 401772739, "date": "2025-09-14T17:00Z", "home": "LV", "away": "ARI", "status": "final", "winner": "LV", "homeScore": 21, "awayScore": 14 },
+      { "id": 401772740, "date": "2025-09-14T17:00Z", "home": "NE", "away": "WAS", "status": "final", "winner": "NE", "homeScore": 20, "awayScore": 13 },
+      { "id": 401772741, "date": "2025-09-14T17:00Z", "home": "NYG", "away": "ATL", "status": "final", "winner": "NYG", "homeScore": 24, "awayScore": 17 }
+    ]
+  },
+  {
+    "week": 9,
+    "games": [
+      { "id": 401772768, "date": "2025-11-02T17:00Z", "home": "KC", "away": "DEN", "status": "final", "winner": "KC", "homeScore": 27, "awayScore": 23 },
+      { "id": 401772872, "date": "2025-11-02T20:15Z", "home": "GB", "away": "DET", "status": "final", "winner": "DET", "homeScore": 20, "awayScore": 34 },
+      { "id": 401772771, "date": "2025-11-02T20:15Z", "home": "PHI", "away": "WAS", "status": "live", "winner": "PHI", "homeScore": 28, "awayScore": 21 },
+      { "id": 401772769, "date": "2025-11-03T00:20Z", "home": "ARI", "away": "SEA", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772770, "date": "2025-11-03T13:00Z", "home": "BUF", "away": "NE", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772772, "date": "2025-11-03T13:00Z", "home": "DAL", "away": "NYG", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772773, "date": "2025-11-03T13:00Z", "home": "HOU", "away": "TEN", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772775, "date": "2025-11-03T13:00Z", "home": "IND", "away": "JAX", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772776, "date": "2025-11-03T13:00Z", "home": "LAC", "away": "LV", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772777, "date": "2025-11-03T13:00Z", "home": "MIA", "away": "NYJ", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772778, "date": "2025-11-03T13:00Z", "home": "MIN", "away": "CHI", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772779, "date": "2025-11-03T13:00Z", "home": "PIT", "away": "BAL", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772780, "date": "2025-11-03T13:00Z", "home": "SEA", "away": "SF", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 },
+      { "id": 401772781, "date": "2025-11-03T13:00Z", "home": "TB", "away": "ATL", "status": "scheduled", "winner": null, "homeScore": 0, "awayScore": 0 }
+    ]
+  }
+]

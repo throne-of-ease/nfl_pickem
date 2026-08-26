@@ -1,0 +1,39 @@
+{
+  "mode": "brier",
+  "points": {
+    "groupStage": 1,
+    "knockoutRound": 2,
+    "medalRound": 3
+  },
+  "brier": {
+    "base": 25,
+    "multiplier": 100,
+    "baseMultipliers": {
+      "groupStage": 1,
+      "playoff": 2
+    },
+    "overtimeMultipliers": {
+      "groupStage": 0.75,
+      "playoff": 1.5
+    }
+  },
+  "exactScoreBonus": {
+    "enabled": false,
+    "points": 1
+  },
+  "polling": {
+    "intervalMinutes": 5,
+    "maxRetries": 3,
+    "retryDelayMs": 5000
+  },
+  "roundTypes": {
+    "Group A": "groupStage",
+    "Group B": "groupStage",
+    "Quarterfinals": "knockoutRound",
+    "Quarterfinal": "knockoutRound",
+    "Semifinals": "knockoutRound",
+    "Semifinal": "knockoutRound",
+    "Bronze Medal Game": "medalRound",
+    "Gold Medal Game": "medalRound"
+  }
+}

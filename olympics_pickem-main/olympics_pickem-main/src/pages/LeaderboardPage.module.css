@@ -1,0 +1,60 @@
+.page {
+  padding-bottom: var(--spacing-xl);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.header h1 {
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.leaderboard {
+  margin-top: var(--spacing-lg);
+}
+
+.error {
+  text-align: center;
+  padding: var(--spacing-2xl);
+}
+
+.error p {
+  color: var(--color-error);
+  margin-bottom: var(--spacing-md);
+}
+
+.refreshButton:disabled {
+  opacity: 1;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .refreshButton:active:not(:disabled) {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+}

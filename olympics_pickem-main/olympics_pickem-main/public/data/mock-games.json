@@ -1,0 +1,724 @@
+{
+  "events": [
+    {
+      "id": "401845001",
+      "name": "Canada vs Germany",
+      "date": "2026-02-11T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "5",
+              "team": {
+                "displayName": "Canada"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "1",
+              "team": {
+                "displayName": "Germany"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845002",
+      "name": "USA vs Sweden",
+      "date": "2026-02-11T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "USA"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "3",
+              "team": {
+                "displayName": "Sweden"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845003",
+      "name": "Sweden vs Switzerland",
+      "date": "2026-02-12T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "4",
+              "team": {
+                "displayName": "Sweden"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "4",
+              "team": {
+                "displayName": "Switzerland"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845004",
+      "name": "Finland vs Slovakia",
+      "date": "2026-02-12T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "3",
+              "team": {
+                "displayName": "Finland"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Slovakia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845005",
+      "name": "Canada vs USA",
+      "date": "2026-02-13T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "Canada"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "3",
+              "team": {
+                "displayName": "USA"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845006",
+      "name": "Czechia vs Latvia",
+      "date": "2026-02-13T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "1",
+              "team": {
+                "displayName": "Czechia"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "displayName": "Latvia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845007",
+      "name": "Russia vs Norway",
+      "date": "2026-02-14T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Quarterfinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "4",
+              "team": {
+                "displayName": "Russia"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Norway"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845008",
+      "name": "Germany vs Switzerland",
+      "date": "2026-02-14T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "Germany"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "1",
+              "team": {
+                "displayName": "Switzerland"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845009",
+      "name": "Sweden vs Finland",
+      "date": "2026-02-15T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "1",
+              "team": {
+                "displayName": "Sweden"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Finland"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845010",
+      "name": "USA vs Latvia",
+      "date": "2026-02-15T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "3",
+              "team": {
+                "displayName": "USA"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "displayName": "Latvia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845011",
+      "name": "Czechia vs Norway",
+      "date": "2026-02-16T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "Czechia"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Norway"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845012",
+      "name": "Canada vs Sweden",
+      "date": "2026-02-16T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Gold Medal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "3",
+              "team": {
+                "displayName": "Canada"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Sweden"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845013",
+      "name": "USA vs Finland",
+      "date": "2026-02-17T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Quarterfinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "USA"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "4",
+              "team": {
+                "displayName": "Finland"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845014",
+      "name": "Germany vs Czechia",
+      "date": "2026-02-17T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Quarterfinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "1",
+              "team": {
+                "displayName": "Germany"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "3",
+              "team": {
+                "displayName": "Czechia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845015",
+      "name": "Switzerland vs Latvia",
+      "date": "2026-02-18T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Quarterfinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "Switzerland"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "displayName": "Latvia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845016",
+      "name": "Norway vs Slovakia",
+      "date": "2026-02-18T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Quarterfinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "1",
+              "team": {
+                "displayName": "Norway"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Slovakia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845017",
+      "name": "Sweden vs USA",
+      "date": "2026-02-19T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Semifinal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "3",
+              "team": {
+                "displayName": "Sweden"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "1",
+              "team": {
+                "displayName": "USA"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845018",
+      "name": "Finland vs Canada",
+      "date": "2026-02-19T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "0",
+              "team": {
+                "displayName": "Finland"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Canada"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845019",
+      "name": "Germany vs Czechia",
+      "date": "2026-02-20T12:00:00Z",
+      "season": {
+        "type": {
+          "name": "Bronze Medal"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "1",
+              "team": {
+                "displayName": "Germany"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "2",
+              "team": {
+                "displayName": "Czechia"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401845020",
+      "name": "Slovakia vs Switzerland",
+      "date": "2026-02-20T16:00:00Z",
+      "season": {
+        "type": {
+          "name": "Group Stage"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "away",
+              "score": "2",
+              "team": {
+                "displayName": "Slovakia"
+              }
+            },
+            {
+              "homeAway": "home",
+              "score": "3",
+              "team": {
+                "displayName": "Switzerland"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "id": "3",
+              "name": "Final"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

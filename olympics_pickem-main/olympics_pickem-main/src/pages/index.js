@@ -1,0 +1,9 @@
+export { GamesPage } from './GamesPage';
+export { LeaderboardPage } from './LeaderboardPage';
+export { PicksOverviewPage } from './PicksOverviewPage';
+export { RulesPage } from './RulesPage';
+export { LoginPage } from './LoginPage';
+export { RegisterPage } from './RegisterPage';
+export { ResetPasswordPage } from './ResetPasswordPage';
+export { MyPicksPage } from './MyPicksPage';
+export { AdminPage } from './AdminPage';

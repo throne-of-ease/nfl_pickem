@@ -1,0 +1,113 @@
+{
+  "teams": [
+    {
+      "id": "1",
+      "name": "USA",
+      "displayName": "United States",
+      "abbreviation": "USA",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+      "color": "002868",
+      "alternateColor": "BF0A30"
+    },
+    {
+      "id": "2",
+      "name": "Canada",
+      "displayName": "Canada",
+      "abbreviation": "CAN",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/can.png",
+      "color": "FF0000",
+      "alternateColor": "FFFFFF"
+    },
+    {
+      "id": "3",
+      "name": "Sweden",
+      "displayName": "Sweden",
+      "abbreviation": "SWE",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/swe.png",
+      "color": "006AA7",
+      "alternateColor": "FECC00"
+    },
+    {
+      "id": "4",
+      "name": "Finland",
+      "displayName": "Finland",
+      "abbreviation": "FIN",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/fin.png",
+      "color": "002F6C",
+      "alternateColor": "FFFFFF"
+    },
+    {
+      "id": "5",
+      "name": "Czech Republic",
+      "displayName": "Czech Republic",
+      "abbreviation": "CZE",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/cze.png",
+      "color": "11457E",
+      "alternateColor": "D7141A"
+    },
+    {
+      "id": "6",
+      "name": "Switzerland",
+      "displayName": "Switzerland",
+      "abbreviation": "SUI",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/sui.png",
+      "color": "FF0000",
+      "alternateColor": "FFFFFF"
+    },
+    {
+      "id": "7",
+      "name": "Germany",
+      "displayName": "Germany",
+      "abbreviation": "GER",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/ger.png",
+      "color": "000000",
+      "alternateColor": "DD0000"
+    },
+    {
+      "id": "8",
+      "name": "Slovakia",
+      "displayName": "Slovakia",
+      "abbreviation": "SVK",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/svk.png",
+      "color": "0B4EA2",
+      "alternateColor": "EE1C25"
+    },
+    {
+      "id": "9",
+      "name": "Latvia",
+      "displayName": "Latvia",
+      "abbreviation": "LAT",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/lat.png",
+      "color": "9E3039",
+      "alternateColor": "FFFFFF"
+    },
+    {
+      "id": "10",
+      "name": "Denmark",
+      "displayName": "Denmark",
+      "abbreviation": "DEN",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/den.png",
+      "color": "C60C30",
+      "alternateColor": "FFFFFF"
+    },
+    {
+      "id": "11",
+      "name": "Norway",
+      "displayName": "Norway",
+      "abbreviation": "NOR",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/nor.png",
+      "color": "BA0C2F",
+      "alternateColor": "00205B"
+    },
+    {
+      "id": "12",
+      "name": "Austria",
+      "displayName": "Austria",
+      "abbreviation": "AUT",
+      "logo": "https://a.espncdn.com/i/teamlogos/countries/500/aut.png",
+      "color": "EF3340",
+      "alternateColor": "FFFFFF"
+    }
+  ],
+  "lastUpdated": "2026-02-01T00:00:00Z"
+}

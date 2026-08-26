@@ -1,0 +1,180 @@
+{
+  "sports": [
+    {
+      "leagues": [
+        {
+          "teams": [
+            {
+              "team": {
+                "id": "1",
+                "displayName": "USA",
+                "abbreviation": "USA",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/usa.png"
+                  }
+                ],
+                "color": "002868",
+                "alternateColor": "BF0A30"
+              }
+            },
+            {
+              "team": {
+                "id": "2",
+                "displayName": "Canada",
+                "abbreviation": "CAN",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/can.png"
+                  }
+                ],
+                "color": "FF0000",
+                "alternateColor": "FFFFFF"
+              }
+            },
+            {
+              "team": {
+                "id": "3",
+                "displayName": "Sweden",
+                "abbreviation": "SWE",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/swe.png"
+                  }
+                ],
+                "color": "006AA7",
+                "alternateColor": "FECC00"
+              }
+            },
+            {
+              "team": {
+                "id": "4",
+                "displayName": "Finland",
+                "abbreviation": "FIN",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/fin.png"
+                  }
+                ],
+                "color": "002F6C",
+                "alternateColor": "FFFFFF"
+              }
+            },
+            {
+              "team": {
+                "id": "5",
+                "displayName": "Czech Republic",
+                "abbreviation": "CZE",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/cze.png"
+                  }
+                ],
+                "color": "11457E",
+                "alternateColor": "D7141A"
+              }
+            },
+            {
+              "team": {
+                "id": "6",
+                "displayName": "Switzerland",
+                "abbreviation": "SUI",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/sui.png"
+                  }
+                ],
+                "color": "FF0000",
+                "alternateColor": "FFFFFF"
+              }
+            },
+            {
+              "team": {
+                "id": "7",
+                "displayName": "Germany",
+                "abbreviation": "GER",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/ger.png"
+                  }
+                ],
+                "color": "000000",
+                "alternateColor": "DD0000"
+              }
+            },
+            {
+              "team": {
+                "id": "8",
+                "displayName": "Slovakia",
+                "abbreviation": "SVK",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/svk.png"
+                  }
+                ],
+                "color": "0B4EA2",
+                "alternateColor": "EE1C25"
+              }
+            },
+            {
+              "team": {
+                "id": "9",
+                "displayName": "Latvia",
+                "abbreviation": "LAT",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/lat.png"
+                  }
+                ],
+                "color": "9E3039",
+                "alternateColor": "FFFFFF"
+              }
+            },
+            {
+              "team": {
+                "id": "10",
+                "displayName": "Denmark",
+                "abbreviation": "DEN",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/den.png"
+                  }
+                ],
+                "color": "C60C30",
+                "alternateColor": "FFFFFF"
+              }
+            },
+            {
+              "team": {
+                "id": "11",
+                "displayName": "Norway",
+                "abbreviation": "NOR",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/nor.png"
+                  }
+                ],
+                "color": "BA0C2F",
+                "alternateColor": "00205B"
+              }
+            },
+            {
+              "team": {
+                "id": "12",
+                "displayName": "Austria",
+                "abbreviation": "AUT",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/countries/500/aut.png"
+                  }
+                ],
+                "color": "EF3340",
+                "alternateColor": "FFFFFF"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+name: Extract picks test
+
+on:
+  push:
+    paths:
+      - 'process_picks_gh.R'
+      - '.github/workflows/run_picks_extract.yml'
+  schedule:
+    # Thursday 02:15 AM CET (01:15 UTC in winter, 00:15 UTC in summer)
+    - cron: '15 1 * * 5'
+    # Sunday 15:30 CET (14:30 UTC in winter, 13:30 UTC in summer)
+    #- cron: '30 14 * * 0'
+    # Sunday 19:00 CET (18:00 UTC in winter, 17:00 UTC in summer)
+    - cron: '50 17 * * 0'
+    - cron: '0 18 * * 0'
+    # Sunday 22:05 CET (21:05 UTC in winter, 20:05 UTC in summer)
+    - cron: '5 21 * * 0'
+    # Sunday 22:25 CET (21:25 UTC in winter, 20:25 UTC in summer)
+    - cron: '25 21 * * 0'
+    # Monday 02:20 AM CET (01:20 UTC in winter, 00:20 UTC in summer)
+    - cron: '20 1 * * 1'
+    # Tuesday 02:15 AM CET (01:15 UTC in winter, 00:15 UTC in summer)
+    - cron: '13 1 * * 2'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  extract_picks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install system dependencies
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y \
+            libnss3 libxss1 libasound2t64 libatk1.0-0 libatk-bridge2.0-0 \
+            libgtk-3-0 libdrm2 libgbm1 libxkbcommon0 libpango-1.0-0 \
+            libpangocairo-1.0-0 libatspi2.0-0 xvfb
+
+
+      - name: Install R packages
+        run: |
+          Rscript -e 'install.packages(c("chromote", "httpuv","data.table","rvest","xml2","httr","glue","jsonlite","R.utils"))'
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Run chromote test
+        run: |
+          xvfb-run Rscript process_picks_gh.R
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all_picks_file
+          path: all_picks_gh.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dt_picks_file
+          path: dt_picks_gh.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: list_of_games_file
+          path: list_of_games_gh.gz 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: picks_json
+          path: picks.json   
+          
+  ci2:
+    runs-on: ubuntu-latest
+    needs: extract_picks
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v4
+        with:        
+          name: all_picks_file
+      - uses: actions/download-artifact@v4
+        with:      
+          name: dt_picks_file
+      - uses: actions/download-artifact@v4
+        with:      
+          name: list_of_games_file
+      - uses: actions/download-artifact@v4
+        with:      
+          name: picks_json
+      - name: Commit report
+        run: |
+          git config --global user.name 'Your Name'
+          git config --global user.email 'your-username@users.noreply.github.com'
+          #git stash
+          #git pull
+          #git stash pop
+          git add -A
+          git commit -m "save commit"
+          git push --force

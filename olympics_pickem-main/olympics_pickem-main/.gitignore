@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.netlify/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+.gemini/
+AGENTS.md
+GEMINI.md
+OUT.md
+deno.lock
+plans/shimmering-swinging-seahorse.md
+netlify/functions/utils/email.js
+

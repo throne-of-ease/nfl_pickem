@@ -1,0 +1,1 @@
+{"scenario":"stale-response","serverClock":"2026-08-27T12:00:00Z","asOf":"2026-08-26T12:00:00Z","events":[{"id":"p1","status":"scheduled","kickoff":"2026-08-27T18:00:00Z","away":"DAL","home":"PHI"}]}

@@ -1,0 +1,60 @@
+name: Update FPI Data
+
+on:
+  schedule:
+    - cron: '0 0 * * 2' # Run every Tuesday at midnight
+    - cron: '0 11 * * 4'   # Thursday 12:05 CET 
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-fpi:
+    runs-on: ubuntu-latest
+    #container:
+    #  image: rocker/r2u:latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        run: |
+          install.packages(c("data.table", "jsonlite", "pak"))
+        shell: Rscript {0}
+
+      - name: Install espnscrapeR
+        #run: R -q -e 'remotes::install_github("jthomasmock/espnscrapeR")'
+        run: R -q -e 'pak::pkg_install("jthomasmock/espnscrapeR")'
+
+      - name: Run FPI data update script
+        run: Rscript update_fpi_data.R
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fpi_data_json
+          path: data/fpi_data.json  
+
+
+  ci2:
+    runs-on: ubuntu-latest
+    needs: update-fpi
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v4
+        with:      
+          name: fpi_data_json
+      - name: Commit report
+        run: |
+          git config --global user.name 'Your Name'
+          git config --global user.email 'your-username@users.noreply.github.com'
+          #git stash
+          #git pull
+          #git stash pop
+          git add -A
+          git commit -m "save commit"
+          git push --force
+

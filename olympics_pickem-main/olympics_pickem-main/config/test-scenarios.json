@@ -1,0 +1,34 @@
+{
+  "description": "Test scenarios for pick'em scoring validation",
+  "scenarios": {
+    "partial_tournament": {
+      "description": "Some games completed, some scheduled - tests incremental scoring",
+      "completedGames": ["401845001", "401845002", "401845003", "401845004", "401845005"],
+      "inProgressGames": ["401845006"],
+      "scheduledGames": ["401845007", "401845008", "401845009", "401845010", "401845011", "401845012"]
+    },
+    "full_tournament": {
+      "description": "All games completed - tests final scoring",
+      "completedGames": "all"
+    },
+    "knockout_only": {
+      "description": "Group stage done, knockout in progress",
+      "completedGames": ["401845001", "401845002", "401845003", "401845004", "401845005", "401845006", "401845013", "401845014", "401845015", "401845016", "401845017", "401845018"],
+      "inProgressGames": ["401845007"],
+      "scheduledGames": ["401845008", "401845009", "401845010", "401845011", "401845012"]
+    }
+  },
+  "expectedResults": {
+    "full_tournament": {
+      "player1": {
+        "totalPoints": 25,
+        "correctPicks": 17,
+        "breakdown": {
+          "groupStage": { "correct": 9, "points": 9 },
+          "knockoutRound": { "correct": 6, "points": 12 },
+          "medalRound": { "correct": 2, "points": 6 }
+        }
+      }
+    }
+  }
+}

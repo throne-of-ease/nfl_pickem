@@ -1,0 +1,54 @@
+{
+  "enabled": true,
+  "overrides": [
+    {
+      "player": "Jirka P",
+      "gameId": "401845664",
+      "teamAScore": 0,
+      "teamBScore": 1,
+      "confidence": 1
+    },
+    {
+      "player": "Jirka P",
+      "gameId": "401845669",
+      "teamAScore": 1,
+      "teamBScore": 0,
+      "confidence": 0.7
+    },
+    {
+      "player": "Jirka P",
+      "gameId": "401845670",
+      "teamAScore": 1,
+      "teamBScore": 0,
+      "confidence": 1
+    },
+    {
+      "player": "Istvanutca",
+      "gameId": "401845674",
+      "teamAScore": 0,
+      "teamBScore": 1,
+      "confidence": 1
+    },
+    {
+      "player": "Istvanutca",
+      "gameId": "401845673",
+      "teamAScore": 0,
+      "teamBScore": 1,
+      "confidence": 0.85
+    },
+    {
+      "player": "Istvanutca",
+      "gameId": "401845785",
+      "teamAScore": 0,
+      "teamBScore": 1,
+      "confidence": 1
+    },
+    {
+      "player": "Jirka P",
+      "gameId": "401845787",
+      "teamAScore": 1,
+      "teamBScore": 0,
+      "confidence": 0.55
+    }
+  ]
+}
