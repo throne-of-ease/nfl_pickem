@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  webServer: { command: 'npm run dev:preseason -- --host 127.0.0.1', port: 5173, reuseExistingServer: true },
+  webServer: { command: 'node node_modules/vite/bin/vite.js --mode preseason --host 127.0.0.1 --port 5173', port: 5173, reuseExistingServer: false },
   use: { baseURL: 'http://127.0.0.1:5173', trace: 'retain-on-failure' },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },

@@ -18,7 +18,7 @@ export async function handler(event) {
     return response(405, { code: 'METHOD_NOT_ALLOWED' })
   } catch (error) {
     const code = error.data?.code ?? error.data?.message ?? 'SERVER_ERROR'
-    const status = code === 'STALE_DRAFT' ? 409 : ['INVALID_CONFIDENCE_SET', 'LOCKED_GAME_CHANGED', 'UNKNOWN_GAME', 'POOL_CLOSED'].includes(code) ? 422 : 500
+    const status = code === 'STALE_DRAFT' ? 409 : ['INVALID_CONFIDENCE_SET', 'INVALID_TEAM', 'LOCKED_GAME_CHANGED', 'UNKNOWN_GAME', 'POOL_CLOSED'].includes(code) ? 422 : error.status === 401 ? 401 : 500
     return response(status, { code })
   }
 }

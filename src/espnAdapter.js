@@ -1,6 +1,10 @@
 import { freezePregameSnapshot } from './domain.js'
 
 const STATUS = { pre: 'scheduled', in: 'live', post: 'final', scheduled: 'scheduled', live: 'live', final: 'final' }
+const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
+const GAME = 'https://cdn.espn.com/core/nfl/game?xhr=1'
+
+const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
 
 export function normalizeEvent(event) {
   const id = String(event?.id ?? '')
@@ -8,6 +12,68 @@ export function normalizeEvent(event) {
   const status = STATUS[event?.status?.type?.state ?? event?.status]
   if (!id || !status || Number.isNaN(kickoff.valueOf())) return null
   return { ...event, id, kickoff: kickoff.toISOString(), status }
+}
+
+export function normalizeScoreboard(payload) {
+  const events = payload?.content?.sbData?.events
+  if (!Array.isArray(events)) throw new Error('ESPN returned an invalid scoreboard')
+  return events.flatMap((event) => {
+    const competition = event.competitions?.[0]
+    const home = competition?.competitors?.find((team) => team.homeAway === 'home')
+    const away = competition?.competitors?.find((team) => team.homeAway === 'away')
+    const status = STATUS[event.status?.type?.state]
+    if (!event.id || !competition || !home?.team?.abbreviation || !away?.team?.abbreviation || !status) return []
+    return [{
+      id: String(event.id),
+      away: away.team.abbreviation,
+      home: home.team.abbreviation,
+      kickoff: new Date(event.date).toISOString(),
+      status,
+      awayScore: finite(away.score) ?? 0,
+      homeScore: finite(home.score) ?? 0,
+      homeWinProbability: null,
+      predictorHome: null,
+      homeMoneyline: null,
+      awayMoneyline: null,
+      gotw: false,
+      source: 'ESPN',
+    }]
+  })
+}
+
+export function addPregameData(game, payload) {
+  const data = payload?.gamepackageJSON ?? payload ?? {}
+  const odds = data.pickcenter?.find((item) => finite(item?.homeTeamOdds?.moneyLine) !== null && finite(item?.awayTeamOdds?.moneyLine) !== null)
+  const projection = finite(data.predictor?.homeTeam?.gameProjection)
+  const probabilities = Array.isArray(data.winprobability) ? data.winprobability : []
+  const initial = finite(probabilities[0]?.homeWinPercentage)
+  const latest = finite(probabilities.at(-1)?.homeWinPercentage)
+  return {
+    ...game,
+    predictorHome: projection === null ? initial : projection / 100,
+    homeMoneyline: finite(odds?.homeTeamOdds?.moneyLine),
+    awayMoneyline: finite(odds?.awayTeamOdds?.moneyLine),
+    homeWinProbability: game.status === 'live' ? latest : null,
+    pregameSource: projection === null ? initial === null ? null : 'ESPN opening win probability' : 'ESPN Matchup Predictor',
+  }
+}
+
+export async function fetchEspnPool(pool, { fetcher = fetch, signal } = {}) {
+  const query = `&dates=${pool.espnSeason}&seasontype=${pool.espnSeasonType}&week=${pool.espnWeek}`
+  const scoreboardResponse = await fetcher(`${SCOREBOARD}${query}`, { signal })
+  if (!scoreboardResponse.ok) throw new Error(`ESPN scoreboard HTTP ${scoreboardResponse.status}`)
+  const games = normalizeScoreboard(await scoreboardResponse.json())
+  if (!games.length) return { games: [], asOf: new Date().toISOString(), source: 'ESPN' }
+  const enriched = await Promise.all(games.map(async (game) => {
+    try {
+      const response = await fetcher(`${GAME}&gameId=${game.id}`, { signal })
+      return response.ok ? addPregameData(game, await response.json()) : game
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      return game
+    }
+  }))
+  return { games: enriched, asOf: new Date().toISOString(), source: 'ESPN' }
 }
 
 export function ingestEspnResponse(payload, previous = [], receivedAt = new Date()) {

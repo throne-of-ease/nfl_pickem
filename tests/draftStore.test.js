@@ -11,6 +11,7 @@ describe('atomic per-user draft revisions', () => {
     }
     expect(store.get('u1', 'week-01', games).draftRevision).toBe(1)
     expect(store.get('u1', 'week-02', games).draftRevision).toBe(0)
+    expect(store.get('u1', 'week-02', games).picks.map((pick) => pick.confidence)).toEqual([1, 2])
   })
 
   it('allows only one writer to win a revision race', () => {

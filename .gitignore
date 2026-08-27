@@ -6,3 +6,7 @@ playwright-report/
 .env.*
 !.env.example
 .supabase/
+supabase/.temp/
+
+# Local Netlify folder
+.netlify

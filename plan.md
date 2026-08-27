@@ -14,7 +14,7 @@
   ## Domain, Data, and API Changes
 
   - Configure these pool mappings explicitly:
-      - preseason-01 through preseason-04: ESPN season type 1; visible as “Preseason rehearsal”; excluded from aggregate season standings.
+      - preseason-hof maps to ESPN preseason week 1; preseason-01 through preseason-03 map to ESPN weeks 2 through 4 so the UI follows the NFL's user-facing preseason week numbers. All are excluded from aggregate season standings.
       - week-01 through week-18: ESPN season type 2; included in season standings.
       - wild-card, divisional, conference, and super-bowl: ESPN season type 3, weeks 1, 2, 3, and 5 respectively; omit Pro Bowl week 4.
       - Never rely on ESPN’s implicit current season/week defaults. ESPN exposes preseason Week 4 separately and maps the Super Bowl to postseason Week 5 while Week 4 is the Pro Bowl. ESPN preseason Week 4

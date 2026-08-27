@@ -5,6 +5,29 @@ import userEvent from '@testing-library/user-event'
 import App from '../src/App.jsx'
 
 describe('four-user application flow', () => {
+  it('opens on the four-player game overview with revealed picks and team logos', () => {
+    render(<App />)
+    expect(screen.getByRole('heading', { name: 'Game overview' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /All player picks/ })).toBeInTheDocument()
+    expect(screen.getAllByTestId(/overview-row-/)).toHaveLength(4)
+    for (const name of ['Alex', 'Blair', 'Casey', 'Devon']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
+    expect(screen.getAllByRole('img', { name: /logo$/ })).toHaveLength(24)
+  })
+
+  it('hides every player pick before kickoff and reveals live picks as pending when provisional scoring is off', async () => {
+    history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
+    const { unmount } = render(<App />)
+    expect(screen.getAllByLabelText('Pick hidden until kickoff')).toHaveLength(16)
+    unmount()
+
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    render(<App />)
+    expect(document.querySelectorAll('.overview-pick')).toHaveLength(4)
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include provisional live scores' }))
+    expect(document.querySelectorAll('.overview-pick.pending')).toHaveLength(4)
+    expect(document.querySelectorAll('.overview-pick.correct, .overview-pick.incorrect')).toHaveLength(0)
+  })
+
   it('switches among all four seeded users and retains isolated drafts', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -16,9 +39,18 @@ describe('four-user application flow', () => {
     }
   })
 
+  it('adds predictor, moneyline, and aggregate picks to the overview on request', async () => {
+    render(<App />)
+    expect(screen.queryByRole('columnheader', { name: /Predictor/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include model picks' }))
+    for (const name of ['Predictor', 'Moneyline', 'Aggregate']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
+    expect(document.querySelectorAll('td.model-column')).toHaveLength(12)
+  })
+
   it('renders all four accessible charts and every display mode', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await user.selectOptions(screen.getByLabelText('Pool'), 'week-02')
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     expect(screen.getAllByRole('img')).toHaveLength(4)
     expect(screen.getAllByRole('button', { name: 'Download PNG' })).toHaveLength(4)
@@ -27,20 +59,39 @@ describe('four-user application flow', () => {
     expect(within(weekly).getAllByRole('option')).toHaveLength(3)
     await user.selectOptions(weekly, 'correct_percentage')
     expect(screen.getByRole('img', { name: /Points per week, correct_percentage/ })).toBeInTheDocument()
-    expect(within(screen.getByLabelText('Current week display mode')).getAllByRole('option')).toHaveLength(5)
+    const currentWeekMode = screen.getByLabelText('Current week display mode')
+    expect(within(currentWeekMode).getAllByRole('option')).toHaveLength(5)
+    await user.selectOptions(currentWeekMode, 'vs_leader')
+    const relativeChart = screen.getByRole('img', { name: /Current week points, vs_leader/ })
+    expect([...relativeChart.querySelectorAll('rect[height]')].every((rect) => Number(rect.getAttribute('height')) >= 0)).toBe(true)
     expect(within(screen.getByLabelText('Game of the Week display mode')).getAllByRole('option')).toHaveLength(3)
   })
 
   it('keeps rehearsal clearly labeled and season charts separate', async () => {
     const user = userEvent.setup()
+    history.replaceState({}, '', '/?pool=preseason-01')
     render(<App />)
     expect(screen.getAllByText('Rehearsal — does not count.').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     expect(screen.getByText(/Rehearsal results are excluded/)).toBeInTheDocument()
+    expect(screen.getByText(/Rehearsal points never enter season analytics/)).toBeInTheDocument()
+    expect(screen.queryByText('Current week')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('img')).toHaveLength(3)
+  })
+
+  it('keeps completed preseason Weeks 1 and 2 open for late picks', async () => {
+    history.replaceState({}, '', '/?pool=preseason-01')
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    expect(screen.getByText(/Late picks are temporarily open/)).toBeInTheDocument()
+    expect(screen.getAllByRole('radio').every((radio) => !radio.disabled)).toBe(true)
+    fireEvent.click(screen.getAllByRole('radio')[0])
+    expect(screen.getAllByRole('radio')[0]).toBeChecked()
   })
 
   it('swaps occupied confidence values on unlocked games', async () => {
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
     fireEvent.change(screen.getByLabelText('Pool'), { target: { value: 'week-02' } })
     const selects = screen.getAllByLabelText(/confidence$/)
     expect(selects[2]).toHaveValue('3')
@@ -50,12 +101,30 @@ describe('four-user application flow', () => {
     expect(selects[3]).toHaveValue('3')
   })
 
-  it('swaps confidence values by dragging one rank onto another game', () => {
+  it('starts every game with a unique preset confidence', () => {
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    expect(screen.getAllByLabelText(/confidence$/).map((select) => select.value)).toEqual(['1', '2', '3', '4'])
+  })
+
+  it('shows pregame probabilities on every scheduled preseason matchup', () => {
+    history.replaceState({}, '', '/?scenario=scheduled&pool=preseason-03')
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    const probabilities = screen.getAllByTitle('Pregame win probability')
+    expect(probabilities).toHaveLength(32)
+    expect(probabilities.slice(0, 2).map((item) => item.textContent)).toEqual(['43%', '57%'])
+  })
+
+  it('reorders games by dragging anywhere on a row', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
     fireEvent.change(screen.getByLabelText('Pool'), { target: { value: 'week-02' } })
     const selects = screen.getAllByLabelText(/confidence$/)
-    const handles = screen.getAllByTestId(/confidence-drag-/)
-    const target = screen.getAllByTestId(/game-row-/)[3]
+    const rows = screen.getAllByTestId(/game-row-/)
+    const sourceId = rows[2].dataset.testid
+    const targetId = rows[3].dataset.testid
+    const target = rows[3]
     let draggedGameId = ''
     const dataTransfer = {
       effectAllowed: 'none',
@@ -64,23 +133,25 @@ describe('four-user application flow', () => {
       getData: () => draggedGameId,
     }
 
-    fireEvent.dragStart(handles[2], { dataTransfer })
+    fireEvent.dragStart(rows[2], { dataTransfer })
     fireEvent.dragOver(target, { dataTransfer })
     fireEvent.drop(target, { dataTransfer })
 
     expect(selects[2]).toHaveValue('4')
     expect(selects[3]).toHaveValue('3')
+    expect(screen.getAllByTestId(/game-row-/).map((row) => row.dataset.testid).slice(2, 4)).toEqual([targetId, sourceId])
   })
 
   it('registers three players and keeps their Week 3 picks isolated', async () => {
     const user = userEvent.setup()
-    history.replaceState({}, '', '/?pool=preseason-03')
+    history.replaceState({}, '', '/?scenario=scheduled&pool=preseason-03')
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Set up 3 players' }))
     await user.type(screen.getByLabelText('Player 1 name'), 'Pat')
     await user.type(screen.getByLabelText('Player 2 name'), 'Quinn')
     await user.type(screen.getByLabelText('Player 3 name'), 'Riley')
     await user.click(screen.getByRole('button', { name: 'Create players' }))
+    await user.click(screen.getByRole('button', { name: 'My picks' }))
 
     const switcher = screen.getByLabelText('Active user')
     expect(within(switcher).getAllByRole('option').map((option) => option.textContent)).toEqual(['Pat', 'Quinn', 'Riley'])
@@ -90,9 +161,19 @@ describe('four-user application flow', () => {
     await user.selectOptions(screen.getByLabelText('PIT at BUF confidence'), '16')
     await user.selectOptions(switcher, 'Quinn')
     expect(screen.getByRole('radio', { name: /PIT/ })).not.toBeChecked()
-    expect(screen.getByLabelText('PIT at BUF confidence')).toHaveValue('')
+    expect(screen.getByLabelText('PIT at BUF confidence')).toHaveValue('1')
     await user.selectOptions(switcher, 'Pat')
     expect(screen.getByRole('radio', { name: /PIT/ })).toBeChecked()
     expect(screen.getByLabelText('PIT at BUF confidence')).toHaveValue('16')
+  }, 10000)
+
+  it('shows predictor, no-vig moneyline, and aggregate model picks with logos', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Models' }))
+    expect(screen.getByRole('columnheader', { name: 'Predictor' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Moneyline' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Aggregate' })).toBeInTheDocument()
+    expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
   })
 })

@@ -1,11 +1,11 @@
-import { validateDraft } from './domain.js'
+import { presetConfidencePicks, validateDraft } from './domain.js'
 
 export class DraftStore {
   #drafts = new Map()
 
   get(userId, poolKey, games) {
     const draft = this.#drafts.get(`${userId}:${poolKey}`) ?? { revision: 0, picks: [] }
-    return { draftRevision: draft.revision, picks: games.map((game) => draft.picks.find((pick) => pick.gameId === game.id) ?? { gameId: game.id, team: null, confidence: null }) }
+    return { draftRevision: draft.revision, picks: presetConfidencePicks(games, draft.picks) }
   }
 
   replace(userId, poolKey, games, expectedDraftRevision, picks, now = new Date()) {

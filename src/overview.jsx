@@ -1,0 +1,84 @@
+import React, { useState } from 'react'
+import { isLocked, modelPicks, poolMetrics, scorePick } from './domain.js'
+
+const ESPN_CODES = { WAS: 'wsh' }
+const NFL_FALLBACK = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nfl.png&w=100&h=100&transparent=true'
+
+export function TeamLogo({ team, size = 'small' }) {
+  const code = ESPN_CODES[team] ?? team.toLowerCase()
+  return <img
+    className={`team-logo ${size === 'large' ? 'large' : ''}`}
+    src={`https://a.espncdn.com/i/teamlogos/nfl/500/${code}.png`}
+    alt={`${team} logo`}
+    loading="lazy"
+    onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = NFL_FALLBACK }}
+  />
+}
+
+const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
+
+function GameSummary({ game }) {
+  const kickoff = new Date(game.kickoff)
+  const hasScore = game.status === 'final' || game.status === 'post' || game.status === 'live' || game.status === 'in'
+  return <div className="overview-game">
+    <div className="overview-matchup">
+      <TeamLogo team={game.away} />
+      <strong>{game.away}</strong>
+      <span>{hasScore ? `${game.awayScore}-${game.homeScore}` : 'at'}</span>
+      <strong>{game.home}</strong>
+      <TeamLogo team={game.home} />
+      {game.gotw && <b title="Game of the Week">+5</b>}
+    </div>
+    <small className={game.status === 'live' || game.status === 'in' ? 'live-text' : ''}>
+      {game.status === 'final' || game.status === 'post' ? 'FINAL' : game.status === 'live' || game.status === 'in' ? 'LIVE' : new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(kickoff)}
+    </small>
+  </div>
+}
+
+function PickCell({ game, pick, provisional, publicPick = false }) {
+  if (!publicPick && !isRevealed(game)) return <span className="pick-hidden" aria-label="Pick hidden until kickoff">?</span>
+  if (!pick?.team || !Number.isFinite(pick.confidence)) return <span className="pick-empty" aria-label="No pick">-</span>
+  const score = scorePick(pick, game, provisional)
+  const state = score.scored ? score.correct ? 'correct' : 'incorrect' : 'pending'
+  return <div className={`overview-pick ${state}`} title={`${pick.team}, confidence ${pick.confidence}${game.gotw ? ', plus 5 Game of the Week points' : ''}`}>
+    <TeamLogo team={pick.team} />
+    <strong>{pick.team}</strong>
+    <span>{pick.confidence + (game.gotw ? 5 : 0)}</span>
+  </div>
+}
+
+export function Overview({ players, games, picksByUser, history, pool, provisional, onProvisional }) {
+  const [showModels, setShowModels] = useState(false)
+  const overviewGames = [...games].sort((a, b) => {
+    const aLive = a.status === 'live' || a.status === 'in'
+    const bLive = b.status === 'live' || b.status === 'in'
+    return bLive - aLive || new Date(a.kickoff) - new Date(b.kickoff) || a.id.localeCompare(b.id)
+  })
+  const totals = new Map(history.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
+  const metrics = poolMetrics(players, games, picksByUser, provisional)
+    .map((player) => ({ ...player, seasonTotal: totals.get(player.id) ?? 0, displayTotal: pool.countsTowardSeason ? totals.get(player.id) ?? 0 : player.points }))
+    .sort((a, b) => b.displayTotal - a.displayTotal || b.points - a.points || a.name.localeCompare(b.name))
+  const leader = metrics[0]?.displayTotal ?? 0
+  const modelColumns = showModels ? [
+    { id: 'model-predictor', name: 'Predictor', picks: modelPicks(games, 'predictor') },
+    { id: 'model-moneyline', name: 'Moneyline', picks: modelPicks(games, 'moneyline') },
+    { id: 'model-aggregate', name: 'Aggregate', picks: modelPicks(games, 'aggregate') },
+  ].map((model) => ({ ...poolMetrics([model], games, { [model.id]: model.picks }, provisional)[0], displayTotal: 0, model: true })) : []
+  const columns = [...metrics, ...modelColumns]
+
+  return <section>
+    <div className="section-title overview-title">
+      <div><h2>Game overview</h2><p>Every revealed pick, confidence, score, and player position in one place.</p></div>
+      <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /> Include model picks</label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /> Include provisional live scores</label></div>
+    </div>
+    <div className="overview-scroll">
+      <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
+        <thead><tr><th>Game</th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
+          <div className="overview-player"><strong>{player.name}</strong><b>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small>{player.points} pool / -{player.pointsLost} lost / {player.potential} left</small></div>
+        </th>)}</tr></thead>
+        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td><GameSummary game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}</tr>)}</tbody>
+      </table>
+    </div>
+    <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> hidden until kickoff</p>
+  </section>
+}

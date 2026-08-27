@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyLiveSample, ingestEspnResponse, normalizeEvent } from '../src/espnAdapter.js'
+import { addPregameData, applyLiveSample, fetchEspnPool, ingestEspnResponse, normalizeEvent, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
   it.each([['pre','scheduled'],['in','live'],['post','final']])('normalizes %s to %s', (input, expected) => {
@@ -18,5 +18,25 @@ describe('ESPN fixture ingestion', () => {
     const later = applyLiveSample(live, { status: 'live', predictorHome: .9, capturedAt: 't2' })
     expect(live.locked).toBe(true)
     expect(later.pregameSnapshot).toEqual(live.pregameSnapshot)
+  })
+
+  it('normalizes every real scoreboard event and enriches pregame probabilities', async () => {
+    const scoreboard = { content: { sbData: { events: [{
+      id: '401', date: '2026-08-21T00:00Z', status: { type: { state: 'post' } }, competitions: [{ competitors: [
+        { homeAway: 'home', score: '20', team: { abbreviation: 'HOU' } },
+        { homeAway: 'away', score: '22', team: { abbreviation: 'LV' } },
+      ] }],
+    }] } } }
+    const summary = { gamepackageJSON: {
+      pickcenter: [{ homeTeamOdds: { moneyLine: 114 }, awayTeamOdds: { moneyLine: -135 } }],
+      winprobability: [{ homeWinPercentage: .5257 }],
+    } }
+    const fetcher = async (url) => ({ ok: true, json: async () => url.includes('scoreboard') ? scoreboard : summary })
+    const pool = { espnSeason: 2026, espnSeasonType: 1, espnWeek: 3 }
+
+    expect(normalizeScoreboard(scoreboard)).toHaveLength(1)
+    expect(addPregameData(normalizeScoreboard(scoreboard)[0], summary)).toMatchObject({ predictorHome: .5257, homeMoneyline: 114, awayMoneyline: -135 })
+    expect(addPregameData(normalizeScoreboard(scoreboard)[0], { gamepackageJSON: { predictor: { homeTeam: { gameProjection: null } } } })).toMatchObject({ predictorHome: null, homeMoneyline: null, awayMoneyline: null })
+    await expect(fetchEspnPool(pool, { fetcher })).resolves.toMatchObject({ games: [{ id: '401', away: 'LV', home: 'HOU', status: 'final', predictorHome: .5257 }] })
   })
 })
