@@ -11,6 +11,7 @@ Completed on 2026-08-27:
 - Linked Supabase project `nfl_pickem` in West Europe and applied both migrations.
 - Pushed the production Site URL and disabled email confirmation while preserving MFA/OTP defaults.
 - Configured Netlify's production environment and deployed the site plus all three Functions.
+- Switched the deployment to modern Supabase API keys and disabled the unused legacy JWT keys.
 - Proved hosted registration, all 16 Week 3 games, draft save/reload, and completed Week 1/2 late picks.
 - Removed every temporary smoke account and pick; production ended with zero profiles, drafts, and picks.
 
