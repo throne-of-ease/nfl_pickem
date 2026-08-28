@@ -115,7 +115,7 @@ describe('four-user application flow', () => {
     history.replaceState({}, '', '/?pool=preseason-01')
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
-    expect(screen.getByText(/Late picks are temporarily open/)).toBeInTheDocument()
+    expect(screen.getByText(/Preseason rehearsal picks remain editable/)).toBeInTheDocument()
     expect(screen.getAllByRole('radio').every((radio) => !radio.disabled)).toBe(true)
     fireEvent.click(screen.getAllByRole('radio')[0])
     expect(screen.getAllByRole('radio')[0]).toBeChecked()
