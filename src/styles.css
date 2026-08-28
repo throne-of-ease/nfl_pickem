@@ -73,16 +73,16 @@ p { color: var(--muted); }
 .player-setup label { display: grid; gap: .3rem; color: var(--muted); font-size: .72rem; }
 .player-setup input { min-width: 0; padding: .48rem .6rem; }
 
-.slate-head { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr) 7rem; gap: .8rem; padding: .35rem .6rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.slate-head { display: grid; grid-template-columns: 7.4rem minmax(0, 1fr) 6.2rem; gap: .45rem; padding: .3rem .4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .slate-head span:last-child { text-align: right; }
 .games { border-bottom: 1px solid var(--line); }
 .game {
   display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr) 7rem;
+  grid-template-columns: 7.4rem minmax(0, 1fr) 6.2rem;
   align-items: center;
-  gap: .8rem;
-  min-height: 54px;
-  padding: .3rem .6rem;
+  gap: .45rem;
+  min-height: 50px;
+  padding: .25rem .4rem;
   border-top: 1px solid var(--line);
   background: transparent;
   transition: background .12s ease, box-shadow .12s ease, opacity .12s ease;
@@ -105,21 +105,21 @@ p { color: var(--muted); }
 fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .teams { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 1.4rem minmax(0, 1fr); align-items: center; }
-.teams label { min-width: 0; height: 34px; display: flex; align-items: center; gap: .5rem; padding: .25rem .6rem; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.teams label { min-width: 0; height: 34px; display: flex; align-items: center; gap: .35rem; padding: .2rem .4rem; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 .teams label:hover { border-color: var(--ink); }
 .teams label.selected { color: var(--ink); background: var(--accent-soft); border-color: var(--accent); }
 .teams input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); flex: 0 0 auto; }
 .team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
 .team-logo.large { width: 30px; height: 30px; }
 .teams span:not(.at) { overflow: hidden; text-overflow: ellipsis; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
-.teams b { margin-left: auto; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.teams b { margin-left: .2rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .at { color: var(--muted); font-size: .65rem; text-align: center; text-transform: uppercase; }
-.confidence-cell { min-height: 34px; display: flex; justify-content: flex-end; align-items: center; gap: .35rem; padding-left: .7rem; border-left: 1px solid var(--line); }
-.drag-handle { width: 24px; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line); cursor: grab; font-size: 1rem; line-height: 1; user-select: none; touch-action: none; }
+.confidence-cell { min-height: 34px; display: flex; justify-content: flex-end; align-items: center; gap: .25rem; padding-left: .45rem; border-left: 1px solid var(--line); }
+.drag-handle { width: 21px; height: 30px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line); cursor: grab; font-size: .92rem; line-height: 1; user-select: none; touch-action: none; }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle[draggable="false"] { cursor: not-allowed; opacity: .25; }
 .confidence { display: grid; gap: .1rem; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
-.confidence select { width: 50px; height: 32px; padding: .25rem .35rem; color: var(--ink); font-size: .82rem; font-variant-numeric: tabular-nums; text-align: center; text-transform: none; }
+.confidence select { width: 44px; height: 30px; padding: .2rem .25rem; color: var(--ink); font-size: .8rem; font-variant-numeric: tabular-nums; text-align: center; text-transform: none; }
 
 .leaderboard { padding: 0; border-top: 1px solid var(--ink); }
 .leaderboard li { display: grid; grid-template-columns: 2.3rem 1fr auto 7rem; align-items: center; gap: 1rem; padding: .8rem .6rem; border-bottom: 1px solid var(--line); }

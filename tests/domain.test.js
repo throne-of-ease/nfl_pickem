@@ -16,7 +16,7 @@ describe('pool contract', () => {
     expect(POOLS.filter((pool) => pool.phase === 'preseason').every((pool) => !pool.countsTowardSeason)).toBe(true)
     expect(POOLS.find((pool) => pool.key === 'preseason-hof')).toMatchObject({ label: 'Hall of Fame Game', espnWeek: 1 })
     expect(POOLS.find((pool) => pool.key === 'preseason-03')).toMatchObject({ label: 'Preseason 3', espnWeek: 4 })
-    expect(POOLS.filter((pool) => pool.acceptsLatePicks).map((pool) => pool.key)).toEqual(['preseason-01', 'preseason-02'])
+    expect(POOLS.filter((pool) => pool.acceptsLatePicks).map((pool) => pool.key)).toEqual(['preseason-hof', 'preseason-01', 'preseason-02', 'preseason-03'])
     expect(POOLS.some((pool) => pool.phase === 'postseason' && pool.espnWeek === 4)).toBe(false)
   })
 
@@ -26,6 +26,10 @@ describe('pool contract', () => {
       { gameId: 'a', team: null, confidence: 1 },
       { gameId: 'c', team: null, confidence: 2 },
     ])
+  })
+
+  it('assigns fresh confidence in AVG model order', () => {
+    expect(presetConfidencePicks(games).map((pick) => [pick.gameId, pick.confidence])).toEqual([['b', 1], ['a', 2], ['c', 3]])
   })
 
   it('contains the official 16-game 2026 preseason Week 3 slate', () => {
@@ -65,6 +69,7 @@ describe('drafts and scoring', () => {
     expect(validateDraft(games, [{ gameId: 'a', confidence: 2 }, { gameId: 'b', confidence: 2 }]).code).toBe('INVALID_CONFIDENCE_SET')
     expect(validateDraft(games, [{ gameId: 'a', confidence: 1 }], { complete: true }).code).toBe('INVALID_CONFIDENCE_SET')
     expect(validateDraft(games, [{ gameId: 'x', confidence: 1 }]).code).toBe('UNKNOWN_GAME')
+    expect(validateDraft(games, [{ gameId: 'a', confidence: 1 }, { gameId: 'a', confidence: 2 }]).code).toBe('INVALID_CONFIDENCE_SET')
   })
 
   it('preserves locked rows', () => {

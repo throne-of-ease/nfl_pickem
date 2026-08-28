@@ -35,8 +35,14 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
 
   useEffect(() => { load() }, [poolKey, token])
   useEffect(() => {
-    loadAdminGotwData(token).then(setGotwData).catch((error) => setGotwMessage((error.code ?? 'GOTW_LOAD_FAILED').replaceAll('_', ' ')))
-  }, [token])
+    let active = true
+    setGotwBusy(true)
+    loadAdminGotwData(token, gotwPoolKey)
+      .then((result) => { if (active) { setGotwData(result); setGotwMessage('') } })
+      .catch((error) => { if (active) setGotwMessage((error.code ?? 'GOTW_LOAD_FAILED').replaceAll('_', ' ')) })
+      .finally(() => { if (active) setGotwBusy(false) })
+    return () => { active = false }
+  }, [token, gotwPoolKey])
 
   const selectedGame = data?.games.find((game) => game.id === selectedGameId)
   const selectedPlayer = data?.players.find((player) => player.id === selectedUserId)
@@ -85,7 +91,8 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
     if (!selectedPlayer || !selectedGame || !team || !confidence) return
     const picks = presetConfidencePicks(data.games, currentPicks)
     const occupied = picks.find((pick) => pick.gameId !== selectedGame.id && pick.confidence === Number(confidence))
-    const nextPicks = picks.map((pick) => pick.gameId === selectedGame.id ? { ...pick, team, confidence: Number(confidence) } : occupied?.gameId === pick.gameId ? { ...pick, confidence: currentPick?.confidence ?? null } : pick)
+    const selectedConfidence = picks.find((pick) => pick.gameId === selectedGame.id)?.confidence
+    const nextPicks = picks.map((pick) => pick.gameId === selectedGame.id ? { ...pick, team, confidence: Number(confidence) } : occupied?.gameId === pick.gameId ? { ...pick, confidence: selectedConfidence } : pick)
     setBusy(true)
     try {
       await saveAdminPicks(poolKey, token, selectedPlayer.id, nextPicks)
@@ -121,7 +128,7 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
       <form className="admin-override" onSubmit={submitOverride}><h3>Override a pick - {poolKey}</h3><label>Player<select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>{data.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label><label>Game<select value={selectedGameId} onChange={(event) => setSelectedGameId(event.target.value)}>{data.games.map((game) => <option key={game.id} value={game.id}>{game.away}@{game.home}</option>)}</select></label><label>Pick<select value={team} onChange={(event) => setTeam(event.target.value)}>{selectedGame && <><option value={selectedGame.away}>{selectedGame.away}</option><option value={selectedGame.home}>{selectedGame.home}</option></>}</select></label><label>Confidence<select value={confidence} onChange={(event) => setConfidence(event.target.value)}>{data.games.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label><button type="submit" disabled={busy || !selectedPlayer || !selectedGame}>Save override</button></form>
     </>}
 
-    {adminTab === 'gotw' && <section className="admin-gotw" aria-label="Game of the Week assignments"><div className="section-title"><div><h3>Weekly Game of the Week</h3><p>Choose one game for each pool. The five-point bonus follows this assignment.</p></div><label>Week<select aria-label="GOTW week" value={gotwPoolKey} onChange={(event) => setGotwPoolKey(event.target.value)}>{POOLS.map((pool) => <option key={pool.key} value={pool.key}>{pool.label}</option>)}</select></label></div>{gotwGames.length ? <div className="gotw-games">{gotwGames.map((game) => <label className={`gotw-game ${selectedGotwGameId === game.id ? 'selected' : ''}`} key={game.id}><input type="radio" name="gotw-game" value={game.id} checked={selectedGotwGameId === game.id} onChange={() => setSelectedGotwGameId(game.id)} /><span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span><small>{game.status === 'final' || game.status === 'post' ? 'Final' : formatKickoff(game.kickoff)}</small>{game.gotw && <b>ASSIGNED</b>}</label>)}</div> : <p className="notice">No games are available for this pool yet.</p>}<div className="gotw-actions"><button type="button" onClick={() => assignGotw()} disabled={gotwBusy || !selectedGotwGameId || selectedGotwGameId === assignedGotwGameId}>Assign Game of the Week</button><button type="button" onClick={() => assignGotw('')} disabled={gotwBusy || !assignedGotwGameId}>Clear assignment</button></div>{gotwMessage && <p className="notice" role="status">{gotwMessage}</p>}</section>}
+    {adminTab === 'gotw' && <section className="admin-gotw" aria-label="Game of the Week assignments"><div className="section-title"><div><h3>Weekly Game of the Week</h3><p>Choose one game for each pool. The five-point bonus follows this assignment.</p></div><label>Week<select aria-label="GOTW week" value={gotwPoolKey} onChange={(event) => setGotwPoolKey(event.target.value)}>{POOLS.map((pool) => <option key={pool.key} value={pool.key}>{pool.label}</option>)}</select></label></div>{gotwBusy && !gotwGames.length ? <p className="notice" role="status">Loading games for {POOLS.find((pool) => pool.key === gotwPoolKey)?.label ?? gotwPoolKey}...</p> : gotwGames.length ? <div className="gotw-games">{gotwGames.map((game) => <label className={`gotw-game ${selectedGotwGameId === game.id ? 'selected' : ''}`} key={game.id}><input type="radio" name="gotw-game" value={game.id} checked={selectedGotwGameId === game.id} onChange={() => setSelectedGotwGameId(game.id)} /><span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span><small>{game.status === 'final' || game.status === 'post' ? 'Final' : formatKickoff(game.kickoff)}</small>{game.gotw && <b>ASSIGNED</b>}</label>)}</div> : <p className="notice">No games are available for this pool yet.</p>}<div className="gotw-actions"><button type="button" onClick={() => assignGotw()} disabled={gotwBusy || !selectedGotwGameId || selectedGotwGameId === assignedGotwGameId}>Assign Game of the Week</button><button type="button" onClick={() => assignGotw('')} disabled={gotwBusy || !assignedGotwGameId}>Clear assignment</button></div>{gotwMessage && <p className="notice" role="status">{gotwMessage}</p>}</section>}
 
     {message && <p className="notice" role="status">{message}</p>}
   </section>

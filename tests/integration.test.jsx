@@ -72,9 +72,9 @@ describe('four-user application flow', () => {
 
   it('adds predictor, moneyline, and aggregate picks to the overview on request', async () => {
     render(<App />)
-    expect(screen.queryByRole('columnheader', { name: /Predictor/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /FPI/ })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Include model picks' }))
-    for (const name of ['Predictor', 'Moneyline', 'Aggregate']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
+    for (const name of ['FPI', 'Moneyline', 'AVG']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
     expect(document.querySelectorAll('td.model-column')).toHaveLength(12)
   })
 
@@ -111,7 +111,7 @@ describe('four-user application flow', () => {
     expect(screen.getAllByRole('img')).toHaveLength(4)
   })
 
-  it('keeps completed preseason Weeks 1 and 2 open for late picks', async () => {
+  it('keeps every preseason pool open for late picks', async () => {
     history.replaceState({}, '', '/?pool=preseason-01')
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
@@ -203,9 +203,9 @@ describe('four-user application flow', () => {
     const user = userEvent.setup()
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Models' }))
-    expect(screen.getByRole('columnheader', { name: 'Predictor' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'FPI' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Moneyline' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Aggregate' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'AVG' })).toBeInTheDocument()
     expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
   })
 })

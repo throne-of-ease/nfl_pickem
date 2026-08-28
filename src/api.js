@@ -168,8 +168,14 @@ export async function loadAdminData(poolKey, token) {
   return { ...data, players, games: (data?.games ?? []).map(mapGame), picksByUser }
 }
 
-export async function loadAdminGotwData(token) {
-  const data = await request('/rest/v1/rpc/get_admin_gotw_data', { method: 'POST', headers: bearer(token), body: '{}' })
+const syncPool = (poolKey, token) => request('/functions/v1/sync-season', { method: 'POST', headers: bearer(token), body: JSON.stringify({ pool: poolKey }), signal: AbortSignal.timeout?.(15000) })
+
+export async function loadAdminGotwData(token, poolKey) {
+  const load = () => request('/rest/v1/rpc/get_admin_gotw_data', { method: 'POST', headers: bearer(token), body: '{}' })
+  let data = await load()
+  if (poolKey && !(data?.games ?? []).some((game) => game.pool_key === poolKey)) {
+    try { await syncPool(poolKey, token); data = await load() } catch { /* the existing slate is still useful */ }
+  }
   return { games: (data?.games ?? []).map(mapGame) }
 }
 

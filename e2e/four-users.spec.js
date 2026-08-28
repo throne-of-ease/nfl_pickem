@@ -57,9 +57,10 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   if (testInfo.project.name === 'mobile') expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await page.getByRole('checkbox', { name: 'Include model picks' }).check()
-  await expect(page.getByRole('columnheader', { name: /Predictor/ })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /FPI/ })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: /Moneyline/ })).toBeVisible()
-  await expect(page.getByRole('columnheader', { name: /Aggregate/ })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /AVG/ })).toBeVisible()
+  await expect(page.getByTestId('download-backup')).toHaveCount(0)
   const switcher = page.getByLabel('Active user')
   for (const name of ['Alex', 'Blair', 'Casey', 'Devon']) {
     await switcher.selectOption({ label: name })
@@ -88,7 +89,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await page.getByRole('button', { name: 'Standings' }).click()
   await expect(page.locator('.leaderboard li')).toHaveCount(4)
   await page.getByRole('button', { name: 'Models' }).click()
-  await expect(page.getByRole('columnheader', { name: 'Predictor' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'FPI', exact: true })).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(4)
   await page.screenshot({ path: testInfo.outputPath('models.png'), fullPage: true })
   expect(errors).toEqual([])
@@ -162,19 +163,23 @@ test('production registration starts a session without email confirmation', asyn
   await expect(page.getByRole('heading', { name: 'Preseason 3' })).toBeVisible()
   await expect(page.locator('.signed-in')).toContainText('Pat')
   await expect(page.getByLabel('Active user')).toHaveCount(0)
+  await expect(page.getByTestId('download-backup')).toHaveCount(0)
   expect(directEspnRequests.length).toBeGreaterThan(0)
 })
 
 test('admin manages registration and overrides a submitted pick', async ({ page }) => {
   const session = { access_token: 'admin-access', refresh_token: 'admin-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'admin-user', email: 'admin@accounts.nfl-pickem.invalid' } }
   const game = { id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z' }
+  const futureGame = { id: 'g7', pool_key: 'week-07', kickoff: '2026-10-25T17:00:00Z', away_team: 'C', home_team: 'D', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }
+  let gotwGames = [game]
   await page.addInitScript((value) => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
   await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => route.fulfill({ json: session }))
   await page.route('**/cdn.espn.com/**', (route) => route.abort())
-  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [game], profiles: [{ id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
-  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [game], profiles: [{ id: 'admin-user', name: 'Admin' }, { id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [{ gameId: 'g1', team: 'B', confidence: 1 }] } }))
   await page.route('**/rest/v1/rpc/get_admin_data', (route) => route.fulfill({ json: { registrationOpen: true, players: [{ id: 'player-1', name: 'Pat', username: 'pat', contactEmail: null }], games: [game], picks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }] } }))
-  await page.route('**/rest/v1/rpc/get_admin_gotw_data', (route) => route.fulfill({ json: { games: [game] } }))
+  await page.route('**/rest/v1/rpc/get_admin_gotw_data', (route) => route.fulfill({ json: { games: gotwGames } }))
+  await page.route('**/functions/v1/sync-season', async (route) => { gotwGames = [game, futureGame]; await route.fulfill({ json: { synced: [{ key: 'week-07', games: 1 }], failures: [] } }) })
   await page.route('**/rest/v1/rpc/set_registration_open', (route) => route.fulfill({ json: { registrationOpen: false } }))
   await page.route('**/rest/v1/rpc/admin_replace_picks', async (route) => {
     const body = JSON.parse(route.request().postData())
@@ -184,8 +189,9 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   })
   await page.route('**/rest/v1/rpc/set_game_of_week', async (route) => {
     const body = JSON.parse(route.request().postData())
-    expect(body).toEqual({ p_pool_key: 'week-01', p_game_id: 'g1' })
-    await route.fulfill({ json: { poolKey: 'week-01', gameId: 'g1' } })
+    expect(['week-01', 'week-07']).toContain(body.p_pool_key)
+    expect(['g1', 'g7']).toContain(body.p_game_id)
+    await route.fulfill({ json: { poolKey: body.p_pool_key, gameId: body.p_game_id } })
   })
   await page.route('**/rest/v1/rpc/admin_delete_player', async (route) => {
     const body = JSON.parse(route.request().postData())
@@ -194,6 +200,8 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   })
   await page.goto('/?pool=week-01')
   await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Admin' })).toBeVisible()
+  await expect(page.getByTestId('download-backup')).toBeVisible()
   await page.getByRole('button', { name: 'Admin' }).click()
   await expect(page.getByRole('heading', { name: 'Registered players' })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Pat', exact: true })).toBeVisible()
@@ -207,6 +215,12 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await page.getByRole('radio', { name: /A @ B/ }).check()
   await page.getByRole('button', { name: 'Assign Game of the Week' }).click()
   await expect(page.getByText('GAME OF THE WEEK ASSIGNED')).toBeVisible()
+  await page.getByLabel('GOTW week').selectOption('week-07')
+  await expect(page.getByRole('radio', { name: /C @ D/ })).toBeVisible()
+  await page.getByRole('radio', { name: /C @ D/ }).check()
+  await page.getByRole('button', { name: 'Assign Game of the Week' }).click()
+  await expect(page.getByText('GAME OF THE WEEK ASSIGNED')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('tab', { name: 'Players' }).click()
   await page.getByRole('button', { name: 'Delete Pat' }).click()

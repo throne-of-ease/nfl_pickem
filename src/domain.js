@@ -9,7 +9,7 @@ const regular = Array.from({ length: 18 }, (_, i) => ({
 }))
 
 export const POOLS = [
-  { key: 'preseason-hof', label: 'Hall of Fame Game', phase: 'preseason', espnSeason: 2026, espnSeasonType: 1, espnWeek: 1, countsTowardSeason: false },
+  { key: 'preseason-hof', label: 'Hall of Fame Game', phase: 'preseason', espnSeason: 2026, espnSeasonType: 1, espnWeek: 1, countsTowardSeason: false, acceptsLatePicks: true },
   ...Array.from({ length: 3 }, (_, i) => ({
     key: `preseason-${String(i + 1).padStart(2, '0')}`,
     label: `Preseason ${i + 1}`,
@@ -18,7 +18,7 @@ export const POOLS = [
     espnSeasonType: 1,
     espnWeek: i + 2,
     countsTowardSeason: false,
-    acceptsLatePicks: i < 2,
+    acceptsLatePicks: true,
   })),
   ...regular,
   ...[
@@ -87,17 +87,30 @@ export function presetConfidencePicks(games, existing = []) {
       used.add(value)
     }
   }
+  const aggregateRank = new Map(modelPicks(games, 'aggregate').map((pick, index) => [pick.gameId, index]))
+  const defaultOrder = [...games].sort((a, b) => {
+    const aRank = aggregateRank.get(a.id) ?? games.length
+    const bRank = aggregateRank.get(b.id) ?? games.length
+    return aRank - bRank || new Date(a.kickoff) - new Date(b.kickoff) || a.id.localeCompare(b.id)
+  })
   const available = Array.from({ length: games.length }, (_, index) => index + 1).filter((value) => !used.has(value))
+  const assigned = new Map(preserved)
+  for (const game of defaultOrder) if (!assigned.has(game.id)) assigned.set(game.id, available.shift())
   return games.map((game) => {
     const previous = old.get(game.id)
     const team = previous && (previous.team === game.home || previous.team === game.away) ? previous.team : null
-    return { gameId: game.id, team, confidence: preserved.get(game.id) ?? available.shift() }
+    return { gameId: game.id, team, confidence: assigned.get(game.id) }
   })
 }
 
 export function validateDraft(games, picks, { complete = false, previous = [], now = new Date(), acceptsLatePicks = false } = {}) {
   const ids = new Set(games.map((game) => game.id))
   if (picks.some((pick) => !ids.has(pick.gameId))) return { code: 'UNKNOWN_GAME' }
+  if (new Set(picks.map((pick) => pick.gameId)).size !== picks.length) return { code: 'INVALID_CONFIDENCE_SET' }
+  if (picks.some((pick) => {
+    const game = games.find((item) => item.id === pick.gameId)
+    return pick.team != null && game.away && game.home && ![game.away, game.home].includes(pick.team)
+  })) return { code: 'INVALID_TEAM' }
   const values = picks.flatMap((pick) => Number.isInteger(pick.confidence) ? [pick.confidence] : [])
   if (new Set(values).size !== values.length || values.some((value) => value < 1 || value > games.length) || (complete && values.length !== games.length)) return { code: 'INVALID_CONFIDENCE_SET' }
   const old = new Map(previous.map((pick) => [pick.gameId, pick]))

@@ -72,9 +72,9 @@ export function Overview({ players, games, picksByUser, history, pool, provision
     .sort((a, b) => b.displayTotal - a.displayTotal || b.points - a.points || a.name.localeCompare(b.name))
   const leader = metrics[0]?.displayTotal ?? 0
   const modelColumns = showModels ? [
-    { id: 'model-predictor', name: 'Predictor', picks: modelPicks(games, 'predictor') },
+    { id: 'model-fpi', name: 'FPI', picks: modelPicks(games, 'predictor') },
     { id: 'model-moneyline', name: 'Moneyline', picks: modelPicks(games, 'moneyline') },
-    { id: 'model-aggregate', name: 'Aggregate', picks: modelPicks(games, 'aggregate') },
+    { id: 'model-avg', name: 'AVG', picks: modelPicks(games, 'aggregate') },
   ].map((model) => ({ ...poolMetrics([model], games, { [model.id]: model.picks }, provisional)[0], displayTotal: 0, model: true })) : []
   const columns = [...metrics, ...modelColumns]
 
