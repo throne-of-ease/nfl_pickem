@@ -12,5 +12,6 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
     { name: 'mobile', use: { ...devices['Pixel 7'], channel: 'chrome' } },
+    { name: 'iphone12pro', use: { ...devices['iPhone 12 Pro'], browserName: 'chromium', channel: 'chrome' } },
   ],
 })

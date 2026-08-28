@@ -115,7 +115,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teams b { margin-left: auto; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .at { color: var(--muted); font-size: .65rem; text-align: center; text-transform: uppercase; }
 .confidence-cell { min-height: 34px; display: flex; justify-content: flex-end; align-items: center; gap: .35rem; padding-left: .7rem; border-left: 1px solid var(--line); }
-.drag-handle { width: 24px; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line); cursor: grab; font-size: 1rem; line-height: 1; user-select: none; }
+.drag-handle { width: 24px; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line); cursor: grab; font-size: 1rem; line-height: 1; user-select: none; touch-action: none; }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle[draggable="false"] { cursor: not-allowed; opacity: .25; }
 .confidence { display: grid; gap: .1rem; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
@@ -130,9 +130,10 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-options { display: grid; gap: .35rem; }
 
 .overview-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
-.overview-table { min-width: 610px; margin: 0; }
+.overview-table { width: 100%; min-width: 0; margin: 0; table-layout: fixed; }
 .overview-table th, .overview-table td { padding: .35rem .45rem; text-align: center; }
-.overview-table th:first-child, .overview-table td:first-child { width: 8rem; min-width: 8rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
+.overview-table .overview-game-column { width: 8rem; min-width: 8rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
+.overview-table .overview-score-column { width: 4.1rem; min-width: 4.1rem; }
 .overview-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-raised); }
 .overview-table thead th:first-child { z-index: 4; background: var(--surface-raised); }
 .overview-table .model-column { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
@@ -145,13 +146,14 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-player b { color: var(--warning); font-size: 1rem; }
 .overview-player span { color: var(--success); font-size: .62rem; text-align: left; letter-spacing: .08em; }
 .overview-player small { grid-column: 1 / -1; color: var(--muted); font-size: .58rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
-.overview-game { display: grid; gap: .12rem; }
-.overview-matchup { display: grid; grid-template-columns: 18px 2.05rem 2.55rem 2.05rem 18px auto; gap: .12rem; align-items: center; }
-.overview-matchup strong { font-size: .72rem; }
-.overview-matchup span { color: var(--muted); text-align: center; font-size: .7rem; font-variant-numeric: tabular-nums; }
-.overview-matchup b { color: var(--warning); font-size: .58rem; }
-.overview-game small { color: var(--muted); font-size: .58rem; letter-spacing: .08em; }
-.overview-game .live-text { color: var(--live); font-weight: 900; }
+.overview-game { display: flex; align-items: center; gap: .25rem; min-width: 0; }
+.overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; }
+.overview-gotw { color: var(--warning); font-size: .58rem; }
+.overview-score { display: grid; justify-items: center; align-content: center; gap: .04rem; min-height: 2rem; font-variant-numeric: tabular-nums; line-height: 1; }
+.overview-score strong { font-size: .76rem; }
+.overview-score small, .overview-schedule span, .overview-schedule strong { color: var(--muted); font-size: .56rem; letter-spacing: .04em; }
+.overview-schedule strong { color: var(--ink); font-size: .68rem; letter-spacing: 0; }
+.overview-score.live-text strong, .overview-score.live-text small { color: var(--live); }
 .live-detail { font-size: .58rem; letter-spacing: 0; }
 .overview-pick { width: 4.15rem; min-height: 32px; margin: auto; display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: .05rem .18rem; padding: .15rem .22rem; border: 1px solid var(--line); border-radius: 3px; }
 .overview-pick strong { font-size: .68rem; text-align: left; }
@@ -262,11 +264,35 @@ footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center;
   .hero label { gap: .3rem; }
   .hero select { max-width: 145px; }
   .section-title p { max-width: 28rem; }
-  .hero-actions { align-items: flex-end; flex-direction: column; gap: .3rem; }
-  .hero-actions button { align-self: flex-end; padding-block: .3rem; }
-  .overview-table th, .overview-table td { padding-inline: .25rem; }
-  .overview-table th:first-child, .overview-table td:first-child { width: 7rem; min-width: 7rem; }
-  .overview-matchup { grid-template-columns: 16px 1.85rem 2.2rem 1.85rem 16px auto; gap: .08rem; }
+  .hero-actions { align-items: center; flex-direction: row; gap: .3rem; }
+  .hero-actions button { align-self: center; padding-block: .3rem; }
+  .overview-title { gap: .35rem; padding: .6rem 0 .35rem; }
+  .overview-title > div p { display: none; }
+  .overview-options { flex-wrap: nowrap; gap: .25rem .45rem; }
+  .overview-options .provisional-toggle { gap: .3rem; font-size: .58rem; }
+  .overview-scroll { overflow-x: auto; }
+  .overview-table { width: 100%; min-width: 0; }
+  .overview-table th, .overview-table td { padding: .12rem .08rem; }
+  .overview-table .overview-game-column { width: 4.55rem; min-width: 4.55rem; }
+  .overview-table .overview-score-column { width: 3.15rem; min-width: 3.15rem; }
+  .overview-table .game-metric { width: 2.1rem; min-width: 2.1rem; }
+  .overview-player { min-width: 2.35rem; display: grid; grid-template-columns: 1fr; justify-items: center; gap: .04rem; }
+  .overview-player strong { max-width: 2.3rem; text-align: center; font-size: .58rem; line-height: 1; }
+  .overview-player b { font-size: .78rem; line-height: 1; }
+  .overview-player span { font-size: .52rem; line-height: 1; }
+  .overview-player small { display: none; }
+  .overview-matchup { font-size: .62rem; }
+  .overview-gotw { font-size: .5rem; }
+  .overview-score { min-height: 1.8rem; }
+  .overview-score strong { font-size: .68rem; }
+  .overview-score small, .overview-schedule span { font-size: .5rem; }
+  .overview-schedule strong { font-size: .62rem; }
+  .overview-pick { width: 1.8rem; min-height: 1.75rem; grid-template-columns: 1fr; justify-items: center; gap: .02rem; padding: .08rem; }
+  .overview-pick .pick-team { display: none; }
+  .overview-pick .team-logo { width: 15px; height: 15px; }
+  .overview-pick span { font-size: .58rem; line-height: 1; }
+  .pick-hidden, .pick-empty { width: 1.65rem; height: 1.65rem; font-size: .64rem; }
+  .game-metric { font-size: .58rem; }
   .admin-override { grid-template-columns: 1fr 1fr; }
   .admin-override button { grid-column: 1 / -1; }
   .gotw-game { grid-template-columns: 1.1rem minmax(0, 1fr) auto; }

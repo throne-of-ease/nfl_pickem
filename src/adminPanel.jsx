@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { POOLS, presetConfidencePicks } from './domain.js'
 import { deleteAdminPlayer, loadAdminData, loadAdminGotwData, saveAdminPicks, setGameOfWeek, setRegistrationOpen } from './api.js'
 import { TeamLogo } from './overview.jsx'
+import { formatCETKickoff } from './time.js'
 
-const formatKickoff = (kickoff) => new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(kickoff))
+const formatKickoff = formatCETKickoff
 
 export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDeleted, onGamesUpdated }) {
   const [data, setData] = useState(null)

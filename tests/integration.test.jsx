@@ -5,13 +5,18 @@ import userEvent from '@testing-library/user-event'
 import App from '../src/App.jsx'
 
 describe('four-user application flow', () => {
-  it('opens on the four-player game overview with revealed picks and team logos', () => {
+  it('opens on the four-player game overview with compact logo picks', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Game overview' })).toBeInTheDocument()
     expect(screen.getByRole('table', { name: /All player picks/ })).toBeInTheDocument()
     expect(screen.getAllByTestId(/overview-row-/)).toHaveLength(4)
     for (const name of ['Alex', 'Blair', 'Casey', 'Devon']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
-    expect(screen.getAllByRole('img', { name: /logo$/ })).toHaveLength(24)
+    expect(screen.getAllByRole('img', { name: /logo$/ })).toHaveLength(16)
+    const headers = within(screen.getByRole('table', { name: /All player picks/ })).getAllByRole('columnheader')
+    expect(headers[0]).toHaveTextContent('Game')
+    expect(headers[1]).toHaveTextContent('Score')
+    expect(headers[headers.length - 2]).toHaveTextContent('GQ')
+    expect(headers[headers.length - 1]).toHaveTextContent('Dev')
   })
 
   it('hides every player pick before kickoff and reveals live picks as pending when provisional scoring is off', async () => {
@@ -42,6 +47,16 @@ describe('four-user application flow', () => {
     expect(screen.getAllByTestId(/overview-row-/)[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g1')
     await user.click(screen.getByRole('checkbox', { name: 'Show GQ / Dev' }))
     expect(screen.queryByRole('columnheader', { name: 'GQ' })).not.toBeInTheDocument()
+  })
+
+  it('shows scheduled kickoff in Central European time in the score column', () => {
+    history.replaceState({}, '', '/?scenario=scheduled&pool=preseason-03')
+    render(<App />)
+    const kickoff = new Date(Date.now() + 3600000)
+    const expectedDate = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(kickoff)
+    const expectedTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hour12: false }).format(kickoff)
+    expect(screen.getAllByText(expectedDate).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(expectedTime).length).toBeGreaterThan(0)
   })
 
   it('switches among all four seeded users and retains isolated drafts', async () => {

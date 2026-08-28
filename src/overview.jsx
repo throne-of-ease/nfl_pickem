@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { gameQuality, isLocked, modelPicks, pickDeviation, poolMetrics, scorePick } from './domain.js'
+import { formatCETDate, formatCETTime } from './time.js'
 
 const ESPN_CODES = { WAS: 'wsh' }
 const NFL_FALLBACK = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nfl.png&w=100&h=100&transparent=true'
@@ -18,23 +19,18 @@ export function TeamLogo({ team, size = 'small' }) {
 const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 
 function GameSummary({ game }) {
-  const kickoff = new Date(game.kickoff)
-  const hasScore = game.status === 'final' || game.status === 'post' || game.status === 'live' || game.status === 'in'
+  return <div className="overview-game">
+    <strong className="overview-matchup">{game.away}@{game.home}</strong>
+    {game.gotw && <b className="overview-gotw" title="Game of the Week">+5</b>}
+  </div>
+}
+
+function ScoreCell({ game }) {
+  const final = game.status === 'final' || game.status === 'post'
   const live = game.status === 'live' || game.status === 'in'
   const detail = live && (game.period || game.displayClock) ? `Q${game.period ?? '?'} · ${game.displayClock ?? '—'}` : game.statusDetail
-  return <div className="overview-game">
-    <div className="overview-matchup">
-      <TeamLogo team={game.away} />
-      <strong>{game.away}</strong>
-      <span>{hasScore ? `${game.awayScore}-${game.homeScore}` : '@'}</span>
-      <strong>{game.home}</strong>
-      <TeamLogo team={game.home} />
-      {game.gotw && <b title="Game of the Week">+5</b>}
-    </div>
-    <small className={live ? 'live-text' : ''}>
-      {game.status === 'final' || game.status === 'post' ? 'FINAL' : live ? <>{'LIVE'}{detail && <b className="live-detail"> · {detail}</b>}</> : new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(kickoff)}
-    </small>
-  </div>
+  if (final || live) return <div className={`overview-score ${live ? 'live-text' : ''}`} title={live && detail ? detail : final ? 'Final score' : 'Live score'}><strong>{game.awayScore}-{game.homeScore}</strong><small>{final ? 'FINAL' : detail ? `LIVE · ${detail}` : 'LIVE'}</small></div>
+  return <time className="overview-score overview-schedule" dateTime={game.kickoff} title="Central European time"><span>{formatCETDate(game.kickoff)}</span><strong>{formatCETTime(game.kickoff)}</strong></time>
 }
 
 function PickCell({ game, pick, provisional, publicPick = false }) {
@@ -42,9 +38,9 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
   if (!pick?.team || !Number.isFinite(pick.confidence)) return <span className="pick-empty" aria-label="No pick">-</span>
   const score = scorePick(pick, game, provisional)
   const state = score.scored ? score.correct ? 'correct' : 'incorrect' : 'pending'
-  return <div className={`overview-pick ${state}`} title={`${pick.team}, confidence ${pick.confidence}${game.gotw ? ', plus 5 Game of the Week points' : ''}`}>
+  return <div className={`overview-pick ${state}`} title={`${pick.team}, confidence ${pick.confidence}${game.gotw ? ', plus 5 Game of the Week points' : ''}`} aria-label={`${pick.team}, confidence ${pick.confidence}`}>
     <TeamLogo team={pick.team} />
-    <strong>{pick.team}</strong>
+    <strong className="pick-team">{pick.team}</strong>
     <span>{pick.confidence + (game.gotw ? 5 : 0)}</span>
   </div>
 }
@@ -85,14 +81,14 @@ export function Overview({ players, games, picksByUser, history, pool, provision
   return <section>
     <div className="section-title overview-title">
       <div><h2>Game overview</h2><p>Every revealed pick, confidence, score, and player position in one place.</p></div>
-      <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /> Include model picks</label><label className="provisional-toggle"><input type="checkbox" checked={showGameMetrics} onChange={(event) => setShowGameMetrics(event.target.checked)} /> Show GQ / Dev</label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /> Include provisional live scores</label></div>
+      <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /><span className="option-label">Include model picks</span></label><label className="provisional-toggle"><input type="checkbox" checked={showGameMetrics} onChange={(event) => setShowGameMetrics(event.target.checked)} /><span className="option-label">Show GQ / Dev</span></label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /><span className="option-label">Include provisional live scores</span></label></div>
     </div>
     <div className="overview-scroll">
       <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
-        <thead><tr><th><button className="table-sort-button" type="button" data-testid="overview-sort-date" onClick={() => sortBy('date')}>Game{sortIndicator('date')}</button></th>{showGameMetrics && <><th><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
+         <thead><tr><th className="overview-game-column"><button className="table-sort-button" type="button" data-testid="overview-sort-date" onClick={() => sortBy('date')}>Game{sortIndicator('date')}</button></th><th className="overview-score-column" title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)">Score</th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
           <div className="overview-player"><strong>{player.name}</strong><b>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="Pool points / points lost / points left">{player.points} / -{player.pointsLost} / {player.potential}</small></div>
-        </th>)}</tr></thead>
-        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td><GameSummary game={game} /></td>{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}</tr>)}</tbody>
+         </th>)}{showGameMetrics && <><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}</tr></thead>
+        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
       </table>
     </div>
     <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> hidden until kickoff</p>

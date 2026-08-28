@@ -18,7 +18,7 @@ test('registers three Week 3 players with isolated persistent picks', async ({ p
   const switcher = page.getByLabel('Active user')
   await expect(page.locator('.game')).toHaveCount(16)
   await expect(page.getByRole('img', { name: /logo$/ })).toHaveCount(32)
-  await expect.poll(() => page.getByRole('img', { name: /logo$/ }).evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))).toBe(true)
+  if (testInfo.project.name !== 'iphone12pro') await expect.poll(() => page.getByRole('img', { name: /logo$/ }).evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))).toBe(true)
   await expect(page.getByRole('heading', { name: 'Preseason 3' })).toBeVisible()
 
   await page.getByRole('radio', { name: /PIT/ }).check()
@@ -52,13 +52,10 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await page.goto('/?scenario=preseason-rehearsal&pool=preseason-01')
   await expect(page.getByRole('heading', { name: 'Game overview' })).toBeVisible()
   await expect(page.locator('[data-testid^="overview-row-"]')).toHaveCount(4)
-  await expect(page.getByRole('img', { name: /logo$/ })).toHaveCount(24)
+  await expect(page.getByRole('img', { name: /logo$/ })).toHaveCount(16)
   await expect.poll(() => page.getByRole('img', { name: /logo$/ }).evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  if (testInfo.project.name === 'mobile') {
-    await page.locator('.overview-scroll').evaluate((element) => { element.scrollLeft = element.scrollWidth })
-    expect(await page.locator('.overview-scroll').evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
-  }
+  if (testInfo.project.name === 'mobile') expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await page.getByRole('checkbox', { name: 'Include model picks' }).check()
   await expect(page.getByRole('columnheader', { name: /Predictor/ })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: /Moneyline/ })).toBeVisible()
@@ -106,6 +103,46 @@ test('overview hides scheduled picks and scores live picks for all four users', 
   await page.getByRole('checkbox', { name: 'Include provisional live scores' }).uncheck()
   await expect(page.locator('.overview-pick.pending')).toHaveCount(4)
   await expect(page.locator('.overview-pick.correct, .overview-pick.incorrect')).toHaveCount(0)
+})
+
+test('dragging a pick row swaps confidence and team buttons remain clickable', async ({ page }, testInfo) => {
+  await page.goto('/?scenario=scheduled&pool=week-02')
+  await page.getByRole('button', { name: 'My picks' }).click()
+  const rows = page.locator('[data-testid^="game-row-"]')
+  await expect(rows).toHaveCount(4)
+  const source = page.locator('[data-testid="game-row-week-02-g3"]')
+  const target = page.locator('[data-testid="game-row-week-02-g4"]')
+  if (testInfo.project.name === 'iphone12pro') {
+    const sourceBox = await page.locator('[data-testid="confidence-drag-week-02-g3"]').boundingBox()
+    const targetBox = await page.locator('[data-testid="game-row-week-02-g4"]').boundingBox()
+    await page.evaluate(({ source, target }) => {
+      const point = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
+      const sourcePoint = point(source)
+      const targetPoint = point(target)
+      document.querySelector('[data-testid="confidence-drag-week-02-g3"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, pointerType: 'touch', clientX: sourcePoint.x, clientY: sourcePoint.y, buttons: 1 }))
+      document.querySelector('[data-testid="game-row-week-02-g4"]').dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 7, pointerType: 'touch', clientX: targetPoint.x, clientY: targetPoint.y, buttons: 1 }))
+      document.querySelector('[data-testid="game-row-week-02-g4"]').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, pointerType: 'touch', clientX: targetPoint.x, clientY: targetPoint.y, buttons: 0 }))
+    }, { source: sourceBox, target: targetBox })
+  } else await source.dragTo(target)
+  await expect(page.getByLabel('TB at ATL confidence')).toHaveValue('4')
+  await expect(page.getByLabel('CIN at CLE confidence')).toHaveValue('3')
+  await page.getByRole('radio', { name: /DAL/ }).check()
+  await expect(page.getByRole('radio', { name: /DAL/ })).toBeChecked()
+})
+
+test('iPhone 12 Pro overview fits the compact 16-game table', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
+  await page.goto('/?scenario=final&pool=preseason-03')
+  await expect(page.locator('[data-testid^="overview-row-"]')).toHaveCount(16)
+  expect(await page.evaluate(() => window.innerWidth)).toBe(390)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
+  expect(await page.locator('.overview-pick .pick-team').evaluateAll((items) => items.every((item) => getComputedStyle(item).display === 'none'))).toBe(true)
+  const headers = await page.locator('.overview-table thead th').allTextContents()
+  expect(headers[0]).toContain('Game')
+  expect(headers[1]).toContain('Score')
+  expect(headers.at(-2)).toContain('GQ')
+  expect(headers.at(-1)).toContain('Dev')
+  await page.screenshot({ path: testInfo.outputPath('iphone12pro-overview.png'), fullPage: false })
 })
 
 test('production registration starts a session without email confirmation', async ({ page }) => {
