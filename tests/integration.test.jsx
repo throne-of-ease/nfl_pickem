@@ -28,6 +28,22 @@ describe('four-user application flow', () => {
     expect(document.querySelectorAll('.overview-pick.correct, .overview-pick.incorrect')).toHaveLength(0)
   })
 
+  it('shows tracker metrics by default, includes live clock detail, and sorts by GQ and Dev', async () => {
+    const user = userEvent.setup()
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    render(<App />)
+    expect(screen.getByRole('columnheader', { name: 'GQ' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Dev' })).toBeInTheDocument()
+    expect(screen.getByText(/Q3 · 04:12/)).toBeInTheDocument()
+    await user.click(screen.getByTestId('overview-sort-gq'))
+    const rows = screen.getAllByTestId(/overview-row-/)
+    expect(rows[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g2')
+    await user.click(screen.getByTestId('overview-sort-gq'))
+    expect(screen.getAllByTestId(/overview-row-/)[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g1')
+    await user.click(screen.getByRole('checkbox', { name: 'Show GQ / Dev' }))
+    expect(screen.queryByRole('columnheader', { name: 'GQ' })).not.toBeInTheDocument()
+  })
+
   it('switches among all four seeded users and retains isolated drafts', async () => {
     const user = userEvent.setup()
     render(<App />)

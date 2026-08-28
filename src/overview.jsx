@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { isLocked, modelPicks, poolMetrics, scorePick } from './domain.js'
+import { gameQuality, isLocked, modelPicks, pickDeviation, poolMetrics, scorePick } from './domain.js'
 
 const ESPN_CODES = { WAS: 'wsh' }
 const NFL_FALLBACK = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nfl.png&w=100&h=100&transparent=true'
@@ -20,17 +20,19 @@ const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 function GameSummary({ game }) {
   const kickoff = new Date(game.kickoff)
   const hasScore = game.status === 'final' || game.status === 'post' || game.status === 'live' || game.status === 'in'
+  const live = game.status === 'live' || game.status === 'in'
+  const detail = live && (game.period || game.displayClock) ? `Q${game.period ?? '?'} · ${game.displayClock ?? '—'}` : game.statusDetail
   return <div className="overview-game">
     <div className="overview-matchup">
       <TeamLogo team={game.away} />
       <strong>{game.away}</strong>
-      <span>{hasScore ? `${game.awayScore}-${game.homeScore}` : 'at'}</span>
+      <span>{hasScore ? `${game.awayScore}-${game.homeScore}` : '@'}</span>
       <strong>{game.home}</strong>
       <TeamLogo team={game.home} />
       {game.gotw && <b title="Game of the Week">+5</b>}
     </div>
-    <small className={game.status === 'live' || game.status === 'in' ? 'live-text' : ''}>
-      {game.status === 'final' || game.status === 'post' ? 'FINAL' : game.status === 'live' || game.status === 'in' ? 'LIVE' : new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(kickoff)}
+    <small className={live ? 'live-text' : ''}>
+      {game.status === 'final' || game.status === 'post' ? 'FINAL' : live ? <>{'LIVE'}{detail && <b className="live-detail"> · {detail}</b>}</> : new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(kickoff)}
     </small>
   </div>
 }
@@ -49,10 +51,24 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
 
 export function Overview({ players, games, picksByUser, history, pool, provisional, onProvisional }) {
   const [showModels, setShowModels] = useState(false)
+  const [showGameMetrics, setShowGameMetrics] = useState(true)
+  const [sort, setSort] = useState({ key: 'date', direction: 'ascending' })
+  const sortBy = (key) => setSort((current) => ({ key, direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending' }))
+  const sortIndicator = (key) => sort.key === key ? (sort.direction === 'ascending' ? ' ▲' : ' ▼') : ''
+  const deviationByGame = new Map(games.map((game) => [game.id, pickDeviation(game, picksByUser)]))
   const overviewGames = [...games].sort((a, b) => {
+    if (sort.key === 'gq' || sort.key === 'dev') {
+      const aValue = sort.key === 'gq' ? gameQuality(a) : deviationByGame.get(a.id)
+      const bValue = sort.key === 'gq' ? gameQuality(b) : deviationByGame.get(b.id)
+      if (aValue === null && bValue !== null) return 1
+      if (aValue !== null && bValue === null) return -1
+      if (aValue !== null && bValue !== null && aValue !== bValue) return (aValue - bValue) * (sort.direction === 'ascending' ? 1 : -1)
+    }
+    const dateOrder = (new Date(a.kickoff) - new Date(b.kickoff)) * (sort.direction === 'descending' ? -1 : 1)
+    if (sort.key === 'date') return dateOrder || a.id.localeCompare(b.id)
     const aLive = a.status === 'live' || a.status === 'in'
     const bLive = b.status === 'live' || b.status === 'in'
-    return bLive - aLive || new Date(a.kickoff) - new Date(b.kickoff) || a.id.localeCompare(b.id)
+    return bLive - aLive || dateOrder || a.id.localeCompare(b.id)
   })
   const totals = new Map(history.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
   const metrics = poolMetrics(players, games, picksByUser, provisional)
@@ -69,14 +85,14 @@ export function Overview({ players, games, picksByUser, history, pool, provision
   return <section>
     <div className="section-title overview-title">
       <div><h2>Game overview</h2><p>Every revealed pick, confidence, score, and player position in one place.</p></div>
-      <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /> Include model picks</label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /> Include provisional live scores</label></div>
+      <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /> Include model picks</label><label className="provisional-toggle"><input type="checkbox" checked={showGameMetrics} onChange={(event) => setShowGameMetrics(event.target.checked)} /> Show GQ / Dev</label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /> Include provisional live scores</label></div>
     </div>
     <div className="overview-scroll">
       <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
-        <thead><tr><th>Game</th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
-          <div className="overview-player"><strong>{player.name}</strong><b>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small>{player.points} pool / -{player.pointsLost} lost / {player.potential} left</small></div>
+        <thead><tr><th><button className="table-sort-button" type="button" data-testid="overview-sort-date" onClick={() => sortBy('date')}>Game{sortIndicator('date')}</button></th>{showGameMetrics && <><th><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
+          <div className="overview-player"><strong>{player.name}</strong><b>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="Pool points / points lost / points left">{player.points} / -{player.pointsLost} / {player.potential}</small></div>
         </th>)}</tr></thead>
-        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td><GameSummary game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}</tr>)}</tbody>
+        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td><GameSummary game={game} /></td>{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}</tr>)}</tbody>
       </table>
     </div>
     <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> hidden until kickoff</p>

@@ -9,10 +9,15 @@ schemas = ["public", "graphql_public"]
 port = 54322
 major_version = 15
 
+[db.vault]
+project_url = "env(SUPABASE_PROJECT_URL)"
+publishable_key = "env(SUPABASE_PUBLISHABLE_KEY)"
+cron_secret = "env(APP_CRON_SECRET)"
+
 [auth]
 enabled = true
-site_url = "https://nfl-pickem-2026.netlify.app"
-additional_redirect_urls = ["http://127.0.0.1:5173"]
+site_url = "https://throne-of-ease.github.io/nfl_pickem/"
+additional_redirect_urls = ["http://127.0.0.1:5173", "http://localhost:5173"]
 enable_signup = true
 
 [auth.email]
@@ -25,3 +30,7 @@ otp_length = 8
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true
+
+[functions.sync-season]
+verify_jwt = false
+entrypoint = './functions/sync-season/index.js'

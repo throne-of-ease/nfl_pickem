@@ -9,9 +9,18 @@ const finite = (value) => value === null || value === '' || typeof value === 'bo
 export function normalizeEvent(event) {
   const id = String(event?.id ?? '')
   const kickoff = new Date(event?.kickoff ?? event?.date)
-  const status = STATUS[event?.status?.type?.state ?? event?.status]
+  const statusInfo = typeof event?.status === 'object' ? event.status : {}
+  const status = STATUS[statusInfo.type?.state ?? statusInfo.state ?? event?.status]
   if (!id || !status || Number.isNaN(kickoff.valueOf())) return null
-  return { ...event, id, kickoff: kickoff.toISOString(), status }
+  return {
+    ...event,
+    id,
+    kickoff: kickoff.toISOString(),
+    status,
+    period: finite(statusInfo.period),
+    displayClock: statusInfo.displayClock ?? statusInfo.type?.detail ?? null,
+    statusDetail: statusInfo.type?.shortDetail ?? statusInfo.type?.detail ?? null,
+  }
 }
 
 export function normalizeScoreboard(payload) {
@@ -21,7 +30,8 @@ export function normalizeScoreboard(payload) {
     const competition = event.competitions?.[0]
     const home = competition?.competitors?.find((team) => team.homeAway === 'home')
     const away = competition?.competitors?.find((team) => team.homeAway === 'away')
-    const status = STATUS[event.status?.type?.state]
+    const statusInfo = event.status ?? {}
+    const status = STATUS[statusInfo.type?.state ?? statusInfo.state]
     if (!event.id || !competition || !home?.team?.abbreviation || !away?.team?.abbreviation || !status) return []
     return [{
       id: String(event.id),
@@ -31,10 +41,14 @@ export function normalizeScoreboard(payload) {
       status,
       awayScore: finite(away.score) ?? 0,
       homeScore: finite(home.score) ?? 0,
+      period: finite(statusInfo.period),
+      displayClock: statusInfo.displayClock ?? statusInfo.type?.detail ?? null,
+      statusDetail: statusInfo.type?.shortDetail ?? statusInfo.type?.detail ?? null,
       homeWinProbability: null,
       predictorHome: null,
       homeMoneyline: null,
       awayMoneyline: null,
+      matchupQuality: finite(event.matchupQuality ?? competition.matchupQuality),
       gotw: false,
       source: 'ESPN',
     }]
@@ -53,6 +67,7 @@ export function addPregameData(game, payload) {
     predictorHome: projection === null ? initial : projection / 100,
     homeMoneyline: finite(odds?.homeTeamOdds?.moneyLine),
     awayMoneyline: finite(odds?.awayTeamOdds?.moneyLine),
+    matchupQuality: finite(data.matchupQuality ?? data.game?.matchupQuality ?? game.matchupQuality),
     homeWinProbability: game.status === 'live' ? latest : null,
     pregameSource: projection === null ? initial === null ? null : 'ESPN opening win probability' : 'ESPN Matchup Predictor',
   }

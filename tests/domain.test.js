@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { POOLS, buildSeasonHistory, freezePregameSnapshot, modelDisagreement, modelPicks, noVigProbabilities, poolMetrics, presetConfidencePicks, scorePick, standings, validateDraft } from '../src/domain.js'
+import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, scorePick, standings, validateDraft } from '../src/domain.js'
 import { gamesByPool, picksByUser, users } from '../src/fixtures.js'
 
 const games = [
@@ -51,6 +51,11 @@ describe('models', () => {
     expect(modelPicks(games, 'aggregate')).toHaveLength(2)
     expect(modelDisagreement(games[2])).toBeNull()
   })
+
+  it('keeps GQ unavailable when ESPN does not provide it', () => {
+    expect(gameQuality({ matchupQuality: 87.4 })).toBe(87.4)
+    expect(gameQuality({ predictorHome: .6 })).toBeNull()
+  })
 })
 
 describe('drafts and scoring', () => {
@@ -97,6 +102,16 @@ describe('drafts and scoring', () => {
     const board = standings(users, [games[0]], picks)
     expect(board).toHaveLength(4)
     expect(board[0].name).toBe('D')
+  })
+
+  it('calculates tracker-compatible signed pick deviation across players', () => {
+    const game = { id: 'dev', away: 'A', home: 'B', gotw: false }
+    expect(pickDeviation(game, {
+      one: [{ gameId: 'dev', team: 'B', confidence: 4 }],
+      two: [{ gameId: 'dev', team: 'A', confidence: 2 }],
+      three: [{ gameId: 'dev', team: 'B', confidence: 1 }],
+    })).toBeCloseTo(3)
+    expect(pickDeviation(game, { one: [{ gameId: 'dev', team: 'B', confidence: 4 }] })).toBeNull()
   })
 })
 

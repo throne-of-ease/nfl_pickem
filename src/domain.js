@@ -57,6 +57,20 @@ export const modelDisagreement = (game) => {
   return Number.isFinite(game.predictorHome) && Number.isFinite(ml) ? Math.abs(game.predictorHome - ml) : null
 }
 
+export const gameQuality = (game) => Number.isFinite(game?.matchupQuality) ? game.matchupQuality : null
+
+export function pickDeviation(game, picksByUser) {
+  const picks = Object.values(picksByUser ?? {}).flatMap((userPicks) => {
+    const pick = userPicks?.find((item) => item.gameId === game.id)
+    if (!pick || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) return []
+    const stake = pick.confidence + (game.gotw ? 5 : 0)
+    return [pick.team === game.home ? stake : -stake]
+  })
+  if (picks.length < 2) return null
+  const total = picks.reduce((sum, value) => sum + value, 0)
+  return picks.reduce((sum, value) => sum + Math.abs(value - (total - value) / (picks.length - 1)), 0) / picks.length
+}
+
 export const isLocked = (game, now = new Date(), acceptsLatePicks = false) => !acceptsLatePicks && (game.locked || new Date(game.kickoff) <= new Date(now))
 
 export function presetConfidencePicks(games, existing = []) {

@@ -3,7 +3,7 @@ import { POOLS, buildSeasonHistory, isLocked, modelDisagreement, modelPicks, noV
 import { gamesByPool, picksByUser as seededPicks, users } from './fixtures.js'
 import { CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from './charts.jsx'
 import { Overview, TeamLogo } from './overview.jsx'
-import { authenticate, clearSession, loadPool, restoreSession, savePicks } from './api.js'
+import { authenticate, clearSession, loadAdminData, loadPool, loadRegistrationStatus, restoreSession, saveAdminPicks, savePicks, setRegistrationOpen } from './api.js'
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const STORAGE_KEY = 'nfl-pickem-rehearsal-v1'
@@ -31,6 +31,8 @@ function AuthPanel({ onSession }) {
   const [registering, setRegistering] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [registrationOpen, setRegistrationOpenState] = useState(true)
+  useEffect(() => { loadRegistrationStatus().then((result) => setRegistrationOpenState(result.registrationOpen !== false)).catch(() => {}) }, [])
   const submit = async (event) => {
     event.preventDefault()
     setBusy(true); setError('')
@@ -39,7 +41,80 @@ function AuthPanel({ onSession }) {
     catch (failure) { setError(failure.code?.replaceAll('_', ' ') ?? 'Unable to sign in') }
     finally { setBusy(false) }
   }
-  return <main className="auth-shell"><section className="auth-panel"><a className="brand" href="#top"><span>NFL</span> PICK/26</a><p className="eyebrow">2026 preseason rehearsal</p><h1>{registering ? 'Create your player' : 'Welcome back'}</h1><p>{registering ? 'Your account is active immediately. No email confirmation is required.' : 'Sign in to continue making picks.'}</p><form onSubmit={submit}>{registering && <label>Display name<input name="displayName" required maxLength="40" autoComplete="name" /></label>}<label>Email<input name="email" type="email" required autoComplete="email" /></label><label>Password<input name="password" type="password" required minLength="8" autoComplete={registering ? 'new-password' : 'current-password'} /></label>{error && <p className="notice error" role="alert">{error}</p>}<button type="submit" disabled={busy}>{busy ? 'Please wait...' : registering ? 'Register and play' : 'Sign in'}</button></form><button className="text-button" type="button" onClick={() => { setRegistering(!registering); setError('') }}>{registering ? 'Already registered? Sign in' : 'Need an account? Register'}</button></section></main>
+  return <main className="auth-shell"><section className="auth-panel"><a className="brand" href="#top"><span>NFL</span> PICK/26</a><p className="eyebrow">2026 preseason rehearsal</p><h1>{registering ? 'Create your player' : 'Welcome back'}</h1><p>{registering ? 'Use a username and password. Email is optional and never required.' : 'Sign in with your username and password.'}</p>{registering && !registrationOpen && <p className="notice error" role="status">New registrations are currently closed.</p>}<form onSubmit={submit}>{registering && <label>Username<input name="username" required minLength="3" maxLength="32" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{2,31}" autoComplete="username" /></label>}{registering && <label>Display name<input name="displayName" required maxLength="40" autoComplete="name" /></label>}{registering && <label>Email <span className="optional">optional</span><input name="email" type="email" autoComplete="email" /></label>}{!registering && <label>Username<input name="username" required autoComplete="username" /></label>}<label>Password<input name="password" type="password" required minLength="8" autoComplete={registering ? 'new-password' : 'current-password'} /></label>{error && <p className="notice error" role="alert">{error}</p>}<button type="submit" disabled={busy || registering && !registrationOpen}>{busy ? 'Please wait...' : registering ? 'Register and play' : 'Sign in'}</button></form><button className="text-button" type="button" onClick={() => { setRegistering(!registering); setError('') }}>{registering ? 'Already registered? Sign in' : 'Need an account? Register'}</button></section></main>
+}
+
+const liveGame = (game) => game.status === 'live' || game.status === 'in'
+const gameStateLabel = (game) => game.status === 'final' || game.status === 'post' ? 'FINAL' : liveGame(game) ? 'LIVE' : 'SCHEDULED'
+const liveDetail = (game) => liveGame(game) && (game.period || game.displayClock) ? `Q${game.period ?? '?'} · ${game.displayClock ?? '—'}` : game.statusDetail
+
+function AdminPanel({ poolKey, token, onPicksUpdated }) {
+  const [data, setData] = useState(null)
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [selectedGameId, setSelectedGameId] = useState('')
+  const [team, setTeam] = useState('')
+  const [confidence, setConfidence] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => {
+    setBusy(true)
+    try {
+      const result = await loadAdminData(poolKey, token)
+      setData(result)
+      setSelectedUserId((current) => result.players.some((player) => player.id === current) ? current : result.players[0]?.id ?? '')
+      setSelectedGameId((current) => result.games.some((game) => game.id === current) ? current : result.games[0]?.id ?? '')
+      setMessage('')
+    } catch (error) { setMessage((error.code ?? 'ADMIN_LOAD_FAILED').replaceAll('_', ' ')) }
+    finally { setBusy(false) }
+  }
+
+  useEffect(() => { load() }, [poolKey, token])
+
+  const selectedGame = data?.games.find((game) => game.id === selectedGameId)
+  const selectedPlayer = data?.players.find((player) => player.id === selectedUserId)
+  const currentPicks = selectedUserId ? data?.picksByUser[selectedUserId] ?? [] : []
+  const currentPick = currentPicks.find((pick) => pick.gameId === selectedGameId)
+
+  useEffect(() => {
+    setTeam(currentPick?.team ?? selectedGame?.away ?? '')
+    setConfidence(currentPick?.confidence ?? '')
+  }, [selectedUserId, selectedGameId, data])
+
+  const toggleRegistration = async () => {
+    setBusy(true)
+    try {
+      const result = await setRegistrationOpen(token, data.registrationOpen === false)
+      setData((current) => ({ ...current, registrationOpen: result.registrationOpen }))
+      setMessage(result.registrationOpen ? 'NEW REGISTRATIONS OPEN' : 'NEW REGISTRATIONS STOPPED')
+    } catch (error) { setMessage((error.code ?? 'REGISTRATION_UPDATE_FAILED').replaceAll('_', ' ')) }
+    finally { setBusy(false) }
+  }
+
+  const submitOverride = async (event) => {
+    event.preventDefault()
+    if (!selectedPlayer || !selectedGame || !team || !confidence) return
+    const picks = presetConfidencePicks(data.games, currentPicks)
+    const occupied = picks.find((pick) => pick.gameId !== selectedGame.id && pick.confidence === Number(confidence))
+    const nextPicks = picks.map((pick) => pick.gameId === selectedGame.id ? { ...pick, team, confidence: Number(confidence) } : occupied?.gameId === pick.gameId ? { ...pick, confidence: currentPick?.confidence ?? null } : pick)
+    setBusy(true)
+    try {
+      await saveAdminPicks(poolKey, token, selectedPlayer.id, nextPicks)
+      setData((current) => ({ ...current, picksByUser: { ...current.picksByUser, [selectedPlayer.id]: nextPicks } }))
+      onPicksUpdated(selectedPlayer.id, nextPicks)
+      setMessage('PICK OVERRIDE SAVED')
+    } catch (error) { setMessage((error.code ?? 'PICK_OVERRIDE_FAILED').replaceAll('_', ' ')) }
+    finally { setBusy(false) }
+  }
+
+  if (!data) return <section><p className="notice" role="status">Loading admin tools…</p></section>
+  return <section className="admin-panel">
+    <div className="section-title"><div><h2>Admin</h2><p>Manage players and correct submitted picks after kickoff.</p></div><button type="button" onClick={load} disabled={busy}>{busy ? 'Working…' : 'Refresh'}</button></div>
+    <div className="admin-registration"><strong>Player registration</strong><span>{data.registrationOpen === false ? 'Closed' : 'Open'}</span><button type="button" onClick={toggleRegistration} disabled={busy}>{data.registrationOpen === false ? 'Allow new registrations' : 'Stop new registrations'}</button></div>
+    <div className="admin-list"><h3>Registered players</h3><table><thead><tr><th>Player</th><th>Username</th><th>Contact</th></tr></thead><tbody>{data.players.map((player) => <tr key={player.id}><td>{player.name}</td><td>{player.username}</td><td>{player.contactEmail || '—'}</td></tr>)}</tbody></table></div>
+    <form className="admin-override" onSubmit={submitOverride}><h3>Override a pick · {poolKey}</h3><label>Player<select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>{data.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label><label>Game<select value={selectedGameId} onChange={(event) => setSelectedGameId(event.target.value)}>{data.games.map((game) => <option key={game.id} value={game.id}>{game.away}@{game.home}</option>)}</select></label><label>Pick<select value={team} onChange={(event) => setTeam(event.target.value)}>{selectedGame && <><option value={selectedGame.away}>{selectedGame.away}</option><option value={selectedGame.home}>{selectedGame.home}</option></>}</select></label><label>Confidence<select value={confidence} onChange={(event) => setConfidence(event.target.value)}>{data.games.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label><button type="submit" disabled={busy || !selectedPlayer || !selectedGame}>Save override</button></form>
+    {message && <p className="notice" role="status">{message}</p>}
+  </section>
 }
 
 export default function App() {
@@ -55,6 +130,11 @@ export default function App() {
   const [picksByUser, setPicks] = useState(localState.picksByUser)
   const [loadedGamesByPool, setLoadedGamesByPool] = useState(() => useFixtures ? gamesByPool : {})
   const [dataState, setDataState] = useState({ loading: !useFixtures, error: null, asOf: null })
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  const forceRefresh = useRef(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [viewerName, setViewerName] = useState('')
   const [tab, setTab] = useState('overview')
   const [provisional, setProvisional] = useState(true)
   const [message, setMessage] = useState(activeScenario === 'validation-error' ? 'INVALID CONFIDENCE SET' : 'All changes saved')
@@ -102,24 +182,33 @@ export default function App() {
     if (useFixtures || !session?.access_token) return
     const controller = new AbortController()
     const load = async () => {
+      const manual = forceRefresh.current
+      forceRefresh.current = false
+      setIsRefreshing(true)
       setDataState((state) => ({ ...state, loading: !loadedGamesByPool[poolKey], error: null }))
       try {
-        const result = await loadPool(poolKey, session.access_token)
+        const result = await loadPool(poolKey, session.access_token, { forceRefresh: manual, signal: controller.signal })
         if (controller.signal.aborted) return
         draftRevisions.current[poolKey] = result.draftRevision
         setAppUsers(result.users)
+        setViewerName(result.viewer?.name ?? '')
+        setIsAdmin(Boolean(result.viewer?.isAdmin))
         setUserId(session.user.id)
         setLoadedGamesByPool((all) => ({ ...all, [poolKey]: result.games }))
         setPicks((all) => ({ ...all, ...Object.fromEntries(result.users.map((player) => [player.id, { ...all[player.id], [poolKey]: result.picksByUser[player.id] ?? [] }])), [session.user.id]: { ...all[session.user.id], [poolKey]: result.ownPicks } }))
-        setDataState({ loading: false, error: result.games.length ? null : 'No games are currently published for this pool.', asOf: result.asOf })
+        setDataState({ loading: false, error: result.games.length ? null : 'No games are currently available for this pool.', asOf: result.asOf })
       } catch (error) {
         if (!controller.signal.aborted) setDataState((state) => ({ ...state, loading: false, error: 'Shared pick data is temporarily unavailable.' }))
+      } finally {
+        if (!controller.signal.aborted) setIsRefreshing(false)
       }
     }
     load()
-    const refresh = setInterval(load, 5 * 60 * 1000)
-    return () => { controller.abort(); clearInterval(refresh) }
-  }, [poolKey, useFixtures, session?.access_token])
+    const refresh = () => { if (document.visibilityState === 'visible') setRefreshVersion((version) => version + 1) }
+    const interval = setInterval(refresh, 5 * 60 * 1000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { controller.abort(); clearInterval(interval); document.removeEventListener('visibilitychange', refresh) }
+  }, [poolKey, useFixtures, session?.access_token, refreshVersion])
 
   useEffect(() => {
     if (!games.length) return
@@ -192,21 +281,22 @@ export default function App() {
   if (!useFixtures && !session) return <AuthPanel onSession={setSession} />
 
   return <>
-    <header><a className="brand" href="#top"><span>NFL</span> PICK/26</a><nav aria-label="Main navigation">{[['overview', 'Overview'], ['games', 'My picks'], ['standings', 'Standings'], ['charts', 'Charts'], ['models', 'Models'], ['rules', 'Rules']].map(([item, label]) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{label}</button>)}</nav>{useFixtures ? <><button className="setup-button" type="button" aria-label="Set up 3 players" onClick={() => setShowSetup((open) => !open)}>Players</button><label className="user-switch"><span>Playing as</span><select aria-label="Active user" value={userId} onChange={(event) => setUserId(event.target.value)}>{appUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label></> : <div className="signed-in"><span>{appUsers.find((user) => user.id === userId)?.name ?? session.user.email}</span><button type="button" onClick={() => { clearSession(); setSession(null); setAppUsers([]); setPicks({}) }}>Sign out</button></div>}</header>
+    <header><a className="brand" href="#top"><span>NFL</span> PICK/26</a><nav aria-label="Main navigation">{[['overview', 'Overview'], ['games', 'My picks'], ['standings', 'Standings'], ['charts', 'Charts'], ['models', 'Models'], ['rules', 'Rules'], ...(isAdmin ? [['admin', 'Admin']] : [])].map(([item, label]) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{label}</button>)}</nav>{useFixtures ? <><button className="setup-button" type="button" aria-label="Set up 3 players" onClick={() => setShowSetup((open) => !open)}>Players</button><label className="user-switch"><span>Playing as</span><select aria-label="Active user" value={userId} onChange={(event) => setUserId(event.target.value)}>{appUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label></> : <div className="signed-in"><span>{viewerName || appUsers.find((user) => user.id === userId)?.name || session.user.email}</span><button type="button" onClick={() => { clearSession(); setSession(null); setAppUsers([]); setPicks({}); setIsAdmin(false) }}>Sign out</button></div>}</header>
     <main id="top">
       {useFixtures && showSetup && <form className="player-setup" aria-label="Set up 3 players" onSubmit={registerPlayers}><div><h2>Register 3 rehearsal players</h2><p>This replaces local rehearsal players and picks on this device.</p></div>{playerNames.map((name, index) => <label key={index}>Player {index + 1}<input aria-label={`Player ${index + 1} name`} value={name} onChange={(event) => setPlayerNames((all) => all.map((item, i) => i === index ? event.target.value : item))} autoComplete="off" /></label>)}<button type="submit">Create players</button></form>}
-      <section className="hero"><div><p className="eyebrow">2026 season</p><h1>{pool.label}</h1>{pool.phase === 'preseason' && <p className="rehearsal">Rehearsal — does not count.</p>}</div><label>Pool <select aria-label="Pool" value={poolKey} onChange={(event) => setPoolKey(event.target.value)}>{enabledPools.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label></section>
+      <section className="hero"><div><p className="eyebrow">2026 season</p><h1>{pool.label}</h1>{pool.phase === 'preseason' && <p className="rehearsal">Rehearsal — does not count.</p>}</div><div className="hero-actions"><label>Pool <select aria-label="Pool" value={poolKey} onChange={(event) => setPoolKey(event.target.value)}>{enabledPools.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>{!useFixtures && <button type="button" onClick={() => { forceRefresh.current = true; setRefreshVersion((version) => version + 1) }} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</button>}</div></section>
       {dataState.loading && <p className="notice" role="status">Loading the real ESPN schedule and pregame probabilities…</p>}
       {dataState.error && <p className="notice error" role="alert">{dataState.error}</p>}
-      {!useFixtures && games.length > 0 && <p className="notice" role="status" data-testid="real-data-status">ESPN schedule · {games.length} real games · {dateRange(games)} · pregame probabilities for {games.filter((game) => Number.isFinite(game.predictorHome) || Number.isFinite(game.homeMoneyline) && Number.isFinite(game.awayMoneyline)).length}/{games.length}</p>}
+      {!useFixtures && games.length > 0 && <p className="notice" role="status" data-testid="real-data-status">Browser ESPN · {games.length} games · {dateRange(games)} · pregame probabilities for {games.filter((game) => Number.isFinite(game.predictorHome) || Number.isFinite(game.homeMoneyline) && Number.isFinite(game.awayMoneyline)).length}/{games.length}{dataState.asOf ? ` · updated ${new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(dataState.asOf))}` : ''}</p>}
       {activeScenario === 'stale-data' && <p className="notice" role="status">Showing last-good data · updated 24 hours ago</p>}
       {activeScenario === 'missing-data' && <p className="notice" role="status">Some model data is unavailable. Picks and scores remain available.</p>}
       {tab === 'overview' && <Overview players={appUsers} games={games} picksByUser={Object.fromEntries(appUsers.map((user) => [user.id, picksByUser[user.id]?.[poolKey] ?? []]))} history={history} pool={pool} provisional={provisional} onProvisional={setProvisional} />}
-      {tab === 'games' && <section><div className="section-title"><div><h2>Make your picks</h2><p>Confidence is preset. Drag anywhere on a row except a team button to reorder it.</p>{pool.acceptsLatePicks && <p className="notice">Late picks are temporarily open for this completed preseason week.</p>}</div><span className="save-state" role="status">{message}</span></div><div className="slate-head" aria-hidden="true"><span>Kickoff</span><span>Matchup</span><span>Confidence</span></div><div className="games">{displayedGames.map((game) => { const pick = userPicks.find((item) => item.gameId === game.id); const locked = isLocked(game, new Date(), pool.acceptsLatePicks); const kickoff = new Date(game.kickoff); const moneylineHome = noVigProbabilities(game.homeMoneyline, game.awayMoneyline)?.home; const pregameHome = Number.isFinite(game.predictorHome) && Number.isFinite(moneylineHome) ? (game.predictorHome + moneylineHome) / 2 : Number.isFinite(game.predictorHome) ? game.predictorHome : moneylineHome; return <article data-testid={`game-row-${game.id}`} className={`game ${game.status} ${pick?.team ? 'picked' : ''} ${draggedGameId === game.id ? 'dragging' : ''} ${dragOverGameId === game.id ? 'drop-target' : ''}`} key={game.id} draggable={!locked && Number.isInteger(pick?.confidence)} title={locked ? 'This game is locked' : 'Drag this row to change its confidence rank'} onDragStart={(event) => { if (event.target.closest?.('.teams')) { event.preventDefault(); return } event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', game.id); setDraggedGameId(game.id) }} onDragEnd={() => { setDraggedGameId(null); setDragOverGameId(null) }} onDragOver={(event) => { if (!locked && draggedGameId && draggedGameId !== game.id) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (dragOverGameId !== game.id) setDragOverGameId(game.id) } }} onDrop={(event) => { event.preventDefault(); swapConfidence(event.dataTransfer.getData('text/plain') || draggedGameId, game.id); setDraggedGameId(null); setDragOverGameId(null) }}><div className="game-meta"><time dateTime={game.kickoff}><span>{new Intl.DateTimeFormat('en', { weekday: 'short' }).format(kickoff)}</span><strong>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(kickoff)}</strong></time><span className="game-status">{locked ? 'locked' : game.status}</span>{game.gotw && <strong className="gotw">GOTW +5</strong>}</div><fieldset disabled={locked}><legend className="sr-only">{game.away} at {game.home}</legend><div className="teams"><label className={pick?.team === game.away ? 'selected' : ''}><input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.away} onChange={() => updatePick(game.id, { team: game.away })} /><TeamLogo team={game.away} /><span>{game.away}</span><b title="Pregame win probability">{game.status === 'scheduled' && Number.isFinite(pregameHome) ? `${((1 - pregameHome) * 100).toFixed(0)}%` : game.awayScore}</b></label><span className="at">at</span><label className={pick?.team === game.home ? 'selected' : ''}><input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.home} onChange={() => updatePick(game.id, { team: game.home })} /><TeamLogo team={game.home} /><span>{game.home}</span><b title="Pregame win probability">{game.status === 'scheduled' && Number.isFinite(pregameHome) ? `${(pregameHome * 100).toFixed(0)}%` : game.homeScore}</b></label></div></fieldset><div className="confidence-cell"><span className="drag-handle" aria-hidden="true" data-testid={`confidence-drag-${game.id}`} data-game-id={game.id}>⠿</span><label className="confidence"><span>Rank</span><select aria-label={`${game.away} at ${game.home} confidence`} value={pick?.confidence ?? ''} onChange={(event) => updatePick(game.id, { confidence: event.target.value ? Number(event.target.value) : null })} disabled={locked}>{games.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label></div></article> })}</div></section>}
+      {tab === 'games' && <section><div className="section-title"><div><h2>Make your picks</h2><p>Confidence is preset. Drag anywhere on a row except a team button to reorder it.</p>{pool.acceptsLatePicks && <p className="notice">Late picks are temporarily open for this completed preseason week.</p>}</div><span className="save-state" role="status">{message}</span></div><div className="slate-head" aria-hidden="true"><span>Kickoff</span><span>Matchup</span><span>Confidence</span></div><div className="games">{displayedGames.map((game) => { const pick = userPicks.find((item) => item.gameId === game.id); const locked = isLocked(game, new Date(), pool.acceptsLatePicks); const kickoff = new Date(game.kickoff); const moneylineHome = noVigProbabilities(game.homeMoneyline, game.awayMoneyline)?.home; const pregameHome = Number.isFinite(game.predictorHome) && Number.isFinite(moneylineHome) ? (game.predictorHome + moneylineHome) / 2 : Number.isFinite(game.predictorHome) ? game.predictorHome : moneylineHome; return <article data-testid={`game-row-${game.id}`} className={`game ${game.status} ${pick?.team ? 'picked' : ''} ${draggedGameId === game.id ? 'dragging' : ''} ${dragOverGameId === game.id ? 'drop-target' : ''}`} key={game.id} draggable={!locked && Number.isInteger(pick?.confidence)} title={locked ? 'This game is locked' : 'Drag this row to change its confidence rank'} onDragStart={(event) => { if (event.target.closest?.('.teams')) { event.preventDefault(); return } event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', game.id); setDraggedGameId(game.id) }} onDragEnd={() => { setDraggedGameId(null); setDragOverGameId(null) }} onDragOver={(event) => { if (!locked && draggedGameId && draggedGameId !== game.id) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (dragOverGameId !== game.id) setDragOverGameId(game.id) } }} onDrop={(event) => { event.preventDefault(); swapConfidence(event.dataTransfer.getData('text/plain') || draggedGameId, game.id); setDraggedGameId(null); setDragOverGameId(null) }}><div className="game-meta"><time dateTime={game.kickoff}><span>{new Intl.DateTimeFormat('en', { weekday: 'short' }).format(kickoff)}</span><strong>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(kickoff)}</strong></time><span className={`game-status ${liveGame(game) ? 'live-status' : ''}`}>{locked ? 'locked' : gameStateLabel(game)}{liveDetail(game) && <small>{liveDetail(game)}</small>}</span>{game.gotw && <strong className="gotw">GOTW +5</strong>}</div><fieldset disabled={locked}><legend className="sr-only">{game.away} @ {game.home}</legend><div className="teams"><label className={pick?.team === game.away ? 'selected' : ''}><input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.away} onChange={() => updatePick(game.id, { team: game.away })} /><TeamLogo team={game.away} /><span>{game.away}</span><b title="Pregame win probability">{game.status === 'scheduled' && Number.isFinite(pregameHome) ? `${((1 - pregameHome) * 100).toFixed(0)}%` : game.awayScore}</b></label><span className="at">@</span><label className={pick?.team === game.home ? 'selected' : ''}><input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.home} onChange={() => updatePick(game.id, { team: game.home })} /><TeamLogo team={game.home} /><span>{game.home}</span><b title="Pregame win probability">{game.status === 'scheduled' && Number.isFinite(pregameHome) ? `${(pregameHome * 100).toFixed(0)}%` : game.homeScore}</b></label></div></fieldset><div className="confidence-cell"><span className="drag-handle" aria-hidden="true" data-testid={`confidence-drag-${game.id}`} data-game-id={game.id}>⠿</span><label className="confidence"><span>Rank</span><select aria-label={`${game.away} at ${game.home} confidence`} value={pick?.confidence ?? ''} onChange={(event) => updatePick(game.id, { confidence: event.target.value ? Number(event.target.value) : null })} disabled={locked}>{games.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label></div></article> })}</div></section>}
       {tab === 'standings' && <section><div className="section-title"><div><h2>{pool.phase === 'preseason' ? 'Rehearsal leaderboard' : 'Standings'}</h2>{pool.phase === 'preseason' && <p className="rehearsal">Rehearsal — does not count.</p>}</div><label><input type="checkbox" checked={provisional} onChange={(event) => setProvisional(event.target.checked)} /> Include provisional live scores</label></div><ol className="leaderboard">{board.map((player, index) => <li key={player.id}><span className="rank">{index + 1}</span><strong>{player.name}</strong><span>{player.points} pts</span><small>up to {player.points + player.potential}</small></li>)}</ol></section>}
       {tab === 'charts' && <section><div className="section-title"><div><h2>Season charts</h2><p>Regular season and postseason only. Rehearsal results are excluded.</p></div><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => setProvisional(event.target.checked)} /> Include provisional live scores</label></div>{!pool.countsTowardSeason && <p className="notice">Select a regular-season or playoff pool to view its current-pool chart. Rehearsal points never enter season analytics.</p>}<div className="charts">{pool.countsTowardSeason && <CurrentWeekChart current={current} />}<WeeklyPointsChart history={history} /><CumulativePointsChart history={history} /><GotwChart history={history} /></div></section>}
-      {tab === 'models' && <section><div className="section-title"><div><h2>Model picks</h2><p>ESPN pregame predictor and normalized no-vig moneyline, equal weighted.</p></div></div><div className="table-scroll"><table><thead><tr><th>Game</th><th>Predictor</th><th>Rank</th><th>Moneyline</th><th>Rank</th><th>Aggregate</th><th>Rank</th><th>Home probabilities P / ML / A</th><th>Disagreement</th></tr></thead><tbody>{games.map((game) => { const fpi = predictor.find((item) => item.gameId === game.id); const ml = moneyline.find((item) => item.gameId === game.id); const pick = aggregate.find((item) => item.gameId === game.id); const disagreement = modelDisagreement(game); return <tr key={game.id}><td><span className="model-matchup"><TeamLogo team={game.away} />{game.away}<span>at</span><TeamLogo team={game.home} />{game.home}</span></td><td><ModelPick pick={fpi} /></td><td>{fpi?.confidence ?? '—'}</td><td><ModelPick pick={ml} /></td><td>{ml?.confidence ?? '—'}</td><td><ModelPick pick={pick} /></td><td>{pick?.confidence ?? '—'}</td><td>{[fpi, ml, pick].map((item) => item ? `${(item.probability * 100).toFixed(1)}%` : '—').join(' / ')}</td><td>{disagreement === null ? 'Missing inputs' : `${(disagreement * 100).toFixed(1)} pts`}</td></tr> })}</tbody></table></div></section>}
+      {tab === 'models' && <section><div className="section-title"><div><h2>Model picks</h2><p>ESPN pregame predictor and normalized no-vig moneyline, equal weighted.</p></div></div><div className="table-scroll"><table><thead><tr><th>Game</th><th>Predictor</th><th>Rank</th><th>Moneyline</th><th>Rank</th><th>Aggregate</th><th>Rank</th><th>Home probabilities P / ML / A</th><th>Disagreement</th></tr></thead><tbody>{games.map((game) => { const fpi = predictor.find((item) => item.gameId === game.id); const ml = moneyline.find((item) => item.gameId === game.id); const pick = aggregate.find((item) => item.gameId === game.id); const disagreement = modelDisagreement(game); return <tr key={game.id}><td><span className="model-matchup"><TeamLogo team={game.away} />{game.away}<span>@</span><TeamLogo team={game.home} />{game.home}</span></td><td><ModelPick pick={fpi} /></td><td>{fpi?.confidence ?? '—'}</td><td><ModelPick pick={ml} /></td><td>{ml?.confidence ?? '—'}</td><td><ModelPick pick={pick} /></td><td>{pick?.confidence ?? '—'}</td><td>{[fpi, ml, pick].map((item) => item ? `${(item.probability * 100).toFixed(1)}%` : '—').join(' / ')}</td><td>{disagreement === null ? 'Missing inputs' : `${(disagreement * 100).toFixed(1)} pts`}</td></tr> })}</tbody></table></div></section>}
+      {tab === 'admin' && isAdmin && <AdminPanel poolKey={poolKey} token={session.access_token} onPicksUpdated={(playerId, picks) => setPicks((all) => ({ ...all, [playerId]: { ...all[playerId], [poolKey]: picks } }))} />}
       {tab === 'rules' && <section className="rules"><h2>Rules</h2><h3>Confidence</h3><p>Use each value from 1 through the number of games exactly once in a completed pool. Locked games keep their values.</p><h3>Scoring</h3><p>A correct pick earns its confidence. Game of the Week adds five. A final tie awards every submitted team pick full points.</p><h3>Live results</h3><p>Official scoring uses finals only. Provisional scoring uses the score leader, then live win probability when tied.</p><h3>Models</h3><p>Predictor, no-vig moneyline, and their equal-weight aggregate receive unique confidence ranks from least to greatest probability separation.</p></section>}
-    </main><footer>{useFixtures ? 'Deterministic test scenario' : 'Live ESPN data'} · <time dateTime={dataState.asOf ?? new Date().toISOString()}>{dataState.asOf ? `Updated ${new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(dataState.asOf))}` : 'Loading'}</time></footer>
+    </main><footer>{useFixtures ? 'Deterministic test scenario' : 'Browser ESPN data'} · <time dateTime={dataState.asOf ?? new Date().toISOString()}>{dataState.asOf ? `Updated ${new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(dataState.asOf))}` : 'Loading'}</time></footer>
   </>
 }

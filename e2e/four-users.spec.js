@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test'
 
+const ONE_PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/a.espncdn.com/**', (route) => route.fulfill({ contentType: 'image/png', body: ONE_PIXEL_PNG }))
+})
+
 test('registers three Week 3 players with isolated persistent picks', async ({ page }, testInfo) => {
   await page.goto('/?scenario=scheduled&pool=preseason-03')
   await page.getByRole('button', { name: 'Set up 3 players' }).click()
@@ -103,18 +109,50 @@ test('overview hides scheduled picks and scores live picks for all four users', 
 })
 
 test('production registration starts a session without email confirmation', async ({ page }) => {
-  await page.route('**/api/auth', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
-  await page.route('**/api/season-data?pool=*', (route) => route.fulfill({ json: { games: [], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], asOf: '2026-08-27T18:00:00Z' } }))
-  await page.route('**/api/picks?pool=*', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
+  const directEspnRequests = []
+  page.on('request', (request) => { if (request.url().includes('cdn.espn.com')) directEspnRequests.push(request.url()) })
+  await page.route('**/cdn.espn.com/**', (route) => route.abort())
+  await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))
+  await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: '2026-08-27T23:00:00Z', away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: '2026-08-27T18:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
   await page.goto('/')
-  await expect(page.getByText('No email confirmation is required.')).toBeVisible()
+  await expect(page.getByText('Email is optional and never required.')).toBeVisible()
+  await page.getByLabel('Username').fill('pat')
   await page.getByLabel('Display name').fill('Pat')
-  await page.getByLabel('Email').fill('pat@example.com')
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
   await expect(page.getByRole('heading', { name: 'Preseason 3' })).toBeVisible()
   await expect(page.locator('.signed-in')).toContainText('Pat')
   await expect(page.getByLabel('Active user')).toHaveCount(0)
+  expect(directEspnRequests.length).toBeGreaterThan(0)
+})
+
+test('admin manages registration and overrides a submitted pick', async ({ page }) => {
+  const session = { access_token: 'admin-access', refresh_token: 'admin-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'admin-user', email: 'admin@accounts.nfl-pickem.invalid' } }
+  await page.addInitScript((value) => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
+  await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => route.fulfill({ json: session }))
+  await page.route('**/cdn.espn.com/**', (route) => route.abort())
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z' }], profiles: [{ id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
+  await page.route('**/rest/v1/rpc/get_admin_data', (route) => route.fulfill({ json: { registrationOpen: true, players: [{ id: 'player-1', name: 'Pat', username: 'pat', contactEmail: null }], games: [{ id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z' }], picks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }] } }))
+  await page.route('**/rest/v1/rpc/set_registration_open', (route) => route.fulfill({ json: { registrationOpen: false } }))
+  await page.route('**/rest/v1/rpc/admin_replace_picks', async (route) => {
+    const body = JSON.parse(route.request().postData())
+    expect(body.p_user_id).toBe('player-1')
+    expect(body.p_picks).toEqual([{ gameId: 'g1', team: 'B', confidence: 1 }])
+    await route.fulfill({ json: { draftRevision: 1, picks: body.p_picks } })
+  })
+  await page.goto('/?pool=week-01')
+  await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
+  await page.getByRole('button', { name: 'Admin' }).click()
+  await expect(page.getByRole('heading', { name: 'Registered players' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Pat', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Stop new registrations' }).click()
+  await expect(page.getByText('NEW REGISTRATIONS STOPPED')).toBeVisible()
+  await page.getByLabel('Pick').selectOption('B')
+  await page.getByRole('button', { name: 'Save override' }).click()
+  await expect(page.getByText('PICK OVERRIDE SAVED')).toBeVisible()
 })
 
 for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 'stale-data', 'validation-error', 'preseason-rehearsal']) {

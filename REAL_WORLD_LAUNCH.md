@@ -1,115 +1,68 @@
-# Real-world preseason launch checklist
+# Real-world launch: GitHub Pages + Supabase Free
 
-Status date: 2026-08-27 (Europe/Berlin)
+The production architecture is a static GitHub Pages frontend backed by the existing Supabase project. Authenticated clients use Supabase Auth and protected RPCs directly. One Supabase Edge Function (`sync-season`) is the only server-side code: it synchronizes the trusted ESPN schedule and scores, preserves pregame snapshots, and leaves the last synchronized slate in place when ESPN is unavailable.
 
-The app is prepared for the 2026 NFL preseason Week 3 slate. The live ESPN diagnostic currently returns all 16 games, and the recorded fallback matches the official NFL schedule. The first game is Pittsburgh at Buffalo at 23:00 UTC on August 27 (01:00 CEST on August 28).
+## Supabase project
 
-Production site: <https://nfl-pickem-2026.netlify.app>.
-
-Completed on 2026-08-27:
-
-- Linked Supabase project `nfl_pickem` in West Europe and applied both migrations.
-- Pushed the production Site URL and disabled email confirmation while preserving MFA/OTP defaults.
-- Configured Netlify's production environment and deployed the site plus all three Functions.
-- Switched the deployment to modern Supabase API keys and disabled the unused legacy JWT keys.
-- Proved hosted registration, all 16 Week 3 games, draft save/reload, and completed Week 1/2 late picks.
-- Removed every temporary smoke account and pick; production ended with zero profiles, drafts, and picks.
-
-## What is already implemented
-
-- Production starts with no example players or picks.
-- The launch migration deletes existing rehearsal drafts and picks.
-- Registration creates an immediately confirmed Supabase user; players do not click an email-confirmation link.
-- Picks are stored per authenticated player in Supabase and autosaved through Netlify Functions.
-- Preseason Weeks 1 and 2 remain editable after kickoff by explicit temporary rule. Week 3 follows normal kickoff locks.
-- Preseason scoring, standings, and model computations run but remain excluded from season totals.
-- Loading a pool synchronizes its real ESPN schedule into Supabase; cached database games remain available if ESPN is temporarily unavailable.
-
-## 1. Supabase project
-
-1. Sign in or create a hosted project at <https://supabase.com/dashboard>.
-2. Copy the project reference, project URL, publishable key, and secret key from Project Settings > API. Never expose the secret key in Vite/client variables or commit it.
-3. Authenticate and link this checkout:
+1. Link the checkout and apply migrations:
 
    ```powershell
    npx.cmd supabase login
    npx.cmd supabase link --project-ref YOUR_PROJECT_REF
+   $env:SUPABASE_PROJECT_URL = "https://YOUR_PROJECT.supabase.co"
+   $env:SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLIC_PUBLISHABLE_KEY"
+   $env:APP_CRON_SECRET = "RANDOM_LONG_CRON_SECRET"
+   npx.cmd supabase config push --project-ref YOUR_PROJECT_REF
    npx.cmd supabase db push
    ```
 
-4. In Authentication > Providers > Email, enable Email and turn off Confirm email. The server already creates registrations with `email_confirm: true`; this dashboard setting keeps any future direct sign-up flow consistent.
-5. In Authentication > URL Configuration, set the Site URL to the final Netlify production URL after the first deploy.
-6. Confirm the migration results in SQL Editor:
+2. In Authentication > Providers > Email, keep Email enabled and Confirm email disabled. This preserves immediate registration without a confirmation step.
+3. In Authentication > URL Configuration, set the Site URL to `https://throne-of-ease.github.io/nfl_pickem/` and allow the local development URLs listed in `supabase/config.toml`.
+4. Create these Edge Function secrets in the Supabase dashboard or CLI. Do not put them in Vite variables:
 
-   ```sql
-   select key, espn_week, accepts_late_picks from public.pools
-   where key like 'preseason-%' order by espn_week;
+   - `APP_SUPABASE_PUBLISHABLE_KEY`
+   - `APP_SUPABASE_SECRET_KEY`
+   - `APP_CRON_SECRET`
+   - `APP_ALLOWED_ORIGIN=https://throne-of-ease.github.io`
 
-   select count(*) as picks_after_launch_reset from public.picks;
-   ```
+5. The `db.vault` entries in `supabase/config.toml` populate the three Vault secrets used by the cron migration (`project_url`, `publishable_key`, `cron_secret`) when `supabase db push` runs. The migration schedules `sync-nfl-season-every-five-minutes` through `pg_cron` and `pg_net`.
 
-   Expected: only `preseason-01` and `preseason-02` have `accepts_late_picks = true`, and the pick count is zero before real registrations begin.
+## GitHub repository
 
-## 2. Netlify site
+1. Enable Settings > Pages > Source: GitHub Actions.
+2. Add repository variables:
 
-1. Authenticate the CLI:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_PROJECT_REF`
 
-   ```powershell
-   npx.cmd netlify-cli login
-   ```
+3. Add the personal Supabase access token as the repository secret `SUPABASE_ACCESS_TOKEN`.
+4. Push to the repository default branch (`feat/compact-pick-sheet`) or `main`. `.github/workflows/deploy.yml` runs the tests, builds with the `/nfl_pickem/` base path, deploys Edge Functions, then publishes `dist` to Pages.
 
-2. The linked site is `nfl-pickem-2026`. Connect GitHub repository `throne-of-ease/nfl_pickem` and select its default branch for continuous deployment. This repository's `netlify.toml` already sets `npm run build`, `dist`, Functions, API redirects, and SPA fallback.
-3. Add these environment variables in Netlify Site configuration > Environment variables (all scopes):
+## Verification
 
-   - `SUPABASE_URL`
-   - `SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SECRET_KEY`
-
-   On this Free-plan team, granular function-only secret scopes are unavailable. The deployed values therefore use the production context and default scopes. They are not bundled into the browser because they have no `VITE_` prefix, but Netlify account members can read them. Upgrade the site and convert `SUPABASE_SECRET_KEY` to a function-only secret if stricter account-level concealment is required.
-
-4. Link this checkout and deploy:
-
-   ```powershell
-   npx.cmd netlify-cli link
-   npx.cmd netlify-cli deploy --build --prod
-   ```
-
-5. Copy the production URL back to Supabase Authentication > URL Configuration as the Site URL.
-
-## 3. Pre-launch verification
-
-Run locally before deployment:
+Run locally:
 
 ```powershell
-npm.cmd test
+npm.cmd test -- --pool=forks --maxWorkers=1
 npm.cmd run build
 npm.cmd run test:e2e
-npm.cmd run dev:preseason:live
 ```
 
-Then verify the deployed URL in a private browser window:
+Then verify the deployed URL with four temporary accounts:
 
-1. Register a new player and confirm the app opens immediately without an email-confirmation step.
-2. Select Preseason 1 and Preseason 2; confirm the late-pick notice appears and team choices are enabled.
-3. Select Preseason 3; confirm 16 games appear with Pittsburgh at Buffalo first and Chicago at Tennessee last.
-4. Make a Week 3 team pick, change its confidence, refresh, and confirm both persist.
-5. Register a second player in another private browser; confirm the first player's future picks are hidden until kickoff and the two drafts remain independent.
-6. After kickoff, confirm the game locks, picks become visible, live scoring updates, and preseason totals do not enter season charts.
-7. In Netlify Function logs, confirm `auth`, `season-data`, and `picks` return successful responses without secret keys appearing in logs.
+1. Register and sign in without email confirmation.
+2. Switch through all pools and confirm the first empty pool performs one initialization sync.
+3. Give each user different teams and confidence values; refresh and confirm drafts remain isolated.
+4. Confirm locked games cannot change, late preseason weeks remain editable, and future picks stay hidden until kickoff.
+5. Verify live/final scores, standings, models, charts, drag/drop confidence, and mobile layout.
+6. In browser developer tools, confirm normal loading uses Supabase Auth/RPC endpoints and does not call ESPN directly.
+7. Check Supabase Usage and Edge Function logs. A five-minute global cron is at most 8,640 invocations per month; Free includes 500,000.
+8. Delete all temporary test users and picks.
 
-## 4. Operational checks during games
+## Rollback and operations
 
-- Open the app shortly before every kickoff; `season-data` refreshes ESPN and persists the latest schedule/scores.
-- If ESPN is unavailable, do not reset Supabase: the function serves the last synchronized slate.
-- Watch Netlify Function errors and Supabase database/auth logs.
-- Keep `preseason-01` and `preseason-02` late picks open only for this test. Before regular-season launch, run:
-
-  ```sql
-  update public.pools set accepts_late_picks = false;
-  ```
-
-## 5. Rollback
-
-- Roll back the site from Netlify Deploys by publishing the previous successful deploy.
-- Do not rerun the launch-reset migration after real picks exist; it intentionally clears all drafts and picks.
-- Database migrations should be corrected with a new forward migration, never by editing production history.
+- Keep the last Netlify deployment available until the Pages smoke test is complete; publish it again only as an emergency rollback.
+- Do not rerun the launch-reset migration after real picks exist.
+- If ESPN fails, leave Supabase data untouched; the sync function returns the last good slate.
+- Free projects can be paused after seven days of low activity outside the season. Resume the project from Supabase Studio when needed.

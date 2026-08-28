@@ -39,4 +39,16 @@ describe('ESPN fixture ingestion', () => {
     expect(addPregameData(normalizeScoreboard(scoreboard)[0], { gamepackageJSON: { predictor: { homeTeam: { gameProjection: null } } } })).toMatchObject({ predictorHome: null, homeMoneyline: null, awayMoneyline: null })
     await expect(fetchEspnPool(pool, { fetcher })).resolves.toMatchObject({ games: [{ id: '401', away: 'LV', home: 'HOU', status: 'final', predictorHome: .5257 }] })
   })
+
+  it('preserves live clock, period, detail, and supplied game quality', () => {
+    const [game] = normalizeScoreboard({ content: { sbData: { events: [{
+      id: '402', date: '2026-08-28T18:00Z', matchupQuality: 82.1,
+      status: { period: 2, displayClock: '07:42', type: { state: 'in', shortDetail: '2nd 07:42' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', score: '14', team: { abbreviation: 'BUF' } },
+        { homeAway: 'away', score: '10', team: { abbreviation: 'PIT' } },
+      ] }],
+    }] } } })
+    expect(game).toMatchObject({ status: 'live', period: 2, displayClock: '07:42', statusDetail: '2nd 07:42', matchupQuality: 82.1 })
+  })
 })
