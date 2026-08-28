@@ -59,10 +59,14 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Deploy Edge Functions
+      - name: Apply database migrations
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$PROJECT_ID"
+          supabase link --project-ref "$PROJECT_ID"
+          supabase db push --linked --yes
+      - name: Deploy Edge Functions
+        run: |
           supabase functions deploy --use-api --project-ref "$PROJECT_ID"
 
   deploy-pages:

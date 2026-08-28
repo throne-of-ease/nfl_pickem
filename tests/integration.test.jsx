@@ -83,16 +83,17 @@ describe('four-user application flow', () => {
     expect(within(screen.getByLabelText('Game of the Week display mode')).getAllByRole('option')).toHaveLength(3)
   })
 
-  it('keeps rehearsal clearly labeled and season charts separate', async () => {
+  it('includes rehearsal results in the season charts', async () => {
     const user = userEvent.setup()
     history.replaceState({}, '', '/?pool=preseason-01')
     render(<App />)
     expect(screen.getAllByText('Rehearsal — does not count.').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Charts' }))
-    expect(screen.getByText(/Rehearsal results are excluded/)).toBeInTheDocument()
-    expect(screen.getByText(/Rehearsal points never enter season analytics/)).toBeInTheDocument()
-    expect(screen.queryByText('Current week')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('img')).toHaveLength(3)
+    expect(screen.getByText(/Preseason, regular season, and postseason results/)).toBeInTheDocument()
+    expect(screen.getByText(/Includes preseason/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Current week' })).toBeInTheDocument()
+    expect(screen.getAllByText('HOF').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('img')).toHaveLength(4)
   })
 
   it('keeps completed preseason Weeks 1 and 2 open for late picks', async () => {

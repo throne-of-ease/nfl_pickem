@@ -52,7 +52,8 @@ describe('models', () => {
     expect(modelDisagreement(games[2])).toBeNull()
   })
 
-  it('keeps GQ unavailable when ESPN does not provide it', () => {
+  it('computes GQ from the two current FPI ratings', () => {
+    expect(gameQuality({ homeFpi: 4.2, awayFpi: 1.8, matchupQuality: 99 })).toBe(3)
     expect(gameQuality({ matchupQuality: 87.4 })).toBe(87.4)
     expect(gameQuality({ predictorHome: .6 })).toBeNull()
   })

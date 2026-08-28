@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addPregameData, applyLiveSample, fetchEspnPool, ingestEspnResponse, normalizeEvent, normalizeScoreboard } from '../src/espnAdapter.js'
+import { addPregameData, applyFpiRatings, applyLiveSample, fetchEspnPool, ingestEspnResponse, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
   it.each([['pre','scheduled'],['in','live'],['post','final']])('normalizes %s to %s', (input, expected) => {
@@ -50,5 +50,13 @@ describe('ESPN fixture ingestion', () => {
       ] }],
     }] } } })
     expect(game).toMatchObject({ status: 'live', period: 2, displayClock: '07:42', statusDetail: '2nd 07:42', matchupQuality: 82.1 })
+  })
+
+  it('uses the current ESPN FPI value for each team and averages them for GQ', () => {
+    const ratings = normalizeFpiRatings({ teams: [
+      { team: { abbreviation: 'BUF' }, categories: [{ name: 'fpi', values: [4.2] }] },
+      { team: { abbreviation: 'PIT' }, categories: [{ name: 'fpi', values: [1.8] }] },
+    ] })
+    expect(applyFpiRatings([{ id: 'g1', away: 'PIT', home: 'BUF', matchupQuality: 90 }], ratings)[0]).toMatchObject({ homeFpi: 4.2, awayFpi: 1.8, matchupQuality: 3 })
   })
 })

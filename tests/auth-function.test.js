@@ -71,7 +71,7 @@ describe('direct Supabase authentication', () => {
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ content: { sbData: { events: [{ id: 'g1', date: '2025-09-01T00:00:00Z', status: { type: { state: 'post' } }, competitions: [{ competitors: [{ homeAway: 'away', team: { abbreviation: 'A' }, score: '7' }, { homeAway: 'home', team: { abbreviation: 'B' }, score: '3' }] }] }] } } }) }))
     await refreshEspnPool('week-01', { fetcher })
     await refreshEspnPool('week-01', { fetcher })
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcher).toHaveBeenCalledTimes(3)
     expect(fetcher.mock.calls.every(([url]) => !url.includes('/functions/v1/sync-season'))).toBe(true)
   })
 })

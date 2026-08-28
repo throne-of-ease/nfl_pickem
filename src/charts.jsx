@@ -150,7 +150,7 @@ export function WeeklyPointsChart({ history }) {
 
 export function CumulativePointsChart({ history }) {
   const series = cumulativeChartSeries(history)
-  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: best remaining gap. Rehearsal pools are excluded." table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={series.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" /></ChartFrame>
+  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: best remaining gap. Includes preseason." table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={series.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" /></ChartFrame>
 }
 
 export function GotwChart({ history }) {

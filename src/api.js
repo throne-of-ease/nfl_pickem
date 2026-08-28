@@ -2,7 +2,7 @@ import { POOLS } from './domain.js'
 import { fetchEspnPool } from './espnAdapter.js'
 
 const SESSION_KEY = 'nfl-pickem-session-v1'
-const ESPN_CACHE_KEY = 'nfl-pickem-espn-cache-v1'
+const ESPN_CACHE_KEY = 'nfl-pickem-espn-cache-v2'
 
 const configuration = () => ({
   url: import.meta.env.VITE_SUPABASE_URL || globalThis.__NFL_SUPABASE_URL || '',
@@ -98,6 +98,8 @@ const mapSeason = (season, draft) => {
     statusDetail: game.status_detail ?? null,
     gotw: game.gotw,
     locked: Boolean(game.locked_at),
+    homeFpi: game.home_fpi ?? null,
+    awayFpi: game.away_fpi ?? null,
     predictorHome: game.predictor_home,
     homeMoneyline: game.home_moneyline,
     awayMoneyline: game.away_moneyline,
@@ -156,7 +158,7 @@ export async function loadPool(poolKey, token, { forceRefresh = false, fetchEspn
 
 export const savePicks = (poolKey, token, expectedDraftRevision, picks) => request('/rest/v1/rpc/replace_picks', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey, p_expected_revision: expectedDraftRevision, p_picks: picks }) })
 
-const mapGame = (game) => ({ id: game.id, poolKey: game.pool_key, kickoff: game.kickoff, away: game.away_team, home: game.home_team, status: game.status, awayScore: game.away_score ?? 0, homeScore: game.home_score ?? 0, period: game.period ?? null, displayClock: game.display_clock ?? null, statusDetail: game.status_detail ?? null, gotw: Boolean(game.gotw), locked: Boolean(game.locked_at), predictorHome: game.predictor_home, homeMoneyline: game.home_moneyline, awayMoneyline: game.away_moneyline, matchupQuality: game.matchup_quality ?? null })
+const mapGame = (game) => ({ id: game.id, poolKey: game.pool_key, kickoff: game.kickoff, away: game.away_team, home: game.home_team, status: game.status, awayScore: game.away_score ?? 0, homeScore: game.home_score ?? 0, period: game.period ?? null, displayClock: game.display_clock ?? null, statusDetail: game.status_detail ?? null, gotw: Boolean(game.gotw), locked: Boolean(game.locked_at), homeFpi: game.home_fpi ?? null, awayFpi: game.away_fpi ?? null, predictorHome: game.predictor_home, homeMoneyline: game.home_moneyline, awayMoneyline: game.away_moneyline, matchupQuality: game.matchup_quality ?? null })
 
 export async function loadAdminData(poolKey, token) {
   const data = await request('/rest/v1/rpc/get_admin_data', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey }) })
@@ -166,6 +168,29 @@ export async function loadAdminData(poolKey, token) {
   return { ...data, players, games: (data?.games ?? []).map(mapGame), picksByUser }
 }
 
+export async function loadAdminGotwData(token) {
+  const data = await request('/rest/v1/rpc/get_admin_gotw_data', { method: 'POST', headers: bearer(token), body: '{}' })
+  return { games: (data?.games ?? []).map(mapGame) }
+}
+
+export const deleteAdminPlayer = (token, userId) => request('/rest/v1/rpc/admin_delete_player', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId }) })
+
 export const setRegistrationOpen = (token, registrationOpen) => request('/rest/v1/rpc/set_registration_open', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_open: registrationOpen }) })
 
 export const saveAdminPicks = (poolKey, token, userId, picks) => request('/rest/v1/rpc/admin_replace_picks', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId, p_pool_key: poolKey, p_picks: picks }) })
+
+export const setGameOfWeek = (token, poolKey, gameId) => request('/rest/v1/rpc/set_game_of_week', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey, p_game_id: gameId || null }) })
+
+export async function loadChartData(token) {
+  const data = await request('/rest/v1/rpc/get_chart_data', { method: 'POST', headers: bearer(token), body: '{}' })
+  const users = data?.profiles ?? []
+  const gamesByPool = {}
+  for (const game of data?.games ?? []) (gamesByPool[game.pool_key] ??= []).push(mapGame(game))
+  const picksByUser = Object.fromEntries(users.map((user) => [user.id, {}]))
+  for (const pick of data?.revealedPicks ?? []) {
+    const userPicks = (picksByUser[pick.userId] ??= {})
+    if (!userPicks[pick.poolKey]) userPicks[pick.poolKey] = []
+    userPicks[pick.poolKey].push({ gameId: pick.gameId, team: pick.team, confidence: pick.confidence })
+  }
+  return { users, gamesByPool, picksByUser }
+}

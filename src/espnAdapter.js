@@ -3,6 +3,7 @@ import { freezePregameSnapshot } from './domain.js'
 const STATUS = { pre: 'scheduled', in: 'live', post: 'final', scheduled: 'scheduled', live: 'live', final: 'final' }
 const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
 const GAME = 'https://cdn.espn.com/core/nfl/game?xhr=1'
+const FPI = 'https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex'
 
 const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
 
@@ -73,12 +74,44 @@ export function addPregameData(game, payload) {
   }
 }
 
+export function normalizeFpiRatings(payload) {
+  const ratings = new Map()
+  for (const entry of payload?.teams ?? []) {
+    const abbreviation = entry?.team?.abbreviation
+    const fpi = finite(entry?.categories?.find((category) => category.name === 'fpi')?.values?.[0])
+    if (abbreviation && Number.isFinite(fpi)) ratings.set(abbreviation, fpi)
+  }
+  return ratings
+}
+
+export function applyFpiRatings(games, ratings, asOf = null) {
+  return games.map((game) => {
+    const homeFpi = ratings.get(game.home) ?? null
+    const awayFpi = ratings.get(game.away) ?? null
+    return {
+      ...game,
+      homeFpi,
+      awayFpi,
+      matchupQuality: Number.isFinite(homeFpi) && Number.isFinite(awayFpi) ? (homeFpi + awayFpi) / 2 : game.matchupQuality ?? null,
+      fpiAsOf: asOf,
+    }
+  })
+}
+
+export async function fetchFpiRatings({ fetcher = fetch, season = new Date().getUTCFullYear(), signal } = {}) {
+  const response = await fetcher(`${FPI}?season=${encodeURIComponent(season)}`, { signal })
+  if (!response.ok) throw new Error(`ESPN FPI HTTP ${response.status}`)
+  const payload = await response.json()
+  return { ratings: normalizeFpiRatings(payload), asOf: payload?.lastUpdated ?? new Date().toISOString() }
+}
+
 export async function fetchEspnPool(pool, { fetcher = fetch, signal } = {}) {
   const query = `&dates=${pool.espnSeason}&seasontype=${pool.espnSeasonType}&week=${pool.espnWeek}`
   const scoreboardResponse = await fetcher(`${SCOREBOARD}${query}`, { signal })
   if (!scoreboardResponse.ok) throw new Error(`ESPN scoreboard HTTP ${scoreboardResponse.status}`)
   const games = normalizeScoreboard(await scoreboardResponse.json())
   if (!games.length) return { games: [], asOf: new Date().toISOString(), source: 'ESPN' }
+  const fpiPromise = fetchFpiRatings({ fetcher, season: pool.espnSeason, signal }).catch(() => null)
   const enriched = await Promise.all(games.map(async (game) => {
     try {
       const response = await fetcher(`${GAME}&gameId=${game.id}`, { signal })
@@ -88,7 +121,8 @@ export async function fetchEspnPool(pool, { fetcher = fetch, signal } = {}) {
       return game
     }
   }))
-  return { games: enriched, asOf: new Date().toISOString(), source: 'ESPN' }
+  const fpi = await fpiPromise
+  return { games: fpi ? applyFpiRatings(enriched, fpi.ratings, fpi.asOf) : enriched, asOf: new Date().toISOString(), source: 'ESPN', fpiAsOf: fpi?.asOf ?? null }
 }
 
 export function ingestEspnResponse(payload, previous = [], receivedAt = new Date()) {

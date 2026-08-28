@@ -57,7 +57,10 @@ export const modelDisagreement = (game) => {
   return Number.isFinite(game.predictorHome) && Number.isFinite(ml) ? Math.abs(game.predictorHome - ml) : null
 }
 
-export const gameQuality = (game) => Number.isFinite(game?.matchupQuality) ? game.matchupQuality : null
+export const gameQuality = (game) => {
+  if (Number.isFinite(game?.homeFpi) && Number.isFinite(game?.awayFpi)) return (game.homeFpi + game.awayFpi) / 2
+  return Number.isFinite(game?.matchupQuality) ? game.matchupQuality : null
+}
 
 export function pickDeviation(game, picksByUser) {
   const picks = Object.values(picksByUser ?? {}).flatMap((userPicks) => {
@@ -151,12 +154,14 @@ export function standings(users, games, picksByUser, provisional = false) {
     .sort((a, b) => b.points - a.points || b.potential - a.potential || a.name.localeCompare(b.name))
 }
 
-export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional = false, throughPoolKey = null) {
-  const seasonPools = POOLS.filter((pool) => pool.countsTowardSeason && gamesByPool[pool.key])
+export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional = false, throughPoolKey = null, includePreseason = false) {
+  const seasonPools = POOLS.filter((pool) => (pool.countsTowardSeason || includePreseason && pool.phase === 'preseason') && gamesByPool[pool.key])
   const selectedIndex = seasonPools.findIndex((pool) => pool.key === throughPoolKey)
   const lastPlayedIndex = seasonPools.reduce((last, pool, index) => gamesByPool[pool.key].some((game) => game.status !== 'scheduled') ? index : last, 0)
   const includedPools = seasonPools.slice(0, (selectedIndex >= 0 ? selectedIndex : lastPlayedIndex) + 1)
-  const labels = includedPools.map((pool) => pool.phase === 'regular' ? `W${pool.espnWeek}` : ({ 'wild-card': 'WC', divisional: 'DIV', conference: 'CONF', 'super-bowl': 'SB' })[pool.key])
+  const labels = includedPools.map((pool) => pool.phase === 'preseason'
+    ? pool.key === 'preseason-hof' ? 'HOF' : `P${pool.espnWeek - 1}`
+    : pool.phase === 'regular' ? `W${pool.espnWeek}` : ({ 'wild-card': 'WC', divisional: 'DIV', conference: 'CONF', 'super-bowl': 'SB' })[pool.key])
   const rows = Object.fromEntries(users.map((user) => [user.id, includedPools.map((pool) => {
     const games = gamesByPool[pool.key]
     const picks = picksByUser[user.id]?.[pool.key] ?? []
