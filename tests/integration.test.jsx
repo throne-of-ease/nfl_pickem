@@ -41,6 +41,8 @@ describe('four-user application flow', () => {
     expect(screen.getByRole('columnheader', { name: 'Dev' })).toBeInTheDocument()
     expect(screen.getByText(/ESPN WP 32%.*68%/)).toBeInTheDocument()
     expect(screen.getByText(/Q3 · 04:12/)).toBeInTheDocument()
+    expect(document.querySelectorAll('.overview-table tr.live')).toHaveLength(1)
+    expect(document.querySelectorAll('.overview-table .live-badge')).toHaveLength(1)
     await user.click(screen.getByTestId('overview-sort-gq'))
     const rows = screen.getAllByTestId(/overview-row-/)
     expect(rows[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g2')
@@ -56,6 +58,7 @@ describe('four-user application flow', () => {
     await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
     expect(screen.getAllByTitle('ESPN real-time win probability')).toHaveLength(2)
     expect(screen.getAllByTitle('ESPN real-time win probability').map((item) => item.textContent)).toEqual(['32%', '68%'])
+    expect(document.querySelectorAll('.game.live .live-badge')).toHaveLength(1)
   })
 
   it('shows scheduled kickoff in Central European time in the score column', () => {

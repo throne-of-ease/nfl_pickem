@@ -25,7 +25,7 @@ The production architecture is a static GitHub Pages frontend backed by the exis
    - `APP_CRON_SECRET`
    - `APP_ALLOWED_ORIGIN=https://throne-of-ease.github.io`
 
-5. The existing `sync-season` Edge Function remains available for explicit schedule/admin operations. Migration `202608290001_disable_live_score_cron.sql` removes the old five-minute score synchronization job; live refreshes do not write to Supabase.
+5. The existing `sync-season` Edge Function remains available for explicit schedule/admin operations. Migration `202608290001_disable_live_score_cron.sql` removes the old five-minute score synchronization job; its payload strips live score state, and live refreshes do not write to Supabase.
 
 ## GitHub repository
 
@@ -58,7 +58,8 @@ Then verify the deployed URL with four temporary accounts:
 5. Verify live/final scores, standings, models, charts, drag/drop confidence, and mobile layout.
 6. In browser developer tools, confirm the initial load uses Supabase Auth/RPC endpoints for account/picks data and ESPN CDN scoreboard/game endpoints for the selected week and live updates.
 7. Confirm pressing Refresh increases ESPN requests without another Supabase season-data request, and that live score/probability changes appear in the rendered page.
-8. Delete all temporary test users and picks.
+8. Confirm an explicit `sync-season` call does not write `status=live`, `away_score`, or `home_score`; only final results may be persisted for historical fallback.
+9. Delete all temporary test users and picks.
 
 ## Rollback and operations
 

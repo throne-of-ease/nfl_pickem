@@ -148,11 +148,12 @@ test('iPhone 12 Pro overview fits the compact 16-game table', async ({ page }, t
 
 test('production registration starts a session without email confirmation', async ({ page }) => {
   const directEspnRequests = []
+  const currentKickoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
   page.on('request', (request) => { if (request.url().includes('cdn.espn.com')) directEspnRequests.push(request.url()) })
   await page.route('**/cdn.espn.com/**', (route) => route.abort())
   await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))
   await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
-  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: '2026-08-27T23:00:00Z', away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: '2026-08-27T18:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } }))
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
   await page.goto('/')
   await expect(page.getByText('Email is optional and never required.')).toBeVisible()
@@ -170,8 +171,9 @@ test('production registration starts a session without email confirmation', asyn
 test('live refresh reads ESPN directly without repeating the Supabase season request', async ({ page }) => {
   let seasonRequests = 0
   let scoreboardRequests = 0
+  const currentKickoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
   const scoreboard = { content: { sbData: { events: [{
-    id: 'g1', date: '2026-08-27T23:00:00Z', status: { period: 2, displayClock: '09:00', type: { state: 'in', shortDetail: '2nd 09:00' } },
+    id: 'g1', date: currentKickoff, status: { period: 2, displayClock: '09:00', type: { state: 'in', shortDetail: '2nd 09:00' } },
     competitions: [{ competitors: [
       { homeAway: 'home', score: '14', team: { abbreviation: 'BUF' } },
       { homeAway: 'away', score: '10', team: { abbreviation: 'PIT' } },
@@ -180,7 +182,7 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   const summary = { gamepackageJSON: { winprobability: [{ homeWinPercentage: .46 }, { homeWinPercentage: .72 }], pickcenter: [{ homeTeamOdds: { moneyLine: -150 }, awayTeamOdds: { moneyLine: 130 } }] } }
   await page.route('**/rest/v1/rpc/get_season_data', async (route) => {
     seasonRequests += 1
-    await route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: '2026-08-27T23:00:00Z', away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: '2026-08-27T18:00:00Z' } })
+    await route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } })
   })
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
   await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))

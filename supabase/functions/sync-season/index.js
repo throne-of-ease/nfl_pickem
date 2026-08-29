@@ -67,10 +67,11 @@ async function syncPool(pool) {
   const { games } = await fetchEspnPool(pool, { signal: AbortSignal.timeout(12000) })
   if (!games.length) return { key: pool.key, games: 0, skipped: true }
 
-  const existing = await supabase(`games?pool_key=eq.${encodeURIComponent(pool.key)}&select=id,locked_at,pregame_snapshot,gotw`, { service: true })
+  const existing = await supabase(`games?pool_key=eq.${encodeURIComponent(pool.key)}&select=id,status,away_score,home_score,locked_at,pregame_snapshot,gotw`, { service: true })
   const previous = new Map((existing ?? []).map((game) => [game.id, game]))
   const payload = games.map((game) => {
     const old = previous.get(game.id)
+    const final = game.status === 'final' || old?.status === 'final'
     const hasStarted = game.status !== 'scheduled' || new Date(game.kickoff) <= receivedAt
     return {
       id: game.id,
@@ -78,12 +79,14 @@ async function syncPool(pool) {
       kickoff: game.kickoff,
       away_team: game.away,
       home_team: game.home,
-      status: game.status,
-      away_score: game.awayScore,
-      home_score: game.homeScore,
-      period: game.period,
-      display_clock: game.displayClock,
-      status_detail: game.statusDetail,
+      // Live score state is a browser concern. Keep only final results in the
+      // database so an explicit schedule sync cannot become a live-score poll.
+      status: final ? 'final' : 'scheduled',
+      away_score: game.status === 'final' ? game.awayScore ?? old?.away_score ?? null : old?.status === 'final' ? old.away_score ?? null : null,
+      home_score: game.status === 'final' ? game.homeScore ?? old?.home_score ?? null : old?.status === 'final' ? old.home_score ?? null : null,
+      period: game.status === 'final' ? game.period : null,
+      display_clock: game.status === 'final' ? game.displayClock : null,
+      status_detail: game.status === 'final' ? game.statusDetail : null,
       matchup_quality: game.matchupQuality,
       gotw: Boolean(old?.gotw || game.gotw),
       locked_at: old?.locked_at ?? (hasStarted ? receivedAt.toISOString() : null),

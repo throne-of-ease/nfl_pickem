@@ -119,14 +119,30 @@ const writeEspnCache = (poolKey, value) => {
   try { localStorage.setItem(`${ESPN_CACHE_KEY}:${poolKey}`, JSON.stringify(value)) } catch { /* cache is an optimization */ }
 }
 
-const currentPool = (games) => games.some((game) => game.status === 'live' || game.status === 'in' || Math.abs(new Date(game.kickoff).valueOf() - Date.now()) < 48 * 3600000)
+const CURRENT_POOL_PADDING = 36 * 60 * 60 * 1000
 
-export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGames = [], fetcher = fetch, signal, includeFpi = true } = {}) {
-  const cached = readEspnCache(poolKey)
-  const maxAge = currentPool([...serverGames, ...(cached?.games ?? [])]) ? 2 * 60 * 1000 : 24 * 60 * 60 * 1000
-  if (!forceRefresh && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true }
+export function isCurrentPool(games = [], now = Date.now()) {
+  const kickoffs = games.map((game) => Date.parse(game.kickoff)).filter(Number.isFinite)
+  if (!kickoffs.length) return false
+  return now >= Math.min(...kickoffs) - CURRENT_POOL_PADDING && now <= Math.max(...kickoffs) + CURRENT_POOL_PADDING
+}
+
+export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGames = [], serverAsOf = null, currentWeek = null, fetcher = fetch, signal, includeFpi = true } = {}) {
   const pool = POOLS.find((item) => item.key === poolKey)
   if (!pool) throw apiError('UNKNOWN_POOL', 404)
+  const cached = readEspnCache(poolKey)
+  const current = currentWeek ?? isCurrentPool([...serverGames, ...(cached?.games ?? [])])
+  if (!current) {
+    if (cached?.games?.length) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'historical' }
+    if (serverGames.length) {
+      const value = { games: serverGames, asOf: serverAsOf ?? new Date().toISOString(), source: 'Supabase schedule cache', cached: true, freshness: 'cached', cacheScope: 'historical' }
+      writeEspnCache(poolKey, value)
+      return value
+    }
+    return { games: [], asOf: serverAsOf ?? new Date().toISOString(), source: 'historical cache miss', cached: true, freshness: 'cached', cacheScope: 'historical' }
+  }
+  const maxAge = 2 * 60 * 1000
+  if (!forceRefresh && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'current' }
   const fresh = await fetchEspnPool(pool, { fetcher, signal, includeFpi })
   const value = { ...fresh, cached: false }
   writeEspnCache(poolKey, value)
@@ -140,8 +156,9 @@ const mergeGames = (serverGames, espnGames) => {
   return [...merged, ...espnGames.filter((game) => !known.has(game.id))]
 }
 
-export async function refreshLivePool(poolKey, previousGames = [], { signal, fetcher = fetch } = {}) {
-  const espn = await refreshEspnPool(poolKey, { forceRefresh: true, serverGames: previousGames, fetcher, signal, includeFpi: false })
+export async function refreshLivePool(poolKey, previousGames = [], { currentWeek = null, signal, fetcher = fetch } = {}) {
+  const current = currentWeek ?? isCurrentPool(previousGames)
+  const espn = await refreshEspnPool(poolKey, { forceRefresh: current, currentWeek: current, serverGames: previousGames, fetcher, signal, includeFpi: false })
   return { ...espn, games: mergeGames(previousGames, espn.games), asOf: espn.asOf, espnAsOf: espn.asOf }
 }
 
@@ -154,7 +171,7 @@ export async function loadPool(poolKey, token, { forceRefresh = false, fetchEspn
   const mapped = mapSeason(season, draft)
   if (!fetchEspn) return mapped
   try {
-    const espn = await refreshEspnPool(poolKey, { forceRefresh, serverGames: mapped.games, signal })
+    const espn = await refreshEspnPool(poolKey, { forceRefresh, serverGames: mapped.games, serverAsOf: mapped.asOf, signal })
     return { ...mapped, games: mergeGames(mapped.games, espn.games), asOf: espn.asOf, espnAsOf: espn.asOf, espnCached: espn.cached, espnSource: espn.source }
   } catch {
     return mapped

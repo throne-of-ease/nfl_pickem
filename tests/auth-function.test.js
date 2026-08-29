@@ -69,9 +69,10 @@ describe('direct Supabase authentication', () => {
     globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
     globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ content: { sbData: { events: [{ id: 'g1', date: '2025-09-01T00:00:00Z', status: { type: { state: 'post' } }, competitions: [{ competitors: [{ homeAway: 'away', team: { abbreviation: 'A' }, score: '7' }, { homeAway: 'home', team: { abbreviation: 'B' }, score: '3' }] }] }] } } }) }))
-    await refreshEspnPool('week-01', { fetcher })
-    await refreshEspnPool('week-01', { fetcher })
-    expect(fetcher).toHaveBeenCalledTimes(3)
+    const serverGames = [{ id: 'g1', kickoff: '2025-09-01T00:00:00Z', status: 'final', away: 'A', home: 'B', awayScore: 7, homeScore: 3 }]
+    await refreshEspnPool('week-01', { serverGames, serverAsOf: '2025-09-02T00:00:00Z', fetcher })
+    await refreshEspnPool('week-01', { serverGames, forceRefresh: true, fetcher })
+    expect(fetcher).not.toHaveBeenCalled()
     expect(fetcher.mock.calls.every(([url]) => !url.includes('/functions/v1/sync-season'))).toBe(true)
   })
 })
