@@ -6,6 +6,11 @@ const GAME = 'https://cdn.espn.com/core/nfl/game?xhr=1'
 const FPI = 'https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex'
 
 const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
+const probability = (value) => {
+  const number = finite(value)
+  return number === null ? null : number > 1 ? number / 100 : number
+}
+const cacheBusted = (url) => `${url}&_nfl_pickem=${Date.now()}`
 
 export function normalizeEvent(event) {
   const id = String(event?.id ?? '')
@@ -61,15 +66,17 @@ export function addPregameData(game, payload) {
   const odds = data.pickcenter?.find((item) => finite(item?.homeTeamOdds?.moneyLine) !== null && finite(item?.awayTeamOdds?.moneyLine) !== null)
   const projection = finite(data.predictor?.homeTeam?.gameProjection)
   const probabilities = Array.isArray(data.winprobability) ? data.winprobability : []
-  const initial = finite(probabilities[0]?.homeWinPercentage)
-  const latest = finite(probabilities.at(-1)?.homeWinPercentage)
+  const initial = probability(probabilities[0]?.homeWinPercentage)
+  const latest = probability(probabilities.at(-1)?.homeWinPercentage)
+  const pregameProbability = projection === null ? initial : probability(projection)
   return {
     ...game,
-    predictorHome: projection === null ? initial : projection / 100,
+    predictorHome: pregameProbability,
     homeMoneyline: finite(odds?.homeTeamOdds?.moneyLine),
     awayMoneyline: finite(odds?.awayTeamOdds?.moneyLine),
     matchupQuality: finite(data.matchupQuality ?? data.game?.matchupQuality ?? game.matchupQuality),
     homeWinProbability: game.status === 'live' ? latest : null,
+    awayWinProbability: game.status === 'live' && latest !== null ? 1 - latest : null,
     pregameSource: projection === null ? initial === null ? null : 'ESPN opening win probability' : 'ESPN Matchup Predictor',
   }
 }
@@ -99,22 +106,22 @@ export function applyFpiRatings(games, ratings, asOf = null) {
 }
 
 export async function fetchFpiRatings({ fetcher = fetch, season = new Date().getUTCFullYear(), signal } = {}) {
-  const response = await fetcher(`${FPI}?season=${encodeURIComponent(season)}`, { signal })
+  const response = await fetcher(cacheBusted(`${FPI}?season=${encodeURIComponent(season)}`), { signal, cache: 'no-store' })
   if (!response.ok) throw new Error(`ESPN FPI HTTP ${response.status}`)
   const payload = await response.json()
   return { ratings: normalizeFpiRatings(payload), asOf: payload?.lastUpdated ?? new Date().toISOString() }
 }
 
-export async function fetchEspnPool(pool, { fetcher = fetch, signal } = {}) {
+export async function fetchEspnPool(pool, { fetcher = fetch, signal, includeFpi = true } = {}) {
   const query = `&dates=${pool.espnSeason}&seasontype=${pool.espnSeasonType}&week=${pool.espnWeek}`
-  const scoreboardResponse = await fetcher(`${SCOREBOARD}${query}`, { signal })
+  const scoreboardResponse = await fetcher(cacheBusted(`${SCOREBOARD}${query}`), { signal, cache: 'no-store' })
   if (!scoreboardResponse.ok) throw new Error(`ESPN scoreboard HTTP ${scoreboardResponse.status}`)
   const games = normalizeScoreboard(await scoreboardResponse.json())
   if (!games.length) return { games: [], asOf: new Date().toISOString(), source: 'ESPN' }
-  const fpiPromise = fetchFpiRatings({ fetcher, season: pool.espnSeason, signal }).catch(() => null)
+  const fpiPromise = includeFpi ? fetchFpiRatings({ fetcher, season: pool.espnSeason, signal }).catch(() => null) : Promise.resolve(null)
   const enriched = await Promise.all(games.map(async (game) => {
     try {
-      const response = await fetcher(`${GAME}&gameId=${game.id}`, { signal })
+      const response = await fetcher(cacheBusted(`${GAME}&gameId=${game.id}`), { signal, cache: 'no-store' })
       return response.ok ? addPregameData(game, await response.json()) : game
     } catch (error) {
       if (error.name === 'AbortError') throw error

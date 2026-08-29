@@ -167,6 +167,43 @@ test('production registration starts a session without email confirmation', asyn
   expect(directEspnRequests.length).toBeGreaterThan(0)
 })
 
+test('live refresh reads ESPN directly without repeating the Supabase season request', async ({ page }) => {
+  let seasonRequests = 0
+  let scoreboardRequests = 0
+  const scoreboard = { content: { sbData: { events: [{
+    id: 'g1', date: '2026-08-27T23:00:00Z', status: { period: 2, displayClock: '09:00', type: { state: 'in', shortDetail: '2nd 09:00' } },
+    competitions: [{ competitors: [
+      { homeAway: 'home', score: '14', team: { abbreviation: 'BUF' } },
+      { homeAway: 'away', score: '10', team: { abbreviation: 'PIT' } },
+    ] }],
+  }] } } }
+  const summary = { gamepackageJSON: { winprobability: [{ homeWinPercentage: .46 }, { homeWinPercentage: .72 }], pickcenter: [{ homeTeamOdds: { moneyLine: -150 }, awayTeamOdds: { moneyLine: 130 } }] } }
+  await page.route('**/rest/v1/rpc/get_season_data', async (route) => {
+    seasonRequests += 1
+    await route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: '2026-08-27T23:00:00Z', away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: '2026-08-27T18:00:00Z' } })
+  })
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
+  await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))
+  await page.route('**/auth/v1/token?grant_type=password', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
+  await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
+  await page.route('**/cdn.espn.com/core/nfl/scoreboard*', async (route) => { scoreboardRequests += 1; await route.fulfill({ json: scoreboard }) })
+  await page.route('**/cdn.espn.com/core/nfl/game*', (route) => route.fulfill({ json: summary }))
+  await page.route('**/site.web.api.espn.com/**', (route) => route.abort())
+
+  await page.goto('/')
+  await page.getByLabel('Username').fill('pat')
+  await page.getByLabel('Display name').fill('Pat')
+  await page.getByLabel('Password').fill('long-enough')
+  await page.getByRole('button', { name: 'Register and play' }).click()
+  await expect(page.getByTestId('real-data-status')).toContainText('1 games')
+  await expect(page.getByText(/ESPN WP 28%.*72%/)).toBeVisible()
+  const seasonRequestsAfterLoad = seasonRequests
+  const scoreboardRequestsAfterLoad = scoreboardRequests
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  await expect.poll(() => scoreboardRequests).toBeGreaterThan(scoreboardRequestsAfterLoad)
+  expect(seasonRequests).toBe(seasonRequestsAfterLoad)
+})
+
 test('admin manages registration and overrides a submitted pick', async ({ page }) => {
   const session = { access_token: 'admin-access', refresh_token: 'admin-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'admin-user', email: 'admin@accounts.nfl-pickem.invalid' } }
   const game = { id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z' }

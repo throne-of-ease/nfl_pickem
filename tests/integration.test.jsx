@@ -39,6 +39,7 @@ describe('four-user application flow', () => {
     render(<App />)
     expect(screen.getByRole('columnheader', { name: 'GQ' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Dev' })).toBeInTheDocument()
+    expect(screen.getByText(/ESPN WP 32%.*68%/)).toBeInTheDocument()
     expect(screen.getByText(/Q3 · 04:12/)).toBeInTheDocument()
     await user.click(screen.getByTestId('overview-sort-gq'))
     const rows = screen.getAllByTestId(/overview-row-/)
@@ -47,6 +48,14 @@ describe('four-user application flow', () => {
     expect(screen.getAllByTestId(/overview-row-/)[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g1')
     await user.click(screen.getByRole('checkbox', { name: 'Show GQ / Dev' }))
     expect(screen.queryByRole('columnheader', { name: 'GQ' })).not.toBeInTheDocument()
+  })
+
+  it('shows the latest ESPN probability beside live pick-sheet scores', async () => {
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    expect(screen.getAllByTitle('ESPN real-time win probability')).toHaveLength(2)
+    expect(screen.getAllByTitle('ESPN real-time win probability').map((item) => item.textContent)).toEqual(['32%', '68%'])
   })
 
   it('shows scheduled kickoff in Central European time in the score column', () => {

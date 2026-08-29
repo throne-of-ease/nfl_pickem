@@ -121,13 +121,13 @@ const writeEspnCache = (poolKey, value) => {
 
 const currentPool = (games) => games.some((game) => game.status === 'live' || game.status === 'in' || Math.abs(new Date(game.kickoff).valueOf() - Date.now()) < 48 * 3600000)
 
-export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGames = [], fetcher = fetch, signal } = {}) {
+export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGames = [], fetcher = fetch, signal, includeFpi = true } = {}) {
   const cached = readEspnCache(poolKey)
   const maxAge = currentPool([...serverGames, ...(cached?.games ?? [])]) ? 2 * 60 * 1000 : 24 * 60 * 60 * 1000
   if (!forceRefresh && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true }
   const pool = POOLS.find((item) => item.key === poolKey)
   if (!pool) throw apiError('UNKNOWN_POOL', 404)
-  const fresh = await fetchEspnPool(pool, { fetcher, signal })
+  const fresh = await fetchEspnPool(pool, { fetcher, signal, includeFpi })
   const value = { ...fresh, cached: false }
   writeEspnCache(poolKey, value)
   return value
@@ -138,6 +138,11 @@ const mergeGames = (serverGames, espnGames) => {
   const merged = serverGames.map((game) => ({ ...game, ...(live.get(game.id) ?? {}), gotw: Boolean(game.gotw), locked: Boolean(game.locked) }))
   const known = new Set(serverGames.map((game) => game.id))
   return [...merged, ...espnGames.filter((game) => !known.has(game.id))]
+}
+
+export async function refreshLivePool(poolKey, previousGames = [], { signal, fetcher = fetch } = {}) {
+  const espn = await refreshEspnPool(poolKey, { forceRefresh: true, serverGames: previousGames, fetcher, signal, includeFpi: false })
+  return { ...espn, games: mergeGames(previousGames, espn.games), asOf: espn.asOf, espnAsOf: espn.asOf }
 }
 
 export async function loadRegistrationStatus() {

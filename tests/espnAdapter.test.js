@@ -52,6 +52,20 @@ describe('ESPN fixture ingestion', () => {
     expect(game).toMatchObject({ status: 'live', period: 2, displayClock: '07:42', statusDetail: '2nd 07:42', matchupQuality: 82.1 })
   })
 
+  it('keeps the latest ESPN win probability for a live game', () => {
+    const [game] = normalizeScoreboard({ content: { sbData: { events: [{
+      id: '403', date: '2026-08-28T18:00Z', status: { type: { state: 'in' } }, competitions: [{ competitors: [
+        { homeAway: 'home', score: '14', team: { abbreviation: 'BUF' } },
+        { homeAway: 'away', score: '10', team: { abbreviation: 'PIT' } },
+      ] }],
+    }] } } })
+    const live = addPregameData(game, { gamepackageJSON: { winprobability: [
+      { homeWinPercentage: .46 },
+      { homeWinPercentage: .72 },
+    ] } })
+    expect(live).toMatchObject({ homeWinProbability: .72, awayWinProbability: .28 })
+  })
+
   it('uses the current ESPN FPI value for each team and averages them for GQ', () => {
     const ratings = normalizeFpiRatings({ teams: [
       { team: { abbreviation: 'BUF' }, categories: [{ name: 'fpi', values: [4.2] }] },

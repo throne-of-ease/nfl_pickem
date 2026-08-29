@@ -1,6 +1,6 @@
 # Real-world launch: GitHub Pages + Supabase Free
 
-The production architecture is a static GitHub Pages frontend backed by the existing Supabase project. Authenticated clients use Supabase Auth and protected RPCs directly. One Supabase Edge Function (`sync-season`) is the only server-side code: it synchronizes the trusted ESPN schedule and scores, preserves pregame snapshots, and leaves the last synchronized slate in place when ESPN is unavailable.
+The production architecture is a static GitHub Pages frontend backed by the existing Supabase project. Authenticated clients use Supabase Auth and protected RPCs directly. The browser reads the selected week, live scores, game status, and live win probabilities directly from ESPN; Supabase stores authentication, schedules, picks, and permissions rather than a live-score cache.
 
 ## Supabase project
 
@@ -25,7 +25,7 @@ The production architecture is a static GitHub Pages frontend backed by the exis
    - `APP_CRON_SECRET`
    - `APP_ALLOWED_ORIGIN=https://throne-of-ease.github.io`
 
-5. The `db.vault` entries in `supabase/config.toml` populate the three Vault secrets used by the cron migration (`project_url`, `publishable_key`, `cron_secret`) when `supabase db push` runs. The migration schedules `sync-nfl-season-every-five-minutes` through `pg_cron` and `pg_net`.
+5. The existing `sync-season` Edge Function remains available for explicit schedule/admin operations. Migration `202608290001_disable_live_score_cron.sql` removes the old five-minute score synchronization job; live refreshes do not write to Supabase.
 
 ## GitHub repository
 
@@ -56,13 +56,13 @@ Then verify the deployed URL with four temporary accounts:
 3. Give each user different teams and confidence values; refresh and confirm drafts remain isolated.
 4. Confirm locked games cannot change, late preseason weeks remain editable, and future picks stay hidden until kickoff.
 5. Verify live/final scores, standings, models, charts, drag/drop confidence, and mobile layout.
-6. In browser developer tools, confirm normal loading uses Supabase Auth/RPC endpoints and does not call ESPN directly.
-7. Check Supabase Usage and Edge Function logs. A five-minute global cron is at most 8,640 invocations per month; Free includes 500,000.
+6. In browser developer tools, confirm the initial load uses Supabase Auth/RPC endpoints for account/picks data and ESPN CDN scoreboard/game endpoints for the selected week and live updates.
+7. Confirm pressing Refresh increases ESPN requests without another Supabase season-data request, and that live score/probability changes appear in the rendered page.
 8. Delete all temporary test users and picks.
 
 ## Rollback and operations
 
 - Keep the last Netlify deployment available until the Pages smoke test is complete; publish it again only as an emergency rollback.
 - Do not rerun the launch-reset migration after real picks exist.
-- If ESPN fails, leave Supabase data untouched; the sync function returns the last good slate.
+- If ESPN fails, leave Supabase data untouched and keep the last client-side ESPN slate visible.
 - Free projects can be paused after seven days of low activity outside the season. Resume the project from Supabase Studio when needed.
