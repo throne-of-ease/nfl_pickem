@@ -2,7 +2,7 @@ import { freezePregameSnapshot } from './domain.js'
 
 const STATUS = { pre: 'scheduled', in: 'live', post: 'final', scheduled: 'scheduled', live: 'live', final: 'final' }
 const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
-const GAME = 'https://cdn.espn.com/core/nfl/game?xhr=1'
+const GAME = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event='
 const FPI = 'https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex'
 
 const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
@@ -11,6 +11,43 @@ const probability = (value) => {
   return number === null ? null : number > 1 ? number / 100 : number
 }
 const cacheBusted = (url) => `${url}&_nfl_pickem=${Date.now()}`
+
+const statusRank = (status) => status === 'final' || status === 'post' ? 2 : status === 'live' || status === 'in' ? 1 : 0
+const scoreValue = (value) => Number.isFinite(Number(value)) ? Number(value) : null
+const clockValue = (value) => {
+  const match = String(value ?? '').match(/^(\d+):([0-5]\d)$/)
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
+
+const isOlderGameState = (current, incoming) => {
+  if (!current || !incoming) return false
+  if (statusRank(incoming.status) < statusRank(current.status)) return true
+  if (statusRank(incoming.status) !== statusRank(current.status)) return false
+
+  const currentAway = scoreValue(current.awayScore)
+  const currentHome = scoreValue(current.homeScore)
+  const incomingAway = scoreValue(incoming.awayScore)
+  const incomingHome = scoreValue(incoming.homeScore)
+  if (currentAway !== null && incomingAway !== null && incomingAway < currentAway) return true
+  if (currentHome !== null && incomingHome !== null && incomingHome < currentHome) return true
+
+  if (statusRank(current.status) !== 1) return false
+  const currentPeriod = scoreValue(current.period)
+  const incomingPeriod = scoreValue(incoming.period)
+  if (currentPeriod !== null && incomingPeriod !== null && incomingPeriod < currentPeriod) return true
+  const currentClock = clockValue(current.displayClock)
+  const incomingClock = clockValue(incoming.displayClock)
+  return currentPeriod !== null && currentPeriod === incomingPeriod && currentClock !== null && incomingClock !== null && incomingClock > currentClock
+}
+
+export function mergeLatestGame(current, incoming) {
+  const merged = { ...current, ...incoming }
+  if (!isOlderGameState(current, incoming)) return merged
+  for (const key of ['status', 'awayScore', 'homeScore', 'period', 'displayClock', 'statusDetail']) {
+    if (current[key] !== undefined) merged[key] = current[key]
+  }
+  return merged
+}
 
 export function normalizeEvent(event) {
   const id = String(event?.id ?? '')
@@ -63,6 +100,22 @@ export function normalizeScoreboard(payload) {
 
 export function addPregameData(game, payload) {
   const data = payload?.gamepackageJSON ?? payload ?? {}
+  const competition = data.header?.competitions?.[0]
+  const competitors = competition?.competitors ?? []
+  const home = competitors.find((team) => team.homeAway === 'home' || team.team?.abbreviation === game.home)
+  const away = competitors.find((team) => team.homeAway === 'away' || team.team?.abbreviation === game.away)
+  const statusInfo = competition?.status ?? {}
+  const summaryStatus = STATUS[statusInfo.type?.state ?? statusInfo.state]
+  const summaryMatchesGame = home?.team?.abbreviation === game.home && away?.team?.abbreviation === game.away
+  const updatedGame = summaryMatchesGame ? {
+    ...game,
+    ...(summaryStatus ? { status: summaryStatus } : {}),
+    ...(Number.isFinite(finite(home.score)) ? { homeScore: finite(home.score) } : {}),
+    ...(Number.isFinite(finite(away.score)) ? { awayScore: finite(away.score) } : {}),
+    ...(Number.isFinite(finite(statusInfo.period)) ? { period: finite(statusInfo.period) } : {}),
+    ...(statusInfo.displayClock || statusInfo.type?.statusPrimary ? { displayClock: statusInfo.displayClock ?? statusInfo.type.statusPrimary } : {}),
+    ...(statusInfo.type?.shortDetail || statusInfo.type?.detail ? { statusDetail: statusInfo.type.shortDetail ?? statusInfo.type.detail } : {}),
+  } : game
   const odds = data.pickcenter?.find((item) => finite(item?.homeTeamOdds?.moneyLine) !== null && finite(item?.awayTeamOdds?.moneyLine) !== null)
   const projection = finite(data.predictor?.homeTeam?.gameProjection)
   const probabilities = Array.isArray(data.winprobability) ? data.winprobability : []
@@ -70,13 +123,13 @@ export function addPregameData(game, payload) {
   const latest = probability(probabilities.at(-1)?.homeWinPercentage)
   const pregameProbability = projection === null ? initial : probability(projection)
   return {
-    ...game,
+    ...updatedGame,
     predictorHome: pregameProbability,
     homeMoneyline: finite(odds?.homeTeamOdds?.moneyLine),
     awayMoneyline: finite(odds?.awayTeamOdds?.moneyLine),
-    matchupQuality: finite(data.matchupQuality ?? data.game?.matchupQuality ?? game.matchupQuality),
-    homeWinProbability: game.status === 'live' ? latest : null,
-    awayWinProbability: game.status === 'live' && latest !== null ? 1 - latest : null,
+    matchupQuality: finite(data.matchupQuality ?? data.game?.matchupQuality ?? updatedGame.matchupQuality),
+    homeWinProbability: updatedGame.status === 'live' ? latest : null,
+    awayWinProbability: updatedGame.status === 'live' && latest !== null ? 1 - latest : null,
     pregameSource: projection === null ? initial === null ? null : 'ESPN opening win probability' : 'ESPN Matchup Predictor',
   }
 }
@@ -121,8 +174,8 @@ export async function fetchEspnPool(pool, { fetcher = fetch, signal, includeFpi 
   const fpiPromise = includeFpi ? fetchFpiRatings({ fetcher, season: pool.espnSeason, signal }).catch(() => null) : Promise.resolve(null)
   const enriched = await Promise.all(games.map(async (game) => {
     try {
-      const response = await fetcher(cacheBusted(`${GAME}&gameId=${game.id}`), { signal, cache: 'no-store' })
-      return response.ok ? addPregameData(game, await response.json()) : game
+      const response = await fetcher(cacheBusted(`${GAME}${game.id}`), { signal, cache: 'no-store' })
+      return response.ok ? mergeLatestGame(game, addPregameData(game, await response.json())) : game
     } catch (error) {
       if (error.name === 'AbortError') throw error
       return game

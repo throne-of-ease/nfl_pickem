@@ -84,6 +84,7 @@ export default function App() {
   const [showAccountMenu, setShowAccountMenu] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
+  const refreshActive = useRef(false)
   const draftRevisions = useRef({})
   const saveQueue = useRef(Promise.resolve())
   const pool = POOLS.find((item) => item.key === poolKey)
@@ -166,6 +167,7 @@ export default function App() {
     const initial = initialLoadKey.current !== loadKey
     const controller = new AbortController()
     const load = async () => {
+      refreshActive.current = true
       setIsRefreshing(true)
       if (initial) setDataState((state) => ({ ...state, loading: !loadedGamesByPool[poolKey], error: null }))
       try {
@@ -190,16 +192,26 @@ export default function App() {
       } catch {
         if (!controller.signal.aborted) setDataState((state) => ({ ...state, loading: false, error: initial ? 'Shared pick data is temporarily unavailable.' : 'Live ESPN data is temporarily unavailable; showing the last update.' }))
       } finally {
-        if (!controller.signal.aborted) setIsRefreshing(false)
+        if (!controller.signal.aborted) {
+          refreshActive.current = false
+          setIsRefreshing(false)
+        }
       }
     }
     load()
-    const refresh = (force = false) => { if (document.visibilityState === 'visible') setRefreshRequest((request) => ({ version: request.version + 1, force })) }
+    return () => controller.abort()
+  }, [poolKey, useFixtures, session?.access_token, session?.user?.id, refreshRequest.version])
+
+  useEffect(() => {
+    if (useFixtures || !session?.access_token) return
+    const refresh = (force = false) => {
+      if (document.visibilityState === 'visible' && !refreshActive.current) setRefreshRequest((request) => ({ version: request.version + 1, force }))
+    }
     const interval = setInterval(refresh, hasLiveGames ? 30 * 1000 : 2 * 60 * 1000)
     const refreshOnVisible = () => refresh()
     document.addEventListener('visibilitychange', refreshOnVisible)
-    return () => { controller.abort(); clearInterval(interval); document.removeEventListener('visibilitychange', refreshOnVisible) }
-  }, [poolKey, useFixtures, session?.access_token, session?.user?.id, refreshRequest.version, hasLiveGames, currentWeek])
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refreshOnVisible) }
+  }, [useFixtures, session?.access_token, hasLiveGames, currentWeek])
 
   useEffect(() => {
     if (!games.length) return

@@ -66,6 +66,19 @@ describe('ESPN fixture ingestion', () => {
     expect(live).toMatchObject({ homeWinProbability: .72, awayWinProbability: .28 })
   })
 
+  it('uses the event summary score and clock when the week scoreboard is behind', () => {
+    const game = { id: '404', away: 'DET', home: 'IND', status: 'live', awayScore: 13, homeScore: 13, period: 2, displayClock: '0:49' }
+    const summary = {
+      header: { competitions: [{ status: { period: 2, displayClock: '0:08', type: { state: 'in', shortDetail: '0:08 - 2nd' } }, competitors: [
+        { homeAway: 'home', score: '13', team: { abbreviation: 'IND' } },
+        { homeAway: 'away', score: '19', team: { abbreviation: 'DET' } },
+      ] }] },
+      winprobability: [{ homeWinPercentage: .28 }],
+    }
+
+    expect(addPregameData(game, summary)).toMatchObject({ status: 'live', awayScore: 19, homeScore: 13, period: 2, displayClock: '0:08', statusDetail: '0:08 - 2nd' })
+  })
+
   it('uses the current ESPN FPI value for each team and averages them for GQ', () => {
     const ratings = normalizeFpiRatings({ teams: [
       { team: { abbreviation: 'BUF' }, categories: [{ name: 'fpi', values: [4.2] }] },

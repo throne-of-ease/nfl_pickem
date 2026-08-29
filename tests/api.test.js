@@ -61,16 +61,30 @@ describe('direct ESPN live refresh', () => {
     const fetcher = async (url) => {
       requests.push(url)
       if (url.includes('scoreboard')) return { ok: true, json: async () => scoreboard }
-      if (url.includes('game?')) return { ok: true, json: async () => summary }
+      if (url.includes('/summary?')) return { ok: true, json: async () => summary }
       return { ok: false, json: async () => ({}) }
     }
 
     const result = await refreshLivePool('week-01', [{ id: 'g1', kickoff: new Date(Date.now() - 30 * 60 * 1000).toISOString(), gotw: true, locked: true }], { fetcher })
 
     expect(requests.some((url) => url.includes('cdn.espn.com/core/nfl/scoreboard') && url.includes('week=1'))).toBe(true)
-    expect(requests.some((url) => url.includes('cdn.espn.com/core/nfl/game') && url.includes('gameId=g1'))).toBe(true)
+    expect(requests.some((url) => url.includes('site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary') && url.includes('event=g1'))).toBe(true)
     expect(requests.every((url) => url.includes('_nfl_pickem='))).toBe(true)
     expect(result.games[0]).toMatchObject({ status: 'live', awayScore: 10, homeScore: 14, homeWinProbability: .72, awayWinProbability: .28, gotw: true, locked: true })
+  })
+
+  it('does not let a delayed live response move the score or clock backward', async () => {
+    const staleSummary = { header: { competitions: [{ status: { period: 2, displayClock: '0:24', type: { state: 'in', shortDetail: '0:24 - 2nd' } }, competitors: [
+      { homeAway: 'home', score: '13', team: { abbreviation: 'BUF' } },
+      { homeAway: 'away', score: '13', team: { abbreviation: 'PIT' } },
+    ] }] }, winprobability: [{ homeWinPercentage: .5 }] }
+    const fetcher = async (url) => {
+      if (url.includes('scoreboard')) return { ok: true, json: async () => scoreboard }
+      return { ok: true, json: async () => staleSummary }
+    }
+    const result = await refreshLivePool('week-01', [{ id: 'g1', away: 'PIT', home: 'BUF', status: 'live', awayScore: 13, homeScore: 13, period: 2, displayClock: '0:08' }], { currentWeek: true, fetcher })
+
+    expect(result.games[0]).toMatchObject({ awayScore: 13, homeScore: 13, period: 2, displayClock: '0:08' })
   })
 
   it('force refreshes a historical slate and requests model data', async () => {

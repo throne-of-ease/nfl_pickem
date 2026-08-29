@@ -1,5 +1,5 @@
 import { POOLS } from './domain.js'
-import { fetchEspnPool } from './espnAdapter.js'
+import { fetchEspnPool, mergeLatestGame } from './espnAdapter.js'
 
 const SESSION_KEY = 'nfl-pickem-session-v1'
 const ESPN_CACHE_KEY = 'nfl-pickem-espn-cache-v2'
@@ -127,6 +127,17 @@ export function isCurrentPool(games = [], now = Date.now()) {
   return now >= Math.min(...kickoffs) - CURRENT_POOL_PADDING && now <= Math.max(...kickoffs) + CURRENT_POOL_PADDING
 }
 
+function mergeGames(serverGames, espnGames) {
+  const updates = new Map(espnGames.map((game) => [game.id, game]))
+  const merged = serverGames.map((game) => {
+    const update = updates.get(game.id)
+    const latest = update ? mergeLatestGame(game, update) : game
+    return { ...game, ...latest, gotw: Boolean(game.gotw), locked: Boolean(game.locked) }
+  })
+  const known = new Set(serverGames.map((game) => game.id))
+  return [...merged, ...espnGames.filter((game) => !known.has(game.id))]
+}
+
 export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGames = [], serverAsOf = null, currentWeek = null, fetcher = fetch, signal, includeFpi = true } = {}) {
   const pool = POOLS.find((item) => item.key === poolKey)
   if (!pool) throw apiError('UNKNOWN_POOL', 404)
@@ -144,16 +155,9 @@ export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGam
   const maxAge = 2 * 60 * 1000
   if (!forceRefresh && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'current' }
   const fresh = await fetchEspnPool(pool, { fetcher, signal, includeFpi })
-  const value = { ...fresh, cached: false }
+  const value = { ...fresh, games: current ? mergeGames(cached?.games ?? [], fresh.games) : fresh.games, cached: false }
   writeEspnCache(poolKey, value)
   return value
-}
-
-const mergeGames = (serverGames, espnGames) => {
-  const live = new Map(espnGames.map((game) => [game.id, game]))
-  const merged = serverGames.map((game) => ({ ...game, ...(live.get(game.id) ?? {}), gotw: Boolean(game.gotw), locked: Boolean(game.locked) }))
-  const known = new Set(serverGames.map((game) => game.id))
-  return [...merged, ...espnGames.filter((game) => !known.has(game.id))]
 }
 
 export async function refreshLivePool(poolKey, previousGames = [], { currentWeek = null, forceRefresh = false, signal, fetcher = fetch } = {}) {

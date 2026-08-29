@@ -31,7 +31,7 @@ function ScoreCell({ game }) {
   const live = game.status === 'live' || game.status === 'in'
   const detail = live && (game.period || game.displayClock) ? `Q${game.period ?? '?'} · ${game.displayClock ?? '—'}` : game.statusDetail
   const liveProbability = live && Number.isFinite(game.homeWinProbability) ? `${((1 - game.homeWinProbability) * 100).toFixed(0)}%–${(game.homeWinProbability * 100).toFixed(0)}%` : null
-  if (final || live) return <div className={`overview-score ${live ? 'live-text' : ''}`} title={live && detail ? `${detail}${liveProbability ? `; ${liveProbability}` : ''}` : final ? 'Final score' : 'Live score'}><strong>{game.awayScore}-{game.homeScore}</strong><small>{live ? 'LIVE' : 'FINAL'}</small>{detail && live && <small className="live-detail">{detail}</small>}{liveProbability && <small className="live-detail">{liveProbability}</small>}</div>
+  if (final || live) return <div className={`overview-score ${live ? 'live-text' : ''}`} title={live && detail ? `${detail}${liveProbability ? `; ${liveProbability}` : ''}` : final ? 'Final score' : 'Live score'}><strong>{game.awayScore}-{game.homeScore}</strong>{!live && <small>FINAL</small>}{detail && live && <small className="live-detail">{detail}</small>}{liveProbability && <small className="live-detail">{liveProbability}</small>}</div>
   return <time className="overview-score overview-schedule" dateTime={game.kickoff} title="Central European time"><span>{formatCETDate(game.kickoff)}</span><strong>{formatCETTime(game.kickoff)}</strong></time>
 }
 

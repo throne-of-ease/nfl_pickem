@@ -212,8 +212,10 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   await page.route('**/auth/v1/token?grant_type=password', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
   await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
   await page.route('**/cdn.espn.com/core/nfl/scoreboard*', async (route) => { scoreboardRequests += 1; await route.fulfill({ json: scoreboard }) })
-  await page.route('**/cdn.espn.com/core/nfl/game*', (route) => route.fulfill({ json: summary }))
-  await page.route('**/site.web.api.espn.com/**', (route) => route.abort())
+  await page.route('**/site.web.api.espn.com/**', async (route) => {
+    if (route.request().url().includes('/summary?')) await route.fulfill({ json: summary })
+    else await route.abort()
+  })
 
   await page.goto('/')
   await page.getByLabel('Username').fill('pat')
@@ -223,12 +225,15 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   await expect(page.getByTestId('real-data-status')).toContainText('1 games')
   await expect(page.getByText(/28%.*72%/)).toBeVisible()
   await expect(page.getByText(/ESPN WP/)).toHaveCount(0)
+  await expect.poll(() => scoreboardRequests).toBe(1)
+  await expect(page.locator('.overview-table .overview-score')).not.toContainText('LIVE')
+  await expect(page.locator('.overview-table .overview-game .live-badge')).toHaveText('LIVE')
   await expect(page.locator('.overview-table .live-badge')).toHaveCSS('font-size', '6.72px')
   await expect(page.locator('.overview-table .live-badge')).toHaveCSS('padding', '1px 3px')
   const seasonRequestsAfterLoad = seasonRequests
   const scoreboardRequestsAfterLoad = scoreboardRequests
   await page.getByRole('button', { name: 'Refresh' }).click()
-  await expect.poll(() => scoreboardRequests).toBeGreaterThan(scoreboardRequestsAfterLoad)
+  await expect.poll(() => scoreboardRequests).toBe(scoreboardRequestsAfterLoad + 1)
   expect(seasonRequests).toBe(seasonRequestsAfterLoad)
 })
 
@@ -314,6 +319,7 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await expect(page.getByText('PICK OVERRIDE SAVED')).toBeVisible()
   await page.getByRole('tab', { name: 'Game of the Week' }).click()
   await expect(page.getByRole('heading', { name: 'Weekly Game of the Week' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'GQ' })).toBeVisible()
   await expect(page.getByRole('cell', { name: '74.5', exact: true })).toBeVisible()
   await page.getByRole('radio', { name: /A @ B/ }).check()
   await page.getByRole('button', { name: 'Assign Game of the Week' }).click()
