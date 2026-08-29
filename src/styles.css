@@ -106,6 +106,7 @@ p { color: var(--muted); }
 .game.live .game-status { color: var(--live); }
 .game-status small { display: block; color: var(--live); font-size: .58rem; letter-spacing: 0; white-space: nowrap; }
 .live-badge { display: inline-block !important; width: fit-content; padding: 2px 5px; border-radius: 3px; background: var(--live); color: #fff !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--live) 70%, white); font-size: .56rem !important; font-weight: 900; letter-spacing: .04em !important; animation: pulse 2s infinite; }
+.overview-score .live-badge { padding: 1px 3px; font-size: .42rem !important; letter-spacing: .02em !important; }
 .gotw { color: var(--warning); }
 fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }

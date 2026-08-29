@@ -214,7 +214,10 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
   await expect(page.getByTestId('real-data-status')).toContainText('1 games')
-  await expect(page.getByText(/ESPN WP 28%.*72%/)).toBeVisible()
+  await expect(page.getByText(/28%.*72%/)).toBeVisible()
+  await expect(page.getByText(/ESPN WP/)).toHaveCount(0)
+  await expect(page.locator('.overview-table .live-badge')).toHaveCSS('font-size', '6.72px')
+  await expect(page.locator('.overview-table .live-badge')).toHaveCSS('padding', '1px 3px')
   const seasonRequestsAfterLoad = seasonRequests
   const scoreboardRequestsAfterLoad = scoreboardRequests
   await page.getByRole('button', { name: 'Refresh' }).click()
