@@ -209,6 +209,13 @@ export const saveAdminPicks = (poolKey, token, userId, picks) => request('/rest/
 
 export const setGameOfWeek = (token, poolKey, gameId) => request('/rest/v1/rpc/set_game_of_week', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey, p_game_id: gameId || null }) })
 
+export const resetAdminPassword = (token, userId, temporaryPassword) => request('/rest/v1/rpc/admin_reset_password', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId, p_temporary_password: temporaryPassword }) })
+
+export const updatePassword = (token, password) => {
+  if (!password || password.length < 8) throw apiError('INVALID_PASSWORD', 422)
+  return request('/auth/v1/user', { method: 'PUT', headers: bearer(token), body: JSON.stringify({ password }) })
+}
+
 export async function loadChartData(token) {
   const data = await request('/rest/v1/rpc/get_chart_data', { method: 'POST', headers: bearer(token), body: '{}' })
   const users = data?.profiles ?? []

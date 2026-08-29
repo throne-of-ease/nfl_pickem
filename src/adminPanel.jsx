@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react'
-import { POOLS, presetConfidencePicks } from './domain.js'
-import { deleteAdminPlayer, loadAdminData, loadAdminGotwData, saveAdminPicks, setGameOfWeek, setRegistrationOpen } from './api.js'
+import { POOLS, gameQuality, presetConfidencePicks } from './domain.js'
+import { deleteAdminPlayer, loadAdminData, loadAdminGotwData, resetAdminPassword, saveAdminPicks, setGameOfWeek, setRegistrationOpen } from './api.js'
 import { TeamLogo } from './overview.jsx'
 import { formatCETKickoff } from './time.js'
 
 const formatKickoff = formatCETKickoff
+
+const temporaryPassword = () => {
+  const values = new Uint32Array(12)
+  globalThis.crypto.getRandomValues(values)
+  const alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  return `Nfl!${values.slice(0, 1)[0] % 10}${Array.from(values.slice(1), (value) => alphabet[value % alphabet.length]).join('')}`
+}
 
 export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDeleted, onGamesUpdated }) {
   const [data, setData] = useState(null)
@@ -20,6 +27,9 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
   const [gotwMessage, setGotwMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [gotwBusy, setGotwBusy] = useState(false)
+  const [resetBusyUserId, setResetBusyUserId] = useState('')
+  const [resetPassword, setResetPassword] = useState(null)
+  const [gotwSort, setGotwSort] = useState({ key: 'kickoff', direction: 'ascending' })
 
   const load = async () => {
     setBusy(true)
@@ -50,6 +60,14 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
   const currentPick = currentPicks.find((pick) => pick.gameId === selectedGameId)
   const gotwGames = (gotwData?.games ?? []).filter((game) => game.poolKey === gotwPoolKey)
   const assignedGotwGameId = gotwGames.find((game) => game.gotw)?.id ?? ''
+  const sortedGotwGames = [...gotwGames].sort((a, b) => {
+    const aValue = gotwSort.key === 'quality' ? gameQuality(a) : Date.parse(a.kickoff)
+    const bValue = gotwSort.key === 'quality' ? gameQuality(b) : Date.parse(b.kickoff)
+    if (aValue == null && bValue != null) return 1
+    if (aValue != null && bValue == null) return -1
+    if (aValue !== bValue) return (aValue < bValue ? -1 : 1) * (gotwSort.direction === 'ascending' ? 1 : -1)
+    return Date.parse(a.kickoff) - Date.parse(b.kickoff) || a.id.localeCompare(b.id)
+  })
 
   useEffect(() => {
     setTeam(currentPick?.team ?? selectedGame?.away ?? '')
@@ -84,6 +102,27 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
       setMessage('PLAYER DELETED')
     } catch (error) { setMessage((error.code ?? 'PLAYER_DELETE_FAILED').replaceAll('_', ' ')) }
     finally { setBusy(false) }
+  }
+
+  const resetPlayerPassword = async (player) => {
+    if (!window.confirm(`Reset ${player.name}'s password? You will need to share the temporary password with them.`)) return
+    const password = temporaryPassword()
+    setResetBusyUserId(player.id)
+    setResetPassword(null)
+    try {
+      await resetAdminPassword(token, player.id, password)
+      setResetPassword({ playerId: player.id, playerName: player.name, password })
+      setMessage('TEMPORARY PASSWORD READY TO SHARE')
+    } catch (error) { setMessage((error.code ?? 'PASSWORD_RESET_FAILED').replaceAll('_', ' ')) }
+    finally { setResetBusyUserId('') }
+  }
+
+  const copyResetPassword = async () => {
+    if (!resetPassword) return
+    try {
+      await navigator.clipboard.writeText(resetPassword.password)
+      setMessage('TEMPORARY PASSWORD COPIED')
+    } catch { setMessage('COPY FAILED - SHARE THE DISPLAYED PASSWORD') }
   }
 
   const submitOverride = async (event) => {
@@ -124,11 +163,11 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
 
     {adminTab === 'players' && <>
       <div className="admin-registration"><strong>Player registration</strong><span>{data.registrationOpen === false ? 'Closed' : 'Open'}</span><button type="button" onClick={toggleRegistration} disabled={busy}>{data.registrationOpen === false ? 'Allow new registrations' : 'Stop new registrations'}</button></div>
-      <div className="admin-list"><h3>Registered players</h3><table><thead><tr><th>Player</th><th>Username</th><th>Contact</th><th>Action</th></tr></thead><tbody>{data.players.length ? data.players.map((player) => <tr key={player.id}><td>{player.name}</td><td>{player.username}</td><td>{player.contactEmail || '-'}</td><td><button type="button" className="danger-button" aria-label={`Delete ${player.name}`} onClick={() => removePlayer(player)} disabled={busy}>Delete</button></td></tr>) : <tr><td colSpan="4">No registered players.</td></tr>}</tbody></table></div>
+      <div className="admin-list"><h3>Registered players</h3><table><thead><tr><th>Player</th><th>Username</th><th>Contact</th><th>Action</th></tr></thead><tbody>{data.players.length ? data.players.map((player) => <tr key={player.id}><td>{player.name}</td><td>{player.username}</td><td>{player.contactEmail || '-'}</td><td className="admin-player-actions"><button type="button" aria-label={`Reset password for ${player.name}`} onClick={() => resetPlayerPassword(player)} disabled={busy || Boolean(resetBusyUserId)}>{resetBusyUserId === player.id ? 'Resetting...' : 'Reset password'}</button><button type="button" className="danger-button" aria-label={`Delete ${player.name}`} onClick={() => removePlayer(player)} disabled={busy || Boolean(resetBusyUserId)}>Delete</button></td></tr>) : <tr><td colSpan="4">No registered players.</td></tr>}</tbody></table>{resetPassword && <div className="password-share" role="status"><strong>Temporary password for {resetPassword.playerName}</strong><code>{resetPassword.password}</code><button type="button" onClick={copyResetPassword}>Copy temporary password</button><small>Share it privately. They can sign in with it, then choose Change password.</small></div>}</div>
       <form className="admin-override" onSubmit={submitOverride}><h3>Override a pick - {poolKey}</h3><label>Player<select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>{data.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label><label>Game<select value={selectedGameId} onChange={(event) => setSelectedGameId(event.target.value)}>{data.games.map((game) => <option key={game.id} value={game.id}>{game.away}@{game.home}</option>)}</select></label><label>Pick<select value={team} onChange={(event) => setTeam(event.target.value)}>{selectedGame && <><option value={selectedGame.away}>{selectedGame.away}</option><option value={selectedGame.home}>{selectedGame.home}</option></>}</select></label><label>Confidence<select value={confidence} onChange={(event) => setConfidence(event.target.value)}>{data.games.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label><button type="submit" disabled={busy || !selectedPlayer || !selectedGame}>Save override</button></form>
     </>}
 
-    {adminTab === 'gotw' && <section className="admin-gotw" aria-label="Game of the Week assignments"><div className="section-title"><div><h3>Weekly Game of the Week</h3><p>Choose one game for each pool. The five-point bonus follows this assignment.</p></div><label>Week<select aria-label="GOTW week" value={gotwPoolKey} onChange={(event) => setGotwPoolKey(event.target.value)}>{POOLS.map((pool) => <option key={pool.key} value={pool.key}>{pool.label}</option>)}</select></label></div>{gotwBusy && !gotwGames.length ? <p className="notice" role="status">Loading games for {POOLS.find((pool) => pool.key === gotwPoolKey)?.label ?? gotwPoolKey}...</p> : gotwGames.length ? <div className="gotw-games">{gotwGames.map((game) => <label className={`gotw-game ${selectedGotwGameId === game.id ? 'selected' : ''}`} key={game.id}><input type="radio" name="gotw-game" value={game.id} checked={selectedGotwGameId === game.id} onChange={() => setSelectedGotwGameId(game.id)} /><span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span><small>{game.status === 'final' || game.status === 'post' ? 'Final' : formatKickoff(game.kickoff)}</small>{game.gotw && <b>ASSIGNED</b>}</label>)}</div> : <p className="notice">No games are available for this pool yet.</p>}<div className="gotw-actions"><button type="button" onClick={() => assignGotw()} disabled={gotwBusy || !selectedGotwGameId || selectedGotwGameId === assignedGotwGameId}>Assign Game of the Week</button><button type="button" onClick={() => assignGotw('')} disabled={gotwBusy || !assignedGotwGameId}>Clear assignment</button></div>{gotwMessage && <p className="notice" role="status">{gotwMessage}</p>}</section>}
+    {adminTab === 'gotw' && <section className="admin-gotw" aria-label="Game of the Week assignments"><div className="section-title"><div><h3>Weekly Game of the Week</h3><p>Choose one game for each pool. The five-point bonus follows this assignment.</p></div><div className="gotw-controls"><label>Week<select aria-label="GOTW week" value={gotwPoolKey} onChange={(event) => setGotwPoolKey(event.target.value)}>{POOLS.map((pool) => <option key={pool.key} value={pool.key}>{pool.label}</option>)}</select></label><label>Order by<select aria-label="Order GOTW games by" value={gotwSort.key} onChange={(event) => setGotwSort({ key: event.target.value, direction: event.target.value === 'kickoff' ? 'ascending' : 'descending' })}><option value="kickoff">Date/time</option><option value="quality">Game quality</option></select></label><button type="button" aria-label="GOTW sort direction" onClick={() => setGotwSort((current) => ({ ...current, direction: current.direction === 'ascending' ? 'descending' : 'ascending' }))}>{gotwSort.direction === 'ascending' ? 'Ascending' : 'Descending'}</button></div></div>{gotwBusy && !gotwGames.length ? <p className="notice" role="status">Loading games for {POOLS.find((pool) => pool.key === gotwPoolKey)?.label ?? gotwPoolKey}...</p> : gotwGames.length ? <div className="gotw-games">{sortedGotwGames.map((game) => <label className={`gotw-game ${selectedGotwGameId === game.id ? 'selected' : ''}`} key={game.id}><input type="radio" name="gotw-game" value={game.id} checked={selectedGotwGameId === game.id} onChange={() => setSelectedGotwGameId(game.id)} /><span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span><small><time dateTime={game.kickoff}>{formatKickoff(game.kickoff)}</time><span>GQ {gameQuality(game) == null ? '—' : gameQuality(game).toFixed(1)}</span></small>{game.gotw && <b>ASSIGNED</b>}</label>)}</div> : <p className="notice">No games are available for this pool yet.</p>}<div className="gotw-actions"><button type="button" onClick={() => assignGotw()} disabled={gotwBusy || !selectedGotwGameId || selectedGotwGameId === assignedGotwGameId}>Assign Game of the Week</button><button type="button" onClick={() => assignGotw('')} disabled={gotwBusy || !assignedGotwGameId}>Clear assignment</button></div>{gotwMessage && <p className="notice" role="status">{gotwMessage}</p>}</section>}
 
     {message && <p className="notice" role="status">{message}</p>}
   </section>

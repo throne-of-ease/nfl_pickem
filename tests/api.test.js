@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isCurrentPool, refreshEspnPool, refreshLivePool } from '../src/api.js'
+import { isCurrentPool, refreshEspnPool, refreshLivePool, resetAdminPassword, updatePassword } from '../src/api.js'
 
 afterEach(() => localStorage.clear())
 
@@ -23,6 +23,26 @@ describe('direct ESPN live refresh', () => {
     const now = Date.parse('2026-08-29T12:00:00Z')
     expect(isCurrentPool([{ kickoff: '2026-08-29T00:00:00Z' }], now)).toBe(true)
     expect(isCurrentPool([{ kickoff: '2026-08-20T00:00:00Z' }], now)).toBe(false)
+  })
+
+  it('uses the admin reset RPC and authenticated self-service password update', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    const calls = []
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+      calls.push([url, options])
+      return { ok: true, json: async () => ({ reset: true }) }
+    }))
+
+    await resetAdminPassword('admin-access', 'player-1', 'Nfl!7Temporary')
+    await updatePassword('player-access', 'new-password')
+
+    expect(calls[0][0]).toBe('https://example.supabase.co/rest/v1/rpc/admin_reset_password')
+    expect(calls[0][1].headers.authorization).toBe('Bearer admin-access')
+    expect(JSON.parse(calls[0][1].body)).toEqual({ p_user_id: 'player-1', p_temporary_password: 'Nfl!7Temporary' })
+    expect(calls[1][0]).toBe('https://example.supabase.co/auth/v1/user')
+    expect(calls[1][1].headers.authorization).toBe('Bearer player-access')
+    expect(JSON.parse(calls[1][1].body)).toEqual({ password: 'new-password' })
   })
 
   it('uses the browser cache for older weeks, even when forced', async () => {

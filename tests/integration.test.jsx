@@ -114,7 +114,9 @@ describe('four-user application flow', () => {
     const user = userEvent.setup()
     history.replaceState({}, '', '/?pool=preseason-01')
     render(<App />)
-    expect(screen.getAllByText('Rehearsal — does not count.').length).toBeGreaterThan(0)
+    expect(screen.queryByText('2026 season')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Preseason 1' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rehearsal.*does not count/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     expect(screen.getByText(/Preseason, regular season, and postseason results/)).toBeInTheDocument()
     expect(screen.getByText(/Includes preseason/)).toBeInTheDocument()
@@ -219,5 +221,27 @@ describe('four-user application flow', () => {
     expect(screen.getByRole('columnheader', { name: 'Moneyline' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'AVG' })).toBeInTheDocument()
     expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
+  })
+
+  it('orders model rows by game time and every model column', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Models' }))
+    const order = screen.getByLabelText('Order models by')
+    expect(within(order).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Game time', 'Game', 'FPI', 'FPI rank', 'Moneyline', 'Moneyline rank', 'AVG', 'AVG rank', 'Home probabilities', 'Disagreement',
+    ])
+    const rows = () => [...document.querySelectorAll('table tbody tr')]
+    expect(rows()[0]).toHaveTextContent('DAL')
+    await user.selectOptions(order, 'fpi')
+    expect(rows()[0]).toHaveTextContent('DAL')
+    expect(rows()[1]).toHaveTextContent('TB')
+    for (const key of ['game', 'fpiRank', 'moneyline', 'moneylineRank', 'avg', 'avgRank', 'homeProbability', 'disagreement']) {
+      await user.selectOptions(order, key)
+      expect(rows()).toHaveLength(4)
+    }
+    await user.selectOptions(order, 'kickoff')
+    await user.click(screen.getByRole('button', { name: 'Model sort direction' }))
+    expect(rows()[0]).toHaveTextContent('CIN')
   })
 })
