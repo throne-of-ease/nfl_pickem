@@ -8,6 +8,7 @@ describe('four-user application flow', () => {
   it('opens on the four-player game overview with compact logo picks', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Game overview' })).toBeInTheDocument()
+    expect(screen.queryByText('Every revealed pick, confidence, score, and player position in one place.')).not.toBeInTheDocument()
     expect(screen.getByRole('table', { name: /All player picks/ })).toBeInTheDocument()
     expect(screen.getAllByTestId(/overview-row-/)).toHaveLength(4)
     for (const name of ['Alex', 'Blair', 'Casey', 'Devon']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
@@ -46,7 +47,7 @@ describe('four-user application flow', () => {
     expect(document.querySelectorAll('.overview-table .live-badge')).toHaveLength(1)
     await user.click(screen.getByTestId('overview-sort-gq'))
     const rows = screen.getAllByTestId(/overview-row-/)
-    expect(rows[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g2')
+    expect(rows[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g1')
     await user.click(screen.getByTestId('overview-sort-gq'))
     expect(screen.getAllByTestId(/overview-row-/)[0]).toHaveAttribute('data-testid', 'overview-row-week-02-g1')
     await user.click(screen.getByRole('checkbox', { name: 'Show GQ / Dev' }))
@@ -224,25 +225,22 @@ describe('four-user application flow', () => {
     expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
   })
 
-  it('orders model rows by game time and every model column', async () => {
+  it('orders model rows by clicking every model table heading', async () => {
     const user = userEvent.setup()
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Models' }))
-    const order = screen.getByLabelText('Order models by')
-    expect(within(order).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Game time', 'Game', 'FPI', 'FPI rank', 'Moneyline', 'Moneyline rank', 'AVG', 'AVG rank', 'Home probabilities', 'Disagreement',
-    ])
     const rows = () => [...document.querySelectorAll('table tbody tr')]
     expect(rows()[0]).toHaveTextContent('DAL')
-    await user.selectOptions(order, 'fpi')
+    await user.click(screen.getByTestId('models-sort-fpi'))
+    expect(rows()[0]).toHaveTextContent('KC')
+    await user.click(screen.getByTestId('models-sort-fpi'))
     expect(rows()[0]).toHaveTextContent('DAL')
-    expect(rows()[1]).toHaveTextContent('TB')
-    for (const key of ['game', 'fpiRank', 'moneyline', 'moneylineRank', 'avg', 'avgRank', 'homeProbability', 'disagreement']) {
-      await user.selectOptions(order, key)
+    for (const key of ['game', 'fpi-rank', 'moneyline', 'moneyline-rank', 'avg', 'avg-rank', 'probability', 'disagreement']) {
+      await user.click(screen.getByTestId(`models-sort-${key}`))
       expect(rows()).toHaveLength(4)
     }
-    await user.selectOptions(order, 'kickoff')
-    await user.click(screen.getByRole('button', { name: 'Model sort direction' }))
-    expect(rows()[0]).toHaveTextContent('CIN')
+    expect(screen.getByTestId('models-sort-disagreement').closest('th')).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(screen.getByTestId('models-sort-game'))
+    expect(rows()[0]).toHaveTextContent('DAL')
   })
 })

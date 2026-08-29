@@ -45,15 +45,15 @@ describe('direct ESPN live refresh', () => {
     expect(JSON.parse(calls[1][1].body)).toEqual({ password: 'new-password' })
   })
 
-  it('uses the browser cache for older weeks, even when forced', async () => {
-    const fetcher = vi.fn()
+  it('uses the browser cache for older weeks until an explicit refresh is requested', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ content: { sbData: { events: [] } } }) }))
     const historical = [{ id: 'old', kickoff: '2026-08-01T00:00:00Z', status: 'final', away: 'A', home: 'B' }]
     const first = await refreshEspnPool('week-01', { serverGames: historical, serverAsOf: '2026-08-02T00:00:00Z', fetcher })
     const second = await refreshEspnPool('week-01', { serverGames: historical, forceRefresh: true, fetcher })
 
-    expect(fetcher).not.toHaveBeenCalled()
+    expect(fetcher).toHaveBeenCalledTimes(1)
     expect(first).toMatchObject({ games: historical, cached: true, cacheScope: 'historical' })
-    expect(second).toMatchObject({ games: historical, cached: true, cacheScope: 'historical' })
+    expect(second).toMatchObject({ games: [], cached: false })
   })
 
   it('fetches the current scoreboard and each game package without Supabase data', async () => {
@@ -71,5 +71,19 @@ describe('direct ESPN live refresh', () => {
     expect(requests.some((url) => url.includes('cdn.espn.com/core/nfl/game') && url.includes('gameId=g1'))).toBe(true)
     expect(requests.every((url) => url.includes('_nfl_pickem='))).toBe(true)
     expect(result.games[0]).toMatchObject({ status: 'live', awayScore: 10, homeScore: 14, homeWinProbability: .72, awayWinProbability: .28, gotw: true, locked: true })
+  })
+
+  it('force refreshes a historical slate and requests model data', async () => {
+    const requests = []
+    const fetcher = async (url) => {
+      requests.push(url)
+      if (url.includes('scoreboard')) return { ok: true, json: async () => scoreboard }
+      return { ok: false, json: async () => ({}) }
+    }
+    const result = await refreshLivePool('week-01', [{ id: 'g1', kickoff: '2025-09-01T00:00:00Z', away: 'PIT', home: 'BUF' }], { currentWeek: false, forceRefresh: true, fetcher })
+
+    expect(result.cached).toBe(false)
+    expect(requests.some((url) => url.includes('powerindex'))).toBe(true)
+    expect(result.games[0]).toMatchObject({ id: 'g1', status: 'live', away: 'PIT', home: 'BUF' })
   })
 })

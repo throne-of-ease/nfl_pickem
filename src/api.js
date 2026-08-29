@@ -132,7 +132,7 @@ export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGam
   if (!pool) throw apiError('UNKNOWN_POOL', 404)
   const cached = readEspnCache(poolKey)
   const current = currentWeek ?? isCurrentPool([...serverGames, ...(cached?.games ?? [])])
-  if (!current) {
+  if (!current && !forceRefresh) {
     if (cached?.games?.length) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'historical' }
     if (serverGames.length) {
       const value = { games: serverGames, asOf: serverAsOf ?? new Date().toISOString(), source: 'Supabase schedule cache', cached: true, freshness: 'cached', cacheScope: 'historical' }
@@ -156,9 +156,9 @@ const mergeGames = (serverGames, espnGames) => {
   return [...merged, ...espnGames.filter((game) => !known.has(game.id))]
 }
 
-export async function refreshLivePool(poolKey, previousGames = [], { currentWeek = null, signal, fetcher = fetch } = {}) {
+export async function refreshLivePool(poolKey, previousGames = [], { currentWeek = null, forceRefresh = false, signal, fetcher = fetch } = {}) {
   const current = currentWeek ?? isCurrentPool(previousGames)
-  const espn = await refreshEspnPool(poolKey, { forceRefresh: current, currentWeek: current, serverGames: previousGames, fetcher, signal, includeFpi: false })
+  const espn = await refreshEspnPool(poolKey, { forceRefresh: current || forceRefresh, currentWeek: current, serverGames: previousGames, fetcher, signal, includeFpi: forceRefresh })
   return { ...espn, games: mergeGames(previousGames, espn.games), asOf: espn.asOf, espnAsOf: espn.asOf }
 }
 
