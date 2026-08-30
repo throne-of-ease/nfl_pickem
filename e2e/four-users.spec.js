@@ -389,6 +389,13 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await expect(page.getByText('OVERRIDE DELETED')).toBeVisible()
   await page.getByRole('tab', { name: 'Game of the Week' }).click()
   await expect(page.getByRole('heading', { name: 'Weekly Game of the Week' })).toBeVisible()
+  if (testInfo.project.name === 'iphone12pro') {
+    const tableBox = await page.locator('.gotw-table').boundingBox()
+    const scrollBox = await page.locator('.gotw-table').locator('..').boundingBox()
+    expect(tableBox.width).toBeLessThanOrEqual(scrollBox.width)
+    expect(await page.locator('.gotw-table').evaluate((table) => table.scrollWidth)).toBeLessThanOrEqual(Math.ceil(tableBox.width))
+    await page.locator('.admin-gotw').screenshot({ path: testInfo.outputPath('iphone12pro-admin-gotw.png') })
+  }
   await expect(page.getByRole('columnheader', { name: 'GQ' })).toBeVisible()
   await expect(page.getByRole('cell', { name: '74.5', exact: true })).toBeVisible()
   await page.getByRole('radio', { name: /Assign A @ B/ }).check()

@@ -156,6 +156,7 @@ export function poolMetrics(users, games, picksByUser, provisional = false) {
       pointsLost: scores.reduce((sum, score) => sum + (score.scored && !score.correct ? score.stake : 0), 0),
       correct: scores.filter((score) => score.correct).length,
       played: scores.filter((score) => score.scored).length,
+      picksMade: picks.filter((pick) => pick.team).length,
       maximum: games.length * (games.length + 1) / 2 + games.filter((game) => game.gotw).length * 5,
       scores,
     }

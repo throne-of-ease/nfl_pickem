@@ -18,6 +18,10 @@ describe('four-user application flow', () => {
     expect(headers[1]).toHaveTextContent('Score')
     expect(headers[headers.length - 2]).toHaveTextContent('GQ')
     expect(headers[headers.length - 1]).toHaveTextContent('Dev')
+    const gotw = screen.getByTitle('Game of the Week')
+    expect(gotw).toHaveTextContent('GOTW +5')
+    expect(gotw.previousElementSibling).toHaveClass('overview-game-line')
+    expect([...document.querySelectorAll('.overview-player small')].every((item) => /^\d+\/-\d+\/\d+$/.test(item.textContent))).toBe(true)
   })
 
   it('orders the overview by kickoff when the Score header is selected', async () => {
@@ -31,6 +35,20 @@ describe('four-user application flow', () => {
       'overview-row-week-02-g4', 'overview-row-week-02-g3', 'overview-row-week-02-g2', 'overview-row-week-02-g1',
     ])
     expect(scoreHeader).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('also orders the overview by kickoff from the Game header', async () => {
+    history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
+    const user = userEvent.setup()
+    render(<App />)
+    const gameHeader = screen.getByTestId('overview-sort-game').closest('th')
+    expect(gameHeader).toHaveAttribute('aria-sort', 'none')
+    await user.click(screen.getByTestId('overview-sort-game'))
+    expect(gameHeader).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(screen.getByTestId('overview-sort-game'))
+    expect(screen.getAllByTestId(/overview-row-/).map((row) => row.dataset.testid)).toEqual([
+      'overview-row-week-02-g4', 'overview-row-week-02-g3', 'overview-row-week-02-g2', 'overview-row-week-02-g1',
+    ])
   })
 
   it('hides every player pick before kickoff and reveals live picks as pending when provisional scoring is off', async () => {
@@ -106,6 +124,9 @@ describe('four-user application flow', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Include model picks' }))
     for (const name of ['FPI', 'Moneyline', 'AVG']) expect(screen.getByRole('columnheader', { name: new RegExp(name) })).toBeInTheDocument()
     expect(document.querySelectorAll('td.model-column')).toHaveLength(12)
+    expect(document.querySelectorAll('th.model-column .overview-player span')).toHaveLength(3)
+    expect([...document.querySelectorAll('th.model-column .overview-player span')].every((item) => /^-?\d+$/.test(item.textContent))).toBe(true)
+    expect(screen.queryByText('MODEL')).not.toBeInTheDocument()
   })
 
   it('renders all four accessible charts and every display mode', async () => {
@@ -141,6 +162,9 @@ describe('four-user application flow', () => {
     expect(screen.queryByRole('button', { name: 'Standings' })).not.toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'Current standings' })).toBeInTheDocument()
     expect(screen.getAllByTestId(/standings-table/)).toHaveLength(1)
+    const standings = screen.getByRole('table', { name: 'Current standings' })
+    expect(within(standings).queryByRole('columnheader', { name: 'Up to' })).not.toBeInTheDocument()
+    for (const name of ['Pick %', 'Point %', 'Games picked']) expect(within(standings).getByRole('columnheader', { name })).toBeInTheDocument()
     expect(document.querySelector('.standings-card').nextElementSibling).toHaveClass('charts')
     expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
   })
@@ -270,6 +294,8 @@ describe('four-user application flow', () => {
     expect(screen.getByRole('columnheader', { name: 'Moneyline' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'AVG' })).toBeInTheDocument()
     expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
+    expect(document.querySelectorAll('.model-pick-probability')).toHaveLength(document.querySelectorAll('.model-pick').length)
+    expect([...document.querySelectorAll('.model-pick-probability')].every((item) => /^\d+\.\d%$/.test(item.textContent))).toBe(true)
   })
 
   it('orders model rows by clicking every model table heading', async () => {

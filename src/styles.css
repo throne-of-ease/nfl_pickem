@@ -153,7 +153,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 
 .overview-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
 .overview-table { width: 100%; min-width: 0; margin: 0; table-layout: fixed; }
-.overview-table th, .overview-table td { padding: .22rem .28rem; text-align: center; }
+.overview-table th, .overview-table td { padding: .18rem .2rem; text-align: center; }
 .overview-table .overview-game-column { width: 6.4rem; min-width: 6.4rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
 .overview-table .overview-score-column { width: 3.15rem; min-width: 3.15rem; }
 .overview-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-raised); }
@@ -168,11 +168,12 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-player strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--ink); text-align: center; }
 .overview-player b { color: var(--warning); font-size: 1rem; }
 .overview-player span { color: var(--success); font-size: .62rem; text-align: center; letter-spacing: .08em; }
-.overview-player small { color: var(--muted); font-size: .58rem; font-weight: 500; letter-spacing: 0; text-align: center; text-transform: none; }
-.overview-game { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+.overview-player small { color: var(--muted); font-size: .56rem; font-weight: 500; letter-spacing: 0; text-align: center; text-transform: none; }
+.overview-game { display: grid; justify-items: start; gap: .08rem; min-width: 0; }
+.overview-game-line { display: flex; align-items: center; gap: .2rem; min-width: 0; }
 .overview-game .live-badge { padding: 1px 3px; font-size: .42rem !important; letter-spacing: .02em !important; }
 .overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .66rem; }
-.overview-gotw { color: var(--warning); font-size: .58rem; }
+.overview-gotw { display: block; color: var(--warning); font-size: .52rem; line-height: 1; }
 .overview-score { display: grid; justify-items: center; align-content: center; gap: .04rem; min-height: 2rem; font-variant-numeric: tabular-nums; line-height: 1; }
 .overview-score strong { font-size: .7rem; }
 .overview-score small, .overview-schedule span, .overview-schedule strong { color: var(--muted); font-size: .52rem; letter-spacing: .04em; }
@@ -189,13 +190,14 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .pick-hidden, .pick-empty { display: inline-grid; width: 32px; height: 32px; place-items: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 50%; }
 .overview-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin: .55rem 0 0; font-size: .65rem; }
 .overview-legend span { width: 7px; height: 7px; border-radius: 50%; margin-left: .4rem; }
-.game-metric { width: 2.7rem; min-width: 2.7rem; color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; }
+.game-metric { width: 2.35rem; min-width: 2.35rem; color: var(--muted); font-size: .64rem; font-variant-numeric: tabular-nums; }
 .table-sort-button { padding: 0; border: 0; background: transparent; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .table-sort-button:hover, .table-sort-button:focus-visible { color: var(--ink); background: transparent; }
 .correct-dot { background: var(--success); }
 .incorrect-dot { background: var(--live); }
 .pending-dot { background: var(--muted); }
 .model-pick, .model-matchup { display: inline-flex; align-items: center; gap: .35rem; }
+.model-pick-probability { color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; }
 .model-pick-rank { display: none; color: var(--accent); font-size: .64rem; font-weight: 900; }
 .model-game { display: grid; gap: .25rem; }
 .model-game time { color: var(--muted); font-size: .65rem; }
@@ -361,12 +363,12 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-table th, .overview-table td { padding: .1rem .05rem; }
   .overview-table .overview-game-column { width: 4.25rem; min-width: 4.25rem; }
   .overview-table .overview-score-column { width: 2.8rem; min-width: 2.8rem; }
-  .overview-table .game-metric { width: 2.1rem; min-width: 2.1rem; }
+  .overview-table .game-metric { width: 1.8rem; min-width: 1.8rem; }
   .overview-player { min-width: 2.35rem; display: grid; grid-template-columns: 1fr; justify-items: center; gap: .04rem; }
   .overview-player strong { max-width: 2.3rem; text-align: center; font-size: .58rem; line-height: 1; }
   .overview-player b { font-size: .78rem; line-height: 1; }
   .overview-player span { font-size: .52rem; line-height: 1; }
-  .overview-player small { display: block; max-width: 3.8rem; font-size: .47rem; line-height: 1; }
+  .overview-player small { display: block; max-width: 3.8rem; font-size: .45rem; line-height: 1; letter-spacing: -.02em; }
   .overview-matchup { font-size: .58rem; }
   .overview-gotw { font-size: .5rem; }
   .overview-score { min-height: 1.8rem; }
@@ -378,12 +380,22 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-pick .team-logo { width: 15px; height: 15px; }
   .overview-pick span { font-size: .58rem; line-height: 1; }
   .pick-hidden, .pick-empty { width: 1.65rem; height: 1.65rem; font-size: .64rem; }
-  .game-metric { font-size: .58rem; }
+  .game-metric { font-size: .54rem; }
   .admin-override { grid-template-columns: 1fr 1fr; }
   .admin-override button { grid-column: 1 / -1; }
   nav button.models-tab { max-width: 4.25rem; white-space: normal; line-height: 1.05; text-align: center; }
   nav button.models-tab .models-word-second { display: block; }
-  .gotw-table { min-width: 560px; }
+  .gotw-table { min-width: 0; table-layout: fixed; }
+  .gotw-table th, .gotw-table td { padding: .25rem .12rem; font-size: .6rem; }
+  .gotw-table th:first-child { width: 38%; }
+  .gotw-table th:nth-child(2) { width: 27%; }
+  .gotw-table th:nth-child(3) { width: 12%; }
+  .gotw-table th:nth-child(4) { width: 23%; }
+  .gotw-table .gotw-matchup { gap: .1rem; }
+  .gotw-table .gotw-matchup strong { min-width: 0; font-size: .65rem; }
+  .gotw-table .gotw-matchup .team-logo { width: 15px; height: 15px; }
+  .gotw-table td time { white-space: normal; font-size: .55rem; }
+  .gotw-state label { gap: .15rem; font-size: .58rem; }
   .standings-card { padding: .55rem .45rem; }
   .standings-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
   .standings-table th, .standings-table td { padding: .3rem .35rem; }
@@ -402,6 +414,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .models-table .model-pick { display: grid; justify-items: center; gap: .05rem; }
   .models-table .model-pick-team { display: none; }
   .models-table .model-pick-rank { display: block; }
+  .models-table .model-pick-probability { font-size: .52rem; line-height: 1; }
   .models-table .model-pick .team-logo { width: 19px; height: 19px; }
   .models-table .model-game { gap: .1rem; }
   .models-table .model-matchup { gap: .12rem; font-size: .6rem; }

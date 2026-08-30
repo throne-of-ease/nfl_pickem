@@ -20,9 +20,8 @@ const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 
 function GameSummary({ game }) {
   return <div className="overview-game">
-    <strong className="overview-matchup">{game.away}@{game.home}</strong>
-    {(game.status === 'live' || game.status === 'in') && <b className="overview-live live-badge">LIVE</b>}
-    {game.gotw && <b className="overview-gotw" title="Game of the Week">+5</b>}
+    <span className="overview-game-line"><strong className="overview-matchup">{game.away}@{game.home}</strong>{(game.status === 'live' || game.status === 'in') && <b className="overview-live live-badge">LIVE</b>}</span>
+    {game.gotw && <b className="overview-gotw" title="Game of the Week">GOTW +5</b>}
   </div>
 }
 
@@ -47,7 +46,7 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
   </div>
 }
 
-export function Overview({ players, games, picksByUser, history, pool, provisional, onProvisional }) {
+export function Overview({ players, games, picksByUser, history, modelHistory, pool, provisional, onProvisional }) {
   const [showModels, setShowModels] = useState(false)
   const [showGameMetrics, setShowGameMetrics] = useState(true)
   const [sort, setSort] = useState({ key: 'score', direction: 'ascending' })
@@ -69,6 +68,7 @@ export function Overview({ players, games, picksByUser, history, pool, provision
     return dateOrder || a.id.localeCompare(b.id)
   })
   const totals = new Map(history.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
+  const modelTotals = new Map(modelHistory.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
   const metrics = poolMetrics(players, games, picksByUser, provisional)
     .map((player) => ({ ...player, seasonTotal: totals.get(player.id) ?? 0, displayTotal: totals.get(player.id) ?? 0 }))
     .sort((a, b) => b.displayTotal - a.displayTotal || b.points - a.points || a.name.localeCompare(b.name))
@@ -77,7 +77,7 @@ export function Overview({ players, games, picksByUser, history, pool, provision
     { id: 'model-fpi', name: 'FPI', picks: modelPicks(games, 'predictor') },
     { id: 'model-moneyline', name: 'Moneyline', picks: modelPicks(games, 'moneyline') },
     { id: 'model-avg', name: 'AVG', picks: modelPicks(games, 'aggregate') },
-  ].map((model) => ({ ...poolMetrics([model], games, { [model.id]: model.picks }, provisional)[0], displayTotal: 0, model: true })) : []
+  ].map((model) => ({ ...poolMetrics([model], games, { [model.id]: model.picks }, provisional)[0], displayTotal: modelTotals.get(model.id) ?? 0, model: true })) : []
   const columns = [...metrics, ...modelColumns]
 
   return <section>
@@ -87,8 +87,8 @@ export function Overview({ players, games, picksByUser, history, pool, provision
     </div>
     <div className="overview-scroll">
       <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
-         <thead><tr><th className="overview-game-column">Game</th><th className="overview-score-column" aria-sort={sort.key === 'score' ? sort.direction : 'none'} title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)"><button className="table-sort-button" type="button" data-testid="overview-sort-score" onClick={() => sortBy('score')}>Score{sortIndicator('score')}</button></th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
-          <div className="overview-player"><strong>{player.name}</strong><b title={player.model ? 'Model points for this week' : 'Total season score'}>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="This week: points / points lost / points left">{player.points} / -{player.pointsLost} / {player.potential}</small></div>
+         <thead><tr><th className="overview-game-column" aria-sort={sort.key === 'game' ? sort.direction : 'none'}><button className="table-sort-button" type="button" data-testid="overview-sort-game" onClick={() => sortBy('game')}>Game{sortIndicator('game')}</button></th><th className="overview-score-column" aria-sort={sort.key === 'score' ? sort.direction : 'none'} title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)"><button className="table-sort-button" type="button" data-testid="overview-sort-score" onClick={() => sortBy('score')}>Score{sortIndicator('score')}</button></th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
+          <div className="overview-player"><strong>{player.name}</strong><b title="Total season score">{player.displayTotal}</b><span>{!player.model && index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="This week: points / points lost / points left">{player.points}/-{player.pointsLost}/{player.potential}</small></div>
          </th>)}{showGameMetrics && <><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}</tr></thead>
         <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
       </table>

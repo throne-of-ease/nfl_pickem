@@ -139,7 +139,7 @@ describe('tracker-compatible analytics', () => {
       { gameId: 'two', team: 'C', confidence: 2 },
       { gameId: 'three', team: 'F', confidence: 3 },
     ] }, true)[0]
-    expect(metrics).toMatchObject({ points: 2, pointsLost: 6, potential: 3, correct: 1, played: 2, maximum: 11 })
+    expect(metrics).toMatchObject({ points: 2, pointsLost: 6, potential: 3, correct: 1, played: 2, picksMade: 3, maximum: 11 })
   })
 
   it('keeps still-assignable confidence available in a partial draft', () => {
