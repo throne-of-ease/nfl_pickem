@@ -191,6 +191,8 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .chart-actions label { display: grid; gap: .2rem; color: var(--muted); font-size: .68rem; }
 .chart-scroll { max-width: 100%; overflow: auto; }
 .chart { display: block; min-width: 620px; width: 100%; height: auto; }
+.chart-footer { display: flex; justify-content: center; margin-top: .55rem; }
+.chart-footer button { font-size: .72rem; }
 .chart text { fill: #b7c7da; font-size: 13px; }
 .chart circle { fill: #07111f; stroke: white; stroke-width: 2; }
 details { margin-top: .7rem; }
@@ -267,7 +269,7 @@ footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center;
 
 @media (max-width: 760px) {
   header { position: static; flex-wrap: wrap; gap: .4rem .7rem; }
-  nav { order: 3; width: 100%; overflow: auto; }
+  nav { order: 3; flex: 0 0 100%; width: 100%; overflow: auto; }
   nav button { padding-inline: .55rem; }
   .signed-in { order: 2; }
   .account-toggle { display: inline-block; }
@@ -299,7 +301,6 @@ footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center;
 }
 
 @media (max-width: 430px) {
-  .brand { width: 100%; }
   .setup-button { margin-left: 0; }
   .hero h1 { font-size: 1.45rem; }
   .hero label { gap: .3rem; }

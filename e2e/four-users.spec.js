@@ -180,6 +180,15 @@ test('production registration starts a session without email confirmation', asyn
   if (testInfo.project.name !== 'desktop') {
     await expect(page.getByRole('button', { name: 'Player options' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible()
+    const brandBox = await page.locator('header .brand').boundingBox()
+    const signedInBox = await page.locator('header .signed-in').boundingBox()
+    const navBox = await page.locator('header nav').boundingBox()
+    expect(brandBox).not.toBeNull()
+    expect(signedInBox).not.toBeNull()
+    expect(navBox).not.toBeNull()
+    expect(Math.abs(brandBox.y - signedInBox.y)).toBeLessThan(8)
+    expect(signedInBox.x).toBeGreaterThan(brandBox.x)
+    expect(navBox.y).toBeGreaterThan(brandBox.y + brandBox.height - 1)
     await page.getByRole('button', { name: 'Player options' }).click()
     await expect(page.getByRole('button', { name: 'Change password' })).toBeVisible()
   }

@@ -17,10 +17,10 @@ export const weeklyChartSeries = (history, mode) => history.users.map((user) => 
       : value),
 }))
 
-export const cumulativeChartSeries = (history) => history.users.map((user) => ({
+export const cumulativeChartSeries = (history, showPotential = true) => history.users.map((user) => ({
   name: user.name,
   values: user.relative,
-  potentialValues: user.relativePotential,
+  ...(showPotential ? { potentialValues: user.relativePotential } : {}),
 }))
 
 export const gotwChartData = (history, mode) => history.users.map((user, colorIndex) => ({
@@ -81,7 +81,7 @@ export async function shareSvgAsPng(svg, filename) {
   return downloadSvgAsPng(svg, filename)
 }
 
-function ChartFrame({ id, title, description, modes = [], mode, onMode, children, table }) {
+function ChartFrame({ id, title, description, modes = [], mode, onMode, children, table, footer }) {
   const ref = useRef(null)
   return <section className="chart-card" aria-labelledby={`${id}-title`}>
     <div className="chart-heading">
@@ -93,6 +93,7 @@ function ChartFrame({ id, title, description, modes = [], mode, onMode, children
       </div>
     </div>
     <div className="chart-scroll">{React.cloneElement(children, { chartRef: ref })}</div>
+    {footer}
     {table}
   </section>
 }
@@ -116,7 +117,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel }) {
     {labels.map((label, index) => <text key={label} x={x(index)} y={height - 18} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
       <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />
-      {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="2" strokeDasharray="7 6" opacity=".7" points={item.potentialValues.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />}
+      {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />}
       {item.values.map((value, index) => <circle key={index} cx={x(index)} cy={y(value)} r="5"><title>{item.name}, {labels[index]}: {value.toFixed(1)}</title></circle>)}
     </g>)}
   </svg>
@@ -149,8 +150,10 @@ export function WeeklyPointsChart({ history }) {
 }
 
 export function CumulativePointsChart({ history }) {
-  const series = cumulativeChartSeries(history)
-  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: best remaining gap. Includes preseason." table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={series.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" /></ChartFrame>
+  const [showPotential, setShowPotential] = useState(true)
+  const series = cumulativeChartSeries(history, showPotential)
+  const tableSeries = cumulativeChartSeries(history)
+  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: potential points gap. Includes preseason." footer={<div className="chart-footer"><button type="button" aria-pressed={showPotential} onClick={() => setShowPotential((visible) => !visible)}>{showPotential ? 'Hide potential' : 'Show potential'}</button></div>} table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={tableSeries.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" /></ChartFrame>
 }
 
 export function GotwChart({ history }) {
