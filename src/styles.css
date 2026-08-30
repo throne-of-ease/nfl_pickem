@@ -131,6 +131,14 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .leaderboard li { display: grid; grid-template-columns: 2.3rem 1fr auto 7rem; align-items: center; gap: 1rem; padding: .8rem .6rem; border-bottom: 1px solid var(--line); }
 .rank { color: var(--accent); font-weight: 900; font-size: 1.1rem; }
 .leaderboard small { color: var(--muted); text-align: right; }
+.standings-card { margin-top: .35rem; padding: .7rem .8rem; background: var(--surface); border: 1px solid var(--line); }
+.standings-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.standings-heading h3 { margin: 0; font-size: .95rem; }
+.standings-heading .rehearsal { margin: .2rem 0 0; }
+.standings-table { margin-top: .35rem; }
+.standings-table th, .standings-table td { padding: .38rem .5rem; font-size: .78rem; }
+.standings-table th { font-size: .62rem; }
+.standings-table tbody th { color: var(--accent); }
 .provisional-toggle { display: flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .provisional-toggle input { accent-color: var(--accent); }
 .overview-options { display: grid; gap: .35rem; }
@@ -205,7 +213,8 @@ th { color: var(--accent); font-size: .7rem; letter-spacing: .05em; text-transfo
 .rules { max-width: 760px; }
 .rules h3 { margin-top: 1.3rem; }
 .rules p { line-height: 1.6; }
-footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; color: var(--muted); font-size: .72rem; }
+footer { border-top: 1px solid var(--line); padding: .7rem 1rem; text-align: center; color: var(--muted); font-size: .62rem; }
+footer [data-testid="real-data-status"] { display: block; }
 .auth-shell { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; }
 .auth-panel { width: min(100%, 420px); padding: 2rem; border: 1px solid var(--line); background: var(--surface); box-shadow: 10px 10px 0 color-mix(in srgb, var(--accent) 18%, transparent); }
 .auth-panel .brand { display: inline-flex; margin-bottom: 2.5rem; }
@@ -286,12 +295,24 @@ footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center;
   .save-state { align-self: flex-start; }
   .slate-head { display: none; }
   .games { border-top: 1px solid var(--ink); }
-  .game { grid-template-columns: minmax(0, 1fr) 6rem; grid-template-areas: "meta confidence" "matchup matchup"; gap: .35rem .6rem; padding: .5rem .35rem .6rem; }
+  .game { grid-template-columns: 4.9rem minmax(0, 1fr) 5rem; grid-template-areas: "meta matchup confidence"; gap: .25rem .35rem; min-height: 46px; padding: .3rem .25rem; }
   .game-meta { grid-area: meta; }
   .game fieldset { grid-area: matchup; }
   .confidence-cell { grid-area: confidence; min-height: 32px; }
-  .teams label { height: 39px; padding-inline: .5rem; }
-  .team-logo { width: 20px; height: 20px; }
+  .game-meta { display: grid; align-content: center; gap: .08rem; }
+  .game-meta time { gap: .2rem; }
+  .game-meta time span { font-size: .52rem; letter-spacing: .06em; }
+  .game-meta time strong { font-size: .68rem; }
+  .game-status, .gotw { font-size: .5rem; letter-spacing: .05em; }
+  .game-status small { font-size: .48rem; }
+  .teams label { height: 30px; gap: .2rem; padding-inline: .25rem; font-size: .72rem; }
+  .teams input { width: 11px; height: 11px; }
+  .team-logo { width: 18px; height: 18px; }
+  .teams b { margin-left: auto; font-size: .68rem; }
+  .confidence-cell { gap: .15rem; padding-left: .25rem; }
+  .drag-handle { width: 17px; height: 26px; font-size: .78rem; }
+  .confidence { font-size: .5rem; }
+  .confidence select { width: 34px; height: 26px; padding-inline: .1rem; font-size: .72rem; }
   .overview-title { flex-direction: column; align-items: flex-start; }
   .overview-options { width: 100%; display: flex; flex-wrap: wrap; gap: .5rem .8rem; }
   .chart-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
@@ -338,6 +359,7 @@ footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center;
   .admin-override { grid-template-columns: 1fr 1fr; }
   .admin-override button { grid-column: 1 / -1; }
   .gotw-table { min-width: 560px; }
-  .teams input { width: 12px; height: 12px; }
-  .teams label { gap: .35rem; font-size: .85rem; }
+  .standings-card { padding: .55rem .45rem; }
+  .standings-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
+  .standings-table th, .standings-table td { padding: .3rem .35rem; }
 }

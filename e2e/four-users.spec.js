@@ -88,9 +88,9 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await page.getByLabel('Current week display mode').selectOption('absolute')
   await page.getByLabel('Points per week display mode').selectOption('absolute')
   await page.getByLabel('Game of the Week display mode').selectOption('absolute')
+  await expect(page.locator('[data-testid="standings-table"] tbody tr')).toHaveCount(4)
+  await expect(page.locator('.standings-card').locator('h3')).toContainText('Standings')
   await page.screenshot({ path: testInfo.outputPath('charts.png'), fullPage: true })
-  await page.getByRole('button', { name: 'Standings' }).click()
-  await expect(page.locator('.leaderboard li')).toHaveCount(4)
   await page.getByRole('button', { name: 'Models' }).click()
   await expect(page.getByRole('columnheader', { name: 'FPI', exact: true })).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(4)
@@ -139,6 +139,21 @@ test('dragging a pick row swaps confidence and team buttons remain clickable', a
   await expect(page.getByLabel('CIN at CLE confidence')).toHaveValue('3')
   await page.getByRole('radio', { name: /DAL/ }).check()
   await expect(page.getByRole('radio', { name: /DAL/ })).toBeChecked()
+})
+
+test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
+  await page.goto('/?scenario=scheduled&pool=week-02')
+  await page.getByRole('button', { name: 'My picks' }).click()
+  const rows = page.locator('[data-testid^="game-row-"]')
+  await expect(rows).toHaveCount(4)
+  const rowBoxes = await rows.all()
+  const heights = []
+  for (const row of rowBoxes) heights.push((await row.boundingBox()).height)
+  expect(Math.max(...heights)).toBeLessThanOrEqual(50)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
+  await expect(page.locator('.game-meta time')).toHaveCount(4)
+  await page.screenshot({ path: testInfo.outputPath('iphone12pro-my-picks.png'), fullPage: false })
 })
 
 test('iPhone 12 Pro overview fits the compact 16-game table', async ({ page }, testInfo) => {
@@ -232,6 +247,9 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
   await expect(page.getByTestId('real-data-status')).toContainText('1 games')
+  await expect(page.getByTestId('real-data-status')).toHaveCount(1)
+  await expect(page.locator('main [data-testid="real-data-status"]')).toHaveCount(0)
+  await expect(page.locator('footer')).toContainText('Browser ESPN data')
   await expect(page.getByText(/28%.*72%/)).toBeVisible()
   await expect(page.getByText(/ESPN WP/)).toHaveCount(0)
   await expect.poll(() => scoreboardRequests).toBe(1)

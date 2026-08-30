@@ -121,6 +121,17 @@ describe('four-user application flow', () => {
     expect(within(screen.getByLabelText('Game of the Week display mode')).getAllByRole('option')).toHaveLength(3)
   })
 
+  it('puts compact standings first inside Charts', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Charts' }))
+    expect(screen.queryByRole('button', { name: 'Standings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Current standings' })).toBeInTheDocument()
+    expect(screen.getAllByTestId(/standings-table/)).toHaveLength(1)
+    expect(document.querySelector('.standings-card').nextElementSibling).toHaveClass('charts')
+    expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
+  })
+
   it('includes rehearsal results in the season charts', async () => {
     const user = userEvent.setup()
     history.replaceState({}, '', '/?pool=preseason-01')
