@@ -174,6 +174,27 @@ describe('four-user application flow', () => {
     expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
   })
 
+  it('sorts the Charts standings by player and numeric columns', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Charts' }))
+    const table = screen.getByRole('table', { name: 'Current standings' })
+    for (const key of ['rank', 'name', 'points', 'totalPoints', 'gotwPoints', 'gotwShare', 'withoutGotw', 'pickPercentage', 'pointPercentage', 'gamesPicked']) expect(screen.getByTestId(`standings-sort-${key}`)).toBeInTheDocument()
+    expect(screen.getByTestId('standings-sort-rank').closest('th')).toHaveAttribute('aria-sort', 'ascending')
+
+    await user.click(screen.getByTestId('standings-sort-name'))
+    const namesAscending = [...table.querySelectorAll('tbody tr')].map((row) => row.cells[1].textContent)
+    expect(namesAscending).toEqual([...namesAscending].sort((a, b) => a.localeCompare(b)))
+    expect(screen.getByTestId('standings-sort-name').closest('th')).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(screen.getByTestId('standings-sort-name'))
+    expect([...table.querySelectorAll('tbody tr')].map((row) => row.cells[1].textContent)).toEqual([...namesAscending].reverse())
+
+    await user.click(screen.getByTestId('standings-sort-points'))
+    const pointsAscending = [...table.querySelectorAll('tbody tr')].map((row) => Number(row.cells[2].textContent))
+    expect(pointsAscending).toEqual([...pointsAscending].sort((a, b) => a - b))
+    expect(screen.getByTestId('standings-sort-points').closest('th')).toHaveAttribute('aria-sort', 'ascending')
+  })
+
   it('keeps model rankings and charts opt-in on the Charts tab', async () => {
     const user = userEvent.setup()
     render(<App />)

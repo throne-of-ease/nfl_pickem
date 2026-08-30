@@ -161,8 +161,8 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 
 .overview-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
 .overview-table { width: 100%; min-width: 0; margin: 0; table-layout: fixed; }
-.overview-table th, .overview-table td { padding: .06rem .02rem; text-align: center; }
-.overview-table .overview-game-column { width: 4.45rem; min-width: 4.45rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
+.overview-table th, .overview-table td { padding: 0; text-align: center; }
+.overview-table .overview-game-column { width: 4.45rem; min-width: 4.45rem; text-align: center; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
 .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
 .overview-table .overview-game-column .table-sort-button, .overview-table .overview-score-column .table-sort-button { font-size: .47rem; }
 .overview-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-raised); }
@@ -178,8 +178,8 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-player b { color: var(--warning); font-size: 1rem; }
 .overview-player span { color: var(--success); font-size: .62rem; text-align: center; letter-spacing: .08em; }
 .overview-player small { color: var(--muted); font-size: .56rem; font-weight: 500; letter-spacing: 0; text-align: center; text-transform: none; }
-.overview-game { display: grid; justify-items: start; gap: .02rem; min-width: 0; }
-.overview-game-line { display: flex; align-items: center; gap: .08rem; min-width: 0; }
+.overview-game { display: grid; justify-items: center; gap: .02rem; min-width: 0; text-align: center; }
+.overview-game-line { display: flex; align-items: center; justify-content: center; gap: .08rem; min-width: 0; }
 .overview-game .live-badge { padding: 1px 3px; font-size: .42rem !important; letter-spacing: .02em !important; }
 .overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .66rem; }
 .overview-gotw { display: block; color: var(--warning); font-size: .52rem; line-height: 1; }
@@ -374,7 +374,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-options .provisional-toggle { gap: .3rem; font-size: .58rem; }
   .overview-scroll { overflow-x: auto; }
   .overview-table { width: 100%; min-width: 0; }
-  .overview-table th, .overview-table td { padding: .1rem .05rem; }
+  .overview-table th, .overview-table td { padding: 0; }
   .overview-table .overview-game-column { width: 3.3rem; min-width: 3.3rem; }
   .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
   .overview-table .game-metric { width: 2rem; min-width: 2rem; }
