@@ -20,6 +20,19 @@ describe('four-user application flow', () => {
     expect(headers[headers.length - 1]).toHaveTextContent('Dev')
   })
 
+  it('orders the overview by kickoff when the Score header is selected', async () => {
+    history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
+    const user = userEvent.setup()
+    render(<App />)
+    const scoreHeader = screen.getByTestId('overview-sort-score').closest('th')
+    expect(scoreHeader).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(screen.getByTestId('overview-sort-score'))
+    expect(screen.getAllByTestId(/overview-row-/).map((row) => row.dataset.testid)).toEqual([
+      'overview-row-week-02-g4', 'overview-row-week-02-g3', 'overview-row-week-02-g2', 'overview-row-week-02-g1',
+    ])
+    expect(scoreHeader).toHaveAttribute('aria-sort', 'descending')
+  })
+
   it('hides every player pick before kickoff and reveals live picks as pending when provisional scoring is off', async () => {
     history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
     const { unmount } = render(<App />)

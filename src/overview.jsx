@@ -50,7 +50,7 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
 export function Overview({ players, games, picksByUser, history, pool, provisional, onProvisional }) {
   const [showModels, setShowModels] = useState(false)
   const [showGameMetrics, setShowGameMetrics] = useState(true)
-  const [sort, setSort] = useState({ key: 'date', direction: 'ascending' })
+  const [sort, setSort] = useState({ key: 'score', direction: 'ascending' })
   const sortBy = (key) => setSort((current) => ({ key, direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   const sortIndicator = (key) => sort.key === key ? (sort.direction === 'ascending' ? ' ▲' : ' ▼') : ''
   const deviationByGame = new Map(games.map((game) => [game.id, pickDeviation(game, picksByUser)]))
@@ -66,7 +66,6 @@ export function Overview({ players, games, picksByUser, history, pool, provision
       if (aValue !== null && bValue !== null && aValue !== bValue) return (aValue - bValue) * (sort.direction === 'ascending' ? 1 : -1)
     }
     const dateOrder = (new Date(a.kickoff) - new Date(b.kickoff)) * (sort.direction === 'descending' ? -1 : 1)
-    if (sort.key === 'date') return dateOrder || a.id.localeCompare(b.id)
     return dateOrder || a.id.localeCompare(b.id)
   })
   const totals = new Map(history.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
@@ -88,7 +87,7 @@ export function Overview({ players, games, picksByUser, history, pool, provision
     </div>
     <div className="overview-scroll">
       <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
-         <thead><tr><th className="overview-game-column"><button className="table-sort-button" type="button" data-testid="overview-sort-date" onClick={() => sortBy('date')}>Game{sortIndicator('date')}</button></th><th className="overview-score-column" title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)">Score</th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
+         <thead><tr><th className="overview-game-column">Game</th><th className="overview-score-column" aria-sort={sort.key === 'score' ? sort.direction : 'none'} title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)"><button className="table-sort-button" type="button" data-testid="overview-sort-score" onClick={() => sortBy('score')}>Score{sortIndicator('score')}</button></th>{columns.map((player, index) => <th key={player.id} className={player.model ? 'model-column' : ''}>
           <div className="overview-player"><strong>{player.name}</strong><b title={player.model ? 'Model points for this week' : 'Total season score'}>{player.model ? player.points : player.displayTotal}</b><span>{player.model ? 'MODEL' : index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="This week: points / points lost / points left">{player.points} / -{player.pointsLost} / {player.potential}</small></div>
          </th>)}{showGameMetrics && <><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}</tr></thead>
         <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? 'model-column' : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
