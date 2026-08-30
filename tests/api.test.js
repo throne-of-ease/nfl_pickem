@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, updatePassword } from '../src/api.js'
+import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, updateDisplayName, updatePassword } from '../src/api.js'
 
 afterEach(() => localStorage.clear())
 
@@ -43,6 +43,25 @@ describe('direct ESPN live refresh', () => {
     expect(calls[1][0]).toBe('https://example.supabase.co/auth/v1/user')
     expect(calls[1][1].headers.authorization).toBe('Bearer player-access')
     expect(JSON.parse(calls[1][1].body)).toEqual({ password: 'new-password' })
+  })
+
+  it('uses the profile and override admin RPCs', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    const calls = []
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+      calls.push([url, options])
+      return { ok: true, json: async () => ({ displayName: 'New Name', deleted: 7 }) }
+    }))
+
+    await updateDisplayName('player-access', 'New Name')
+    await deleteAdminOverride('admin-access', 7)
+
+    expect(calls[0][0]).toBe('https://example.supabase.co/rest/v1/rpc/update_my_display_name')
+    expect(calls[0][1].headers.authorization).toBe('Bearer player-access')
+    expect(JSON.parse(calls[0][1].body)).toEqual({ p_display_name: 'New Name' })
+    expect(calls[1][0]).toBe('https://example.supabase.co/rest/v1/rpc/delete_admin_override')
+    expect(JSON.parse(calls[1][1].body)).toEqual({ p_override_id: 7 })
   })
 
   it('syncs an existing GOTW pool when stored quality is missing', async () => {

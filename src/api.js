@@ -218,6 +218,8 @@ export async function loadAdminOverrideHistory(token) {
   return data?.overrides ?? []
 }
 
+export const deleteAdminOverride = (token, overrideId) => request('/rest/v1/rpc/delete_admin_override', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_override_id: overrideId }) })
+
 export const setGameOfWeek = (token, poolKey, gameId) => request('/rest/v1/rpc/set_game_of_week', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey, p_game_id: gameId || null }) })
 
 export const resetAdminPassword = (token, userId, temporaryPassword) => request('/rest/v1/rpc/admin_reset_password', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId, p_temporary_password: temporaryPassword }) })
@@ -225,6 +227,12 @@ export const resetAdminPassword = (token, userId, temporaryPassword) => request(
 export const updatePassword = (token, password) => {
   if (!password || password.length < 8) throw apiError('INVALID_PASSWORD', 422)
   return request('/auth/v1/user', { method: 'PUT', headers: bearer(token), body: JSON.stringify({ password }) })
+}
+
+export const updateDisplayName = (token, displayName) => {
+  const value = displayName?.trim()
+  if (!value || value.length > 40) throw apiError('INVALID_DISPLAY_NAME', 422)
+  return request('/rest/v1/rpc/update_my_display_name', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_display_name: value }) })
 }
 
 export async function loadChartData(token) {

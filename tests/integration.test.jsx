@@ -132,6 +132,19 @@ describe('four-user application flow', () => {
     expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
   })
 
+  it('keeps model rankings and charts opt-in on the Charts tab', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Charts' }))
+    const models = screen.getByRole('checkbox', { name: 'Include model picks' })
+    expect(models).not.toBeChecked()
+    expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
+    await user.click(models)
+    expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(8)
+    expect(screen.getByRole('img', { name: 'Cumulative points versus season leader' })).toBeInTheDocument()
+    expect(screen.getAllByText('FPI').length).toBeGreaterThan(0)
+  })
+
   it('includes rehearsal results in the season charts', async () => {
     const user = userEvent.setup()
     history.replaceState({}, '', '/?pool=preseason-01')
