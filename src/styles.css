@@ -100,7 +100,7 @@ p { color: var(--muted); }
   border: 1px solid #5c6d7f;
   margin-top: .35rem;
   background: transparent;
-  transition: background .12s ease, box-shadow .12s ease, opacity .12s ease;
+  transition: background .12s ease, box-shadow .12s ease, border-color .12s ease, opacity .12s ease;
 }
 .game:hover { background: var(--surface); }
 .game[draggable="true"] { cursor: grab; }
@@ -111,6 +111,7 @@ p { color: var(--muted); }
 .game.live:hover { background: rgba(220, 53, 69, .1); }
 .game.dragging { opacity: .42; }
 .game.drop-target { background: #302815; box-shadow: inset 0 0 0 2px var(--warning); }
+.game.moved { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .drag-handle { grid-area: drag; width: 2rem; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed #5c6d7f; cursor: grab; font-size: .92rem; line-height: 1; user-select: none; touch-action: none; }
 .game-meta { grid-area: meta; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: .15rem; }
 .game-meta time { display: flex; align-items: baseline; gap: .38rem; }
@@ -198,7 +199,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .pick-hidden, .pick-empty { display: inline-grid; width: 32px; height: 32px; place-items: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 50%; }
 .overview-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin: .55rem 0 0; font-size: .65rem; }
 .overview-legend span { width: 7px; height: 7px; border-radius: 50%; margin-left: .4rem; }
-.game-metric { width: 1.65rem; min-width: 1.65rem; padding-inline: 0 !important; color: var(--muted); font-size: .43rem; font-variant-numeric: tabular-nums; }
+.game-metric { width: 2.1rem; min-width: 2.1rem; padding-inline: 0 !important; color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; }
 .table-sort-button { padding: 0; border: 0; background: transparent; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .table-sort-button:hover, .table-sort-button:focus-visible { color: var(--ink); background: transparent; }
 .correct-dot { background: var(--success); }
@@ -376,7 +377,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-table th, .overview-table td { padding: .1rem .05rem; }
   .overview-table .overview-game-column { width: 3.3rem; min-width: 3.3rem; }
   .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
-  .overview-table .game-metric { width: 1.65rem; min-width: 1.65rem; }
+  .overview-table .game-metric { width: 2rem; min-width: 2rem; }
   .overview-player { min-width: 2.35rem; display: grid; grid-template-columns: 1fr; justify-items: center; gap: .04rem; }
   .overview-player strong { max-width: 2.3rem; text-align: center; font-size: .58rem; line-height: 1; }
   .overview-player b { font-size: .78rem; line-height: 1; }
@@ -393,7 +394,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-pick .team-logo { width: 15px; height: 15px; }
   .overview-pick span { font-size: .58rem; line-height: 1; }
   .pick-hidden, .pick-empty { width: 1.65rem; height: 1.65rem; font-size: .64rem; }
-  .game-metric { font-size: .43rem; }
+  .game-metric { font-size: .58rem; }
   .admin-override { grid-template-columns: 1fr 1fr; }
   .admin-override button { grid-column: 1 / -1; }
   nav button.models-tab { max-width: 4.25rem; white-space: normal; line-height: 1.05; text-align: center; }
@@ -415,15 +416,16 @@ footer [data-testid="real-data-status"] { display: block; }
   .standings-table th, .standings-table td { padding: .2rem .08rem; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.05; }
   .standings-table th { font-size: .48rem; letter-spacing: 0; }
   .standings-table td { font-size: .58rem; }
-  .standings-table th:nth-child(1) { width: 8%; }
-  .standings-table th:nth-child(2) { width: 18%; }
-  .standings-table th:nth-child(3) { width: 8%; }
-  .standings-table th:nth-child(4) { width: 11%; }
-  .standings-table th:nth-child(5) { width: 14%; }
-  .standings-table th:nth-child(6) { width: 12%; }
-  .standings-table th:nth-child(7) { width: 10%; }
-  .standings-table th:nth-child(8) { width: 10%; }
+  .standings-table th:nth-child(1) { width: 7%; }
+  .standings-table th:nth-child(2) { width: 16%; }
+  .standings-table th:nth-child(3) { width: 7%; }
+  .standings-table th:nth-child(4) { width: 10%; }
+  .standings-table th:nth-child(5) { width: 10%; }
+  .standings-table th:nth-child(6) { width: 13%; }
+  .standings-table th:nth-child(7) { width: 11%; }
+  .standings-table th:nth-child(8) { width: 9%; }
   .standings-table th:nth-child(9) { width: 9%; }
+  .standings-table th:nth-child(10) { width: 8%; }
   .pick-actions { gap: .25rem; }
   .pick-actions button { padding: .3rem .35rem; font-size: .6rem; }
 }
@@ -433,7 +435,9 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-title > div:first-child h2 { display: none; }
   .overview-table .overview-game-column { width: 2.7rem; min-width: 2.7rem; max-width: 2.7rem; padding-left: 0 !important; padding-right: 0 !important; }
   .overview-table .overview-score-column { width: 1.9rem; min-width: 1.9rem; max-width: 1.9rem; padding-left: 0 !important; padding-right: 0 !important; }
-  .overview-table .game-metric { width: 1.25rem; min-width: 1.25rem; max-width: 1.25rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .game-metric { width: 2rem; min-width: 2rem; max-width: 2rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .model-moneyline-column { width: 2.8rem; min-width: 2.8rem; max-width: 2.8rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .model-moneyline-column .overview-player strong { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
   .overview-player { min-width: 1.95rem; }
   .overview-player strong { max-width: 1.95rem; overflow: hidden; text-overflow: ellipsis; font-size: .52rem; }
   .overview-player b { font-size: .7rem; }
@@ -443,7 +447,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-pick { width: 1.55rem; min-height: 1.55rem; padding: .04rem; }
   .overview-pick .team-logo { width: 14px; height: 14px; }
   .overview-pick span { font-size: .52rem; }
-  .game-metric { font-size: .4rem; }
+  .game-metric { font-size: .58rem; }
   .models-table { table-layout: fixed; }
   .models-table th, .models-table td { padding: .28rem .2rem; text-align: center; }
   .models-table th:first-child, .models-table td:first-child { width: 6.1rem; text-align: left; }
@@ -460,8 +464,8 @@ footer [data-testid="real-data-status"] { display: block; }
   .models-table .model-matchup { gap: .12rem; font-size: .6rem; }
   .models-table .model-matchup .team-logo { width: 15px; height: 15px; }
   .models-table .model-game time { font-size: .5rem; }
-  .models-table thead th:nth-child(4) .table-sort-button,
+  .models-table thead th:nth-child(4), .models-table tbody td:nth-child(4) { width: 4rem; min-width: 4rem; }
+  .models-table thead th:nth-child(4) .table-sort-button { white-space: nowrap; }
   .models-table thead th:nth-child(9) .table-sort-button { font-size: 0; }
-  .models-table thead th:nth-child(4) .table-sort-button::before { content: 'ML'; font-size: .7rem; }
   .models-table thead th:nth-child(9) .table-sort-button::before { content: 'Dis.'; font-size: .58rem; }
 }

@@ -153,7 +153,7 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(rankBox.y).toBeLessThan(probabilityBox.y)
 
   await page.getByRole('button', { name: 'Charts' }).click()
-  for (const heading of ['Total points', 'GOTW % of total', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  for (const heading of ['Total points', 'GOTW points', 'GOTW % of total', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
 
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()
@@ -188,8 +188,11 @@ test('dragging a pick row swaps confidence and team buttons remain clickable', a
   } else await source.dragTo(target)
   await expect(page.getByLabel('TB at ATL confidence')).toHaveValue('4')
   await expect(page.getByLabel('CIN at CLE confidence')).toHaveValue('3')
+  await expect(source).toHaveClass(/moved/)
+  await expect(target).not.toHaveClass(/moved/)
   await page.getByRole('radio', { name: /DAL/ }).check()
   await expect(page.getByRole('radio', { name: /DAL/ })).toBeChecked()
+  await expect(source).not.toHaveClass(/moved/)
 })
 
 test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page }, testInfo) => {
@@ -200,6 +203,7 @@ test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page
   await expect(page.locator('.models-word-second')).toHaveCSS('display', 'block')
   await expect(page.locator('.models-table .model-pick-team').first()).toHaveCSS('display', 'none')
   await expect(page.locator('.models-table .model-pick-rank')).toHaveCount(10)
+  await expect(page.getByRole('columnheader', { name: 'Moneyline', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await page.getByRole('button', { name: 'My picks' }).click()
   const rows = page.locator('[data-testid^="game-row-"]')
@@ -467,6 +471,9 @@ test('iPhone 12 Pro keeps model overview and Charts standings inside the viewpor
   await page.getByRole('checkbox', { name: 'Include model picks' }).check()
   const overviewMetrics = page.locator('.overview-table tbody .game-metric')
   await expect(overviewMetrics).toHaveCount(8)
+  const moneylineHeader = page.locator('.overview-table th.model-moneyline-column .overview-player strong')
+  await expect(moneylineHeader).toHaveText('Moneyline')
+  expect(await moneylineHeader.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
   await expect(page.locator('.overview-table .overview-game-column').first()).toHaveCSS('padding-right', '0px')
   await expect(page.locator('.overview-table .overview-score-column').first()).toHaveCSS('padding-right', '0px')
   await expect(overviewMetrics.first()).toHaveCSS('padding-right', '0px')
@@ -481,7 +488,7 @@ test('iPhone 12 Pro keeps model overview and Charts standings inside the viewpor
   expect(overviewLayout.contentWidth).toBeLessThanOrEqual(overviewLayout.scrollWidth + 1)
   expect(overviewLayout.documentWidth).toBeLessThanOrEqual(overviewLayout.viewport)
   expect(overviewLayout.gameWidth).toBeLessThanOrEqual(45)
-  expect(overviewLayout.metricWidths.every((width) => width <= 20)).toBe(true)
+  expect(overviewLayout.metricWidths.every((width) => width >= 30 && width <= 34)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('iphone12pro-overview-models.png'), fullPage: false })
 
   await page.getByRole('button', { name: 'Charts' }).click()
