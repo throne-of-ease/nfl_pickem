@@ -278,7 +278,8 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [game], profiles: [{ id: 'admin-user', name: 'Admin' }, { id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [{ gameId: 'g1', team: 'B', confidence: 1 }] } }))
   await page.route('**/rest/v1/rpc/get_admin_data', (route) => route.fulfill({ json: { registrationOpen: true, players: [{ id: 'player-1', name: 'Pat', username: 'pat', contactEmail: null }], games: [game], picks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }] } }))
-  await page.route('**/rest/v1/rpc/get_admin_gotw_data', (route) => route.fulfill({ json: { games: gotwGames } }))
+  let adminGotwLoads = 0
+  await page.route('**/rest/v1/rpc/get_admin_gotw_data', (route) => { adminGotwLoads += 1; return route.fulfill({ json: { games: adminGotwLoads === 1 ? [{ ...game, matchup_quality: null }] : gotwGames } }) })
   await page.route('**/functions/v1/sync-season', async (route) => { gotwGames = [game, futureGameLow, futureGame]; await route.fulfill({ json: { synced: [{ key: 'week-07', games: 2 }], failures: [] } }) })
   await page.route('**/rest/v1/rpc/set_registration_open', (route) => route.fulfill({ json: { registrationOpen: false } }))
   await page.route('**/rest/v1/rpc/admin_replace_picks', async (route) => {

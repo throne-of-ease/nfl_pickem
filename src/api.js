@@ -199,7 +199,9 @@ const syncPool = (poolKey, token) => request('/functions/v1/sync-season', { meth
 export async function loadAdminGotwData(token, poolKey) {
   const load = () => request('/rest/v1/rpc/get_admin_gotw_data', { method: 'POST', headers: bearer(token), body: '{}' })
   let data = await load()
-  if (poolKey && !(data?.games ?? []).some((game) => game.pool_key === poolKey)) {
+  const poolGames = (data?.games ?? []).filter((game) => game.pool_key === poolKey)
+  const qualityMissing = poolGames.some((game) => game.matchup_quality == null)
+  if (poolKey && (!poolGames.length || qualityMissing)) {
     try { await syncPool(poolKey, token); data = await load() } catch { /* the existing slate is still useful */ }
   }
   return { games: (data?.games ?? []).map(mapGame) }

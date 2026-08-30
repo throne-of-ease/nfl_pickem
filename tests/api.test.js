@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isCurrentPool, refreshEspnPool, refreshLivePool, resetAdminPassword, updatePassword } from '../src/api.js'
+import { isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, updatePassword } from '../src/api.js'
 
 afterEach(() => localStorage.clear())
 
@@ -43,6 +43,28 @@ describe('direct ESPN live refresh', () => {
     expect(calls[1][0]).toBe('https://example.supabase.co/auth/v1/user')
     expect(calls[1][1].headers.authorization).toBe('Bearer player-access')
     expect(JSON.parse(calls[1][1].body)).toEqual({ password: 'new-password' })
+  })
+
+  it('syncs an existing GOTW pool when stored quality is missing', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    let adminLoads = 0
+    const calls = []
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+      calls.push([url, options])
+      if (url.endsWith('/rest/v1/rpc/get_admin_gotw_data')) {
+        adminLoads += 1
+        return { ok: true, json: async () => ({ games: [{ id: 'g1', pool_key: 'week-07', kickoff: '2026-10-24T17:00:00Z', away_team: 'A', home_team: 'B', status: 'scheduled', gotw: false, matchup_quality: adminLoads === 1 ? null : 91.2 }] }) }
+      }
+      return { ok: true, json: async () => ({ synced: [{ key: 'week-07', games: 1 }] }) }
+    }))
+
+    const result = await loadAdminGotwData('admin-access', 'week-07')
+
+    expect(adminLoads).toBe(2)
+    expect(calls.some(([url]) => url.endsWith('/functions/v1/sync-season'))).toBe(true)
+    expect(JSON.parse(calls.find(([url]) => url.endsWith('/functions/v1/sync-season'))[1].body)).toEqual({ pool: 'week-07' })
+    expect(result.games[0]).toMatchObject({ id: 'g1', matchupQuality: 91.2 })
   })
 
   it('uses the browser cache for older weeks until an explicit refresh is requested', async () => {
