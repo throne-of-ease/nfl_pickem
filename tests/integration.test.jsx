@@ -98,7 +98,7 @@ describe('four-user application flow', () => {
   it('renders all four accessible charts and every display mode', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.selectOptions(screen.getByLabelText('Pool'), 'week-02')
+    await user.selectOptions(screen.getByLabelText('Week'), 'week-02')
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     expect(screen.getAllByRole('img')).toHaveLength(4)
     expect([...document.querySelectorAll('.chart-card h3')].map((heading) => heading.textContent)).toEqual(['Points vs season leader', 'Current week', 'Points per week', 'Game of the Week'])
@@ -107,8 +107,8 @@ describe('four-user application flow', () => {
     expect(cumulative.querySelectorAll('polyline')).toHaveLength(8)
     await user.click(screen.getByRole('button', { name: 'Hide potential' }))
     expect(cumulative.querySelectorAll('polyline')).toHaveLength(4)
-    expect(screen.getAllByRole('button', { name: 'Download PNG' })).toHaveLength(4)
-    expect(screen.getAllByRole('button', { name: 'Share PNG' })).toHaveLength(4)
+    expect(screen.getAllByRole('button', { name: 'Download chart as PNG' })).toHaveLength(4)
+    expect(screen.getAllByRole('button', { name: 'Share chart as PNG' })).toHaveLength(4)
     const weekly = screen.getByLabelText('Points per week display mode')
     expect(within(weekly).getAllByRole('option')).toHaveLength(3)
     await user.selectOptions(weekly, 'correct_percentage')
@@ -140,7 +140,8 @@ describe('four-user application flow', () => {
     expect(screen.queryByRole('heading', { name: 'Preseason 1' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Rehearsal.*does not count/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Charts' }))
-    expect(screen.getByText(/Preseason, regular season, and postseason results/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Season charts' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Preseason, regular season, and postseason results/)).not.toBeInTheDocument()
     expect(screen.getByText(/Includes preseason/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Current week' })).toBeInTheDocument()
     expect(screen.getAllByText('HOF').length).toBeGreaterThan(0)
@@ -160,7 +161,7 @@ describe('four-user application flow', () => {
   it('swaps occupied confidence values on unlocked games', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
-    fireEvent.change(screen.getByLabelText('Pool'), { target: { value: 'week-02' } })
+    fireEvent.change(screen.getByLabelText('Week'), { target: { value: 'week-02' } })
     const selects = screen.getAllByLabelText(/confidence$/)
     expect(selects[2]).toHaveValue('3')
     expect(selects[3]).toHaveValue('4')
@@ -187,7 +188,7 @@ describe('four-user application flow', () => {
   it('reorders games by dragging anywhere on a row', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
-    fireEvent.change(screen.getByLabelText('Pool'), { target: { value: 'week-02' } })
+    fireEvent.change(screen.getByLabelText('Week'), { target: { value: 'week-02' } })
     const selects = screen.getAllByLabelText(/confidence$/)
     const rows = screen.getAllByTestId(/game-row-/)
     const sourceId = rows[2].dataset.testid
@@ -238,7 +239,7 @@ describe('four-user application flow', () => {
   it('shows predictor, no-vig moneyline, and aggregate model picks with logos', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Models' }))
+    await user.click(screen.getByRole('button', { name: 'Win probs.' }))
     expect(screen.getByRole('columnheader', { name: 'FPI' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Moneyline' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'AVG' })).toBeInTheDocument()
@@ -248,7 +249,7 @@ describe('four-user application flow', () => {
   it('orders model rows by clicking every model table heading', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Models' }))
+    await user.click(screen.getByRole('button', { name: 'Win probs.' }))
     const rows = () => [...document.querySelectorAll('table tbody tr')]
     expect(rows()[0]).toHaveTextContent('DAL')
     await user.click(screen.getByTestId('models-sort-fpi'))

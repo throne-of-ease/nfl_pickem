@@ -213,6 +213,11 @@ export const setRegistrationOpen = (token, registrationOpen) => request('/rest/v
 
 export const saveAdminPicks = (poolKey, token, userId, picks) => request('/rest/v1/rpc/admin_replace_picks', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId, p_pool_key: poolKey, p_picks: picks }) })
 
+export async function loadAdminOverrideHistory(token) {
+  const data = await request('/rest/v1/rpc/get_admin_override_history', { method: 'POST', headers: bearer(token), body: '{}' })
+  return data?.overrides ?? []
+}
+
 export const setGameOfWeek = (token, poolKey, gameId) => request('/rest/v1/rpc/set_game_of_week', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey, p_game_id: gameId || null }) })
 
 export const resetAdminPassword = (token, userId, temporaryPassword) => request('/rest/v1/rpc/admin_reset_password', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_user_id: userId, p_temporary_password: temporaryPassword }) })

@@ -81,6 +81,19 @@ export async function shareSvgAsPng(svg, filename) {
   return downloadSvgAsPng(svg, filename)
 }
 
+function ChartIcon({ type }) {
+  return type === 'share'
+    ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 5 8 2 5 5M8 2v8M3 8v5h10V8" /></svg>
+    : <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 12v2h10v-2" /></svg>
+}
+
+function ChartActions({ id, chartRef }) {
+  return <div className="chart-actions chart-actions-bottom">
+    <button type="button" title="Share chart as PNG" aria-label="Share chart as PNG" onClick={() => shareSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="share" /></button>
+    <button type="button" title="Download chart as PNG" aria-label="Download chart as PNG" onClick={() => downloadSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="download" /></button>
+  </div>
+}
+
 function ChartFrame({ id, title, description, modes = [], mode, onMode, children, table, footer }) {
   const ref = useRef(null)
   return <section className="chart-card" aria-labelledby={`${id}-title`}>
@@ -88,12 +101,11 @@ function ChartFrame({ id, title, description, modes = [], mode, onMode, children
       <div><h3 id={`${id}-title`}>{title}</h3><p>{description}</p></div>
       <div className="chart-actions">
         {modes.length > 0 && <label>Display <select aria-label={`${title} display mode`} value={mode} onChange={(event) => onMode(event.target.value)}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}
-        <button type="button" onClick={() => shareSvgAsPng(ref.current, `${id}.png`)}>Share PNG</button>
-        <button type="button" onClick={() => downloadSvgAsPng(ref.current, `${id}.png`)}>Download PNG</button>
       </div>
     </div>
     <div className="chart-scroll">{React.cloneElement(children, { chartRef: ref })}</div>
     {footer}
+    <ChartActions id={id} chartRef={ref} />
     {table}
   </section>
 }
