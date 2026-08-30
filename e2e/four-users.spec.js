@@ -126,8 +126,11 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   await page.goto('/?scenario=scheduled&pool=week-02')
   const gameColumn = page.locator('.overview-game-column').first()
   const scoreColumn = page.locator('.overview-score-column').first()
+  const metricColumn = page.locator('.game-metric').first()
   expect(parseFloat(await gameColumn.evaluate((node) => getComputedStyle(node).width))).toBeLessThan(80)
   expect(parseFloat(await scoreColumn.evaluate((node) => getComputedStyle(node).width))).toBeLessThan(45)
+  expect(parseFloat(await metricColumn.evaluate((node) => getComputedStyle(node).width))).toBeLessThan(35)
+  expect(parseFloat(await metricColumn.evaluate((node) => getComputedStyle(node).paddingLeft))).toBeLessThanOrEqual(1)
   expect(parseFloat(await page.locator('.overview-matchup').first().evaluate((node) => getComputedStyle(node).fontSize))).toBeLessThanOrEqual(8)
   expect(parseFloat(await page.locator('.overview-score strong').first().evaluate((node) => getComputedStyle(node).fontSize))).toBeLessThanOrEqual(8)
 
