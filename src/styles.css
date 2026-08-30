@@ -398,6 +398,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .models-table .model-pick-column { width: 2.3rem; }
   .models-table .model-rank-column, .models-table .model-probability-column { display: none; }
   .models-table .model-disagreement-column { width: 2.6rem; white-space: normal; overflow-wrap: anywhere; font-size: .58rem; }
+  .models-table .missing { font-size: .5rem; }
   .models-table .model-pick { display: grid; justify-items: center; gap: .05rem; }
   .models-table .model-pick-team { display: none; }
   .models-table .model-pick-rank { display: block; }
@@ -406,4 +407,8 @@ footer [data-testid="real-data-status"] { display: block; }
   .models-table .model-matchup { gap: .12rem; font-size: .6rem; }
   .models-table .model-matchup .team-logo { width: 15px; height: 15px; }
   .models-table .model-game time { font-size: .5rem; }
+  .models-table thead th:nth-child(4) .table-sort-button,
+  .models-table thead th:nth-child(9) .table-sort-button { font-size: 0; }
+  .models-table thead th:nth-child(4) .table-sort-button::before { content: 'ML'; font-size: .7rem; }
+  .models-table thead th:nth-child(9) .table-sort-button::before { content: 'Dis.'; font-size: .58rem; }
 }
