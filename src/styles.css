@@ -82,17 +82,20 @@ p { color: var(--muted); }
 .player-setup label { display: grid; gap: .3rem; color: var(--muted); font-size: .72rem; }
 .player-setup input { min-width: 0; padding: .48rem .6rem; }
 
-.slate-head { display: grid; grid-template-columns: 7.4rem minmax(0, 1fr) 6.2rem; gap: .45rem; padding: .3rem .4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.slate-head span:last-child { text-align: right; }
+.slate-head { display: grid; grid-template-columns: 2rem 7.4rem minmax(0, 1fr) 6.2rem; gap: .45rem; padding: .3rem .4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.slate-head span:first-child { grid-column: 2; }
+.slate-head span:nth-child(2) { grid-column: 3; }
+.slate-head span:last-child { grid-column: 4; text-align: right; }
 .games { padding-bottom: .35rem; }
 .game {
   display: grid;
-  grid-template-columns: 7.4rem minmax(0, 1fr) 6.2rem;
+  grid-template-columns: 2rem 7.4rem minmax(0, 1fr) 6.2rem;
+  grid-template-areas: "drag meta matchup confidence";
   align-items: center;
   gap: .45rem;
   min-height: 50px;
   padding: .25rem .4rem;
-  border: 1px solid var(--line);
+  border: 1px solid #5c6d7f;
   margin-top: .35rem;
   background: transparent;
   transition: background .12s ease, box-shadow .12s ease, opacity .12s ease;
@@ -100,12 +103,14 @@ p { color: var(--muted); }
 .game:hover { background: var(--surface); }
 .game[draggable="true"] { cursor: grab; }
 .game[draggable="true"]:active { cursor: grabbing; }
+.game fieldset { grid-area: matchup; }
 .game .teams, .game select { cursor: auto; }
 .game.live { background: rgba(220, 53, 69, .05); box-shadow: inset 3px 0 var(--live); }
 .game.live:hover { background: rgba(220, 53, 69, .1); }
 .game.dragging { opacity: .42; }
 .game.drop-target { background: #302815; box-shadow: inset 0 0 0 2px var(--warning); }
-.game-meta { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: .15rem; }
+.drag-handle { grid-area: drag; width: 2rem; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed #5c6d7f; cursor: grab; font-size: .92rem; line-height: 1; user-select: none; touch-action: none; }
+.game-meta { grid-area: meta; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: .15rem; }
 .game-meta time { display: flex; align-items: baseline; gap: .38rem; }
 .game-meta time span { color: var(--accent); font-size: .64rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 .game-meta time strong { font-size: .83rem; font-variant-numeric: tabular-nums; }
@@ -127,11 +132,11 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teams span:not(.at) { overflow: hidden; text-overflow: ellipsis; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
 .teams b { margin-left: .2rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .at { color: var(--muted); font-size: .65rem; text-align: center; text-transform: uppercase; }
-.confidence-cell { min-height: 34px; display: flex; justify-content: flex-end; align-items: center; gap: .25rem; padding-left: .45rem; border-left: 1px solid var(--line); }
-.drag-handle { width: 21px; height: 30px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line); cursor: grab; font-size: .92rem; line-height: 1; user-select: none; touch-action: none; }
+.confidence-cell { grid-area: confidence; min-height: 34px; display: contents; }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle[draggable="false"] { cursor: not-allowed; opacity: .25; }
-.confidence { display: grid; gap: .1rem; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.confidence { grid-area: confidence; justify-self: end; display: grid; gap: .1rem; padding-left: .45rem; border-left: 1px solid var(--line); color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.confidence > span { display: none; }
 .confidence select { width: 44px; height: 30px; padding: .2rem .25rem; color: var(--ink); font-size: .8rem; font-variant-numeric: tabular-nums; text-align: center; text-transform: none; }
 
 .leaderboard { padding: 0; border-top: 1px solid var(--ink); }
@@ -153,9 +158,9 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 
 .overview-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
 .overview-table { width: 100%; min-width: 0; margin: 0; table-layout: fixed; }
-.overview-table th, .overview-table td { padding: .18rem .2rem; text-align: center; }
-.overview-table .overview-game-column { width: 6.4rem; min-width: 6.4rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
-.overview-table .overview-score-column { width: 3.15rem; min-width: 3.15rem; }
+.overview-table th, .overview-table td { padding: .06rem .02rem; text-align: center; }
+.overview-table .overview-game-column { width: 4.45rem; min-width: 4.45rem; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
+.overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
 .overview-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-raised); }
 .overview-table thead th:first-child { z-index: 4; background: var(--surface-raised); }
 .overview-table .model-column { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
@@ -169,16 +174,16 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-player b { color: var(--warning); font-size: 1rem; }
 .overview-player span { color: var(--success); font-size: .62rem; text-align: center; letter-spacing: .08em; }
 .overview-player small { color: var(--muted); font-size: .56rem; font-weight: 500; letter-spacing: 0; text-align: center; text-transform: none; }
-.overview-game { display: grid; justify-items: start; gap: .08rem; min-width: 0; }
-.overview-game-line { display: flex; align-items: center; gap: .2rem; min-width: 0; }
+.overview-game { display: grid; justify-items: start; gap: .02rem; min-width: 0; }
+.overview-game-line { display: flex; align-items: center; gap: .08rem; min-width: 0; }
 .overview-game .live-badge { padding: 1px 3px; font-size: .42rem !important; letter-spacing: .02em !important; }
-.overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .66rem; }
-.overview-gotw { display: block; color: var(--warning); font-size: .52rem; line-height: 1; }
+.overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .44rem; letter-spacing: -.02em; }
+.overview-gotw { display: block; color: var(--warning); font-size: .42rem; line-height: 1; }
 .overview-score { display: grid; justify-items: center; align-content: center; gap: .04rem; min-height: 2rem; font-variant-numeric: tabular-nums; line-height: 1; }
-.overview-score strong { font-size: .7rem; }
-.overview-score small, .overview-schedule span, .overview-schedule strong { color: var(--muted); font-size: .52rem; letter-spacing: .04em; }
+.overview-score strong { font-size: .47rem; }
+.overview-score small, .overview-schedule span, .overview-schedule strong { color: var(--muted); font-size: .35rem; letter-spacing: .02em; }
 .overview-score .live-detail { letter-spacing: 0; }
-.overview-schedule strong { color: var(--ink); font-size: .64rem; letter-spacing: 0; }
+.overview-schedule strong { color: var(--ink); font-size: .43rem; letter-spacing: 0; }
 .overview-score.live-text strong, .overview-score.live-text small { color: var(--live); }
 .live-detail { font-size: .58rem; letter-spacing: 0; }
 .overview-pick { width: 4.15rem; min-height: 32px; margin: auto; display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: .05rem .18rem; padding: .15rem .22rem; border: 1px solid var(--line); border-radius: 3px; }
@@ -190,15 +195,18 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .pick-hidden, .pick-empty { display: inline-grid; width: 32px; height: 32px; place-items: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 50%; }
 .overview-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin: .55rem 0 0; font-size: .65rem; }
 .overview-legend span { width: 7px; height: 7px; border-radius: 50%; margin-left: .4rem; }
-.game-metric { width: 2.35rem; min-width: 2.35rem; color: var(--muted); font-size: .64rem; font-variant-numeric: tabular-nums; }
+.game-metric { width: 1.65rem; min-width: 1.65rem; padding-inline: 0 !important; color: var(--muted); font-size: .43rem; font-variant-numeric: tabular-nums; }
 .table-sort-button { padding: 0; border: 0; background: transparent; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .table-sort-button:hover, .table-sort-button:focus-visible { color: var(--ink); background: transparent; }
 .correct-dot { background: var(--success); }
 .incorrect-dot { background: var(--live); }
 .pending-dot { background: var(--muted); }
 .model-pick, .model-matchup { display: inline-flex; align-items: center; gap: .35rem; }
-.model-pick-probability { color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; }
-.model-pick-rank { display: none; color: var(--accent); font-size: .64rem; font-weight: 900; }
+.model-pick { display: inline-grid; grid-template-columns: 22px minmax(0, 1fr); grid-template-rows: auto auto; align-items: center; column-gap: .25rem; row-gap: .02rem; }
+.model-pick > .team-logo { grid-column: 1; grid-row: 1 / span 2; }
+.model-pick-team { display: none; }
+.model-pick-probability { grid-column: 2; grid-row: 2; color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; line-height: 1; }
+.model-pick-rank { display: block; grid-column: 2; grid-row: 1; color: var(--accent); font-size: .64rem; font-weight: 900; line-height: 1; }
 .model-game { display: grid; gap: .25rem; }
 .model-game time { color: var(--muted); font-size: .65rem; }
 .model-matchup > span { color: var(--muted); font-size: .65rem; }
@@ -319,7 +327,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .save-state { align-self: flex-start; }
   .slate-head { display: none; }
   .games { border-top: 1px solid var(--ink); }
-  .game { grid-template-columns: 4.9rem minmax(0, 1fr) 5rem; grid-template-areas: "meta matchup confidence"; gap: .25rem .35rem; min-height: 46px; padding: .3rem .25rem; }
+  .game { grid-template-columns: 2.1rem 4.6rem minmax(0, 1fr) 3.4rem; grid-template-areas: "drag meta matchup confidence"; gap: .25rem .3rem; min-height: 46px; padding: .3rem .25rem; }
   .game-meta { grid-area: meta; }
   .game fieldset { grid-area: matchup; }
   .confidence-cell { grid-area: confidence; min-height: 32px; }
@@ -334,8 +342,9 @@ footer [data-testid="real-data-status"] { display: block; }
   .team-logo { width: 18px; height: 18px; }
   .teams b { margin-left: auto; font-size: .68rem; }
   .confidence-cell { gap: .15rem; padding-left: .25rem; }
-  .drag-handle { width: 17px; height: 26px; font-size: .78rem; }
-  .confidence { font-size: .5rem; }
+  .drag-handle { width: 34px; height: 32px; font-size: .78rem; }
+  .confidence { padding-left: .25rem; font-size: .5rem; }
+  .confidence > span { display: none; }
   .confidence select { width: 34px; height: 26px; padding-inline: .1rem; font-size: .72rem; }
   .overview-title { flex-direction: column; align-items: flex-start; }
   .overview-options { width: 100%; display: flex; flex-wrap: wrap; gap: .5rem .8rem; }
@@ -361,41 +370,41 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-scroll { overflow-x: auto; }
   .overview-table { width: 100%; min-width: 0; }
   .overview-table th, .overview-table td { padding: .1rem .05rem; }
-  .overview-table .overview-game-column { width: 4.25rem; min-width: 4.25rem; }
-  .overview-table .overview-score-column { width: 2.8rem; min-width: 2.8rem; }
-  .overview-table .game-metric { width: 1.8rem; min-width: 1.8rem; }
+  .overview-table .overview-game-column { width: 3.8rem; min-width: 3.8rem; }
+  .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
+  .overview-table .game-metric { width: 1.65rem; min-width: 1.65rem; }
   .overview-player { min-width: 2.35rem; display: grid; grid-template-columns: 1fr; justify-items: center; gap: .04rem; }
   .overview-player strong { max-width: 2.3rem; text-align: center; font-size: .58rem; line-height: 1; }
   .overview-player b { font-size: .78rem; line-height: 1; }
   .overview-player span { font-size: .52rem; line-height: 1; }
   .overview-player small { display: block; max-width: 3.8rem; font-size: .45rem; line-height: 1; letter-spacing: -.02em; }
-  .overview-matchup { font-size: .58rem; }
-  .overview-gotw { font-size: .5rem; }
+  .overview-matchup { font-size: .39rem; }
+  .overview-gotw { font-size: .42rem; }
   .overview-score { min-height: 1.8rem; }
-  .overview-score strong { font-size: .64rem; }
-  .overview-score small, .overview-schedule span { font-size: .46rem; }
-  .overview-schedule strong { font-size: .58rem; }
+  .overview-score strong { font-size: .43rem; }
+  .overview-score small, .overview-schedule span { font-size: .35rem; }
+  .overview-schedule strong { font-size: .43rem; }
   .overview-pick { width: 1.8rem; min-height: 1.75rem; grid-template-columns: 1fr; justify-items: center; gap: .02rem; padding: .08rem; }
   .overview-pick .pick-team { display: none; }
   .overview-pick .team-logo { width: 15px; height: 15px; }
   .overview-pick span { font-size: .58rem; line-height: 1; }
   .pick-hidden, .pick-empty { width: 1.65rem; height: 1.65rem; font-size: .64rem; }
-  .game-metric { font-size: .54rem; }
+  .game-metric { font-size: .43rem; }
   .admin-override { grid-template-columns: 1fr 1fr; }
   .admin-override button { grid-column: 1 / -1; }
   nav button.models-tab { max-width: 4.25rem; white-space: normal; line-height: 1.05; text-align: center; }
   nav button.models-tab .models-word-second { display: block; }
-  .gotw-table { min-width: 0; table-layout: fixed; }
-  .gotw-table th, .gotw-table td { padding: .25rem .12rem; font-size: .6rem; }
+  .gotw-table { width: 100%; min-width: 0; table-layout: fixed; }
+  .gotw-table th, .gotw-table td { padding: .18rem .08rem; font-size: .58rem; }
   .gotw-table th:first-child { width: 38%; }
   .gotw-table th:nth-child(2) { width: 27%; }
   .gotw-table th:nth-child(3) { width: 12%; }
   .gotw-table th:nth-child(4) { width: 23%; }
-  .gotw-table .gotw-matchup { gap: .1rem; }
-  .gotw-table .gotw-matchup strong { min-width: 0; font-size: .65rem; }
+  .gotw-table .gotw-matchup { width: 100%; gap: .05rem; }
+  .gotw-table .gotw-matchup strong { min-width: 0; font-size: .62rem; }
   .gotw-table .gotw-matchup .team-logo { width: 15px; height: 15px; }
-  .gotw-table td time { white-space: normal; font-size: .55rem; }
-  .gotw-state label { gap: .15rem; font-size: .58rem; }
+  .gotw-table td time { white-space: normal; overflow-wrap: anywhere; font-size: .52rem; }
+  .gotw-state label { gap: .12rem; white-space: normal; font-size: .55rem; }
   .standings-card { padding: .55rem .45rem; }
   .standings-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
   .standings-table th, .standings-table td { padding: .3rem .35rem; }
@@ -411,7 +420,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .models-table .model-rank-column, .models-table .model-probability-column { display: none; }
   .models-table .model-disagreement-column { width: 2.6rem; white-space: normal; overflow-wrap: anywhere; font-size: .58rem; }
   .models-table .missing { font-size: .5rem; }
-  .models-table .model-pick { display: grid; justify-items: center; gap: .05rem; }
+  .models-table .model-pick { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-rows: auto auto; justify-items: start; column-gap: .12rem; row-gap: .02rem; }
   .models-table .model-pick-team { display: none; }
   .models-table .model-pick-rank { display: block; }
   .models-table .model-pick-probability { font-size: .52rem; line-height: 1; }

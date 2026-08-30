@@ -122,6 +122,36 @@ test('overview hides scheduled picks and scores live picks for all four users', 
   await expect(page.locator('.overview-pick.correct, .overview-pick.incorrect')).toHaveCount(0)
 })
 
+test('compact overview, model, chart, and pick controls match the new layout', async ({ page }, testInfo) => {
+  await page.goto('/?scenario=scheduled&pool=week-02')
+  const gameColumn = page.locator('.overview-game-column').first()
+  const scoreColumn = page.locator('.overview-score-column').first()
+  expect(parseFloat(await gameColumn.evaluate((node) => getComputedStyle(node).width))).toBeLessThan(80)
+  expect(parseFloat(await scoreColumn.evaluate((node) => getComputedStyle(node).width))).toBeLessThan(45)
+  expect(parseFloat(await page.locator('.overview-matchup').first().evaluate((node) => getComputedStyle(node).fontSize))).toBeLessThanOrEqual(8)
+  expect(parseFloat(await page.locator('.overview-score strong').first().evaluate((node) => getComputedStyle(node).fontSize))).toBeLessThanOrEqual(8)
+
+  await page.getByRole('button', { name: 'Win probs.' }).click()
+  const modelPick = page.locator('.model-pick').first()
+  const logoBox = await modelPick.locator('.team-logo').boundingBox()
+  const rankBox = await modelPick.locator('.model-pick-rank').boundingBox()
+  const probabilityBox = await modelPick.locator('.model-pick-probability').boundingBox()
+  expect(logoBox.x + logoBox.width).toBeLessThanOrEqual(rankBox.x + 1)
+  expect(rankBox.y).toBeLessThan(probabilityBox.y)
+
+  await page.getByRole('button', { name: 'Charts' }).click()
+  for (const heading of ['Total points', 'GOTW % of total', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+
+  await page.getByRole('button', { name: 'My picks' }).click()
+  const row = page.locator('[data-testid^="game-row-"]').first()
+  const handleBox = await row.locator('.drag-handle').boundingBox()
+  const metaBox = await row.locator('.game-meta').boundingBox()
+  expect(handleBox.x).toBeLessThan(metaBox.x)
+  if (testInfo.project.name === 'iphone12pro') expect(handleBox.width).toBeGreaterThanOrEqual(30)
+  await expect(row.locator('.confidence > span')).toBeHidden()
+  expect(await row.evaluate((node) => getComputedStyle(node).borderTopColor)).not.toBe('rgb(41, 55, 70)')
+})
+
 test('dragging a pick row swaps confidence and team buttons remain clickable', async ({ page }, testInfo) => {
   await page.goto('/?scenario=scheduled&pool=week-02')
   await page.getByRole('button', { name: 'My picks' }).click()

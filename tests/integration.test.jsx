@@ -164,7 +164,11 @@ describe('four-user application flow', () => {
     expect(screen.getAllByTestId(/standings-table/)).toHaveLength(1)
     const standings = screen.getByRole('table', { name: 'Current standings' })
     expect(within(standings).queryByRole('columnheader', { name: 'Up to' })).not.toBeInTheDocument()
-    for (const name of ['Pick %', 'Point %', 'Games picked']) expect(within(standings).getByRole('columnheader', { name })).toBeInTheDocument()
+    for (const name of ['Total points', 'GOTW % of total', 'Without GOTW', 'Pick %', 'Point %', 'Games picked']) expect(within(standings).getByRole('columnheader', { name })).toBeInTheDocument()
+    const total = Number(screen.getByTestId('total-points-u1').textContent)
+    const withoutGotw = Number(screen.getByTestId('without-gotw-u1').textContent)
+    expect(total).toBeGreaterThanOrEqual(withoutGotw)
+    expect(screen.getByTestId('gotw-share-u1')).toHaveTextContent(/%|—/)
     expect(document.querySelector('.standings-card').nextElementSibling).toHaveClass('charts')
     expect(within(screen.getByRole('table', { name: 'Current standings' })).getAllByRole('row')).toHaveLength(5)
   })
@@ -218,6 +222,14 @@ describe('four-user application flow', () => {
     fireEvent.change(selects[2], { target: { value: '4' } })
     expect(selects[2]).toHaveValue('4')
     expect(selects[3]).toHaveValue('3')
+  })
+
+  it('keeps the confidence control compact with a left drag handle and no rank label', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    const row = screen.getAllByTestId(/game-row-/)[0]
+    expect(row.querySelector('.drag-handle')).toBeInTheDocument()
+    expect(row.querySelector('.confidence select')).toBeInTheDocument()
   })
 
   it('starts every game with a unique preset confidence', () => {
@@ -296,6 +308,7 @@ describe('four-user application flow', () => {
     expect(screen.getAllByRole('img', { name: /logo$/ }).length).toBeGreaterThan(8)
     expect(document.querySelectorAll('.model-pick-probability')).toHaveLength(document.querySelectorAll('.model-pick').length)
     expect([...document.querySelectorAll('.model-pick-probability')].every((item) => /^\d+\.\d%$/.test(item.textContent))).toBe(true)
+    expect(document.querySelectorAll('.model-pick-rank').length).toBeGreaterThan(0)
   })
 
   it('orders model rows by clicking every model table heading', async () => {
