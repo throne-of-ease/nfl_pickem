@@ -52,6 +52,37 @@ export function modelPicks(games, kind) {
   return valid.map((game, index) => ({ gameId: game.id, team: game.homeProbability >= 0.5 ? game.home : game.away, confidence: index + 1, probability: game.homeProbability }))
 }
 
+export function modelAutopick(games, kind, existing = [], { now = new Date(), acceptsLatePicks = false } = {}) {
+  const old = new Map(existing.map((pick) => [pick.gameId, pick]))
+  const model = modelPicks(games, kind)
+  const modelByGame = new Map(model.map((pick) => [pick.gameId, pick]))
+  const preserved = new Map()
+  const used = new Set()
+  for (const game of games) {
+    const previous = old.get(game.id)
+    const confidence = Number.isInteger(previous?.confidence) && previous.confidence >= 1 && previous.confidence <= games.length ? previous.confidence : null
+    if (confidence !== null && (isLocked(game, now, acceptsLatePicks) || !modelByGame.has(game.id))) {
+      preserved.set(game.id, confidence)
+      used.add(confidence)
+    }
+  }
+  const available = Array.from({ length: games.length }, (_, index) => index + 1).filter((value) => !used.has(value))
+  const assigned = new Map(preserved)
+  for (const pick of model) {
+    const game = games.find((item) => item.id === pick.gameId)
+    if (!game || isLocked(game, now, acceptsLatePicks)) continue
+    assigned.set(pick.gameId, available.shift())
+  }
+  return games.map((game) => {
+    const previous = old.get(game.id)
+    const modelPick = modelByGame.get(game.id)
+    if (!modelPick || isLocked(game, now, acceptsLatePicks)) {
+      return { gameId: game.id, team: previous && [game.away, game.home].includes(previous.team) ? previous.team : null, confidence: assigned.get(game.id) ?? previous?.confidence ?? null }
+    }
+    return { gameId: game.id, team: modelPick.team, confidence: assigned.get(game.id) }
+  })
+}
+
 export const modelDisagreement = (game) => {
   const ml = noVigProbabilities(game.homeMoneyline, game.awayMoneyline)?.home
   return Number.isFinite(game.predictorHome) && Number.isFinite(ml) ? Math.abs(game.predictorHome - ml) : null

@@ -271,6 +271,26 @@ describe('four-user application flow', () => {
     expect(selects[2]).toHaveValue('4')
     expect(selects[3]).toHaveValue('3')
     expect(screen.getAllByTestId(/game-row-/).map((row) => row.dataset.testid).slice(2, 4)).toEqual([targetId, sourceId])
+    expect(screen.getByTestId(targetId)).toHaveClass('drop-target')
+  })
+
+  it('applies FPI, moneyline, and AVG autopicks from the My picks tab', async () => {
+    const user = userEvent.setup()
+    history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'My picks' }))
+    for (const id of ['autopick-fpi', 'autopick-moneyline', 'autopick-avg']) expect(screen.getByTestId(id)).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('autopick-fpi'))
+    expect(screen.getByLabelText('TB at ATL confidence')).toHaveValue('1')
+    expect(screen.getByRole('radio', { name: /ATL/ })).toBeChecked()
+    expect(screen.getByText('FPI picks applied')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('autopick-moneyline'))
+    expect(screen.getByText('Moneyline picks applied')).toBeInTheDocument()
+    await user.click(screen.getByTestId('autopick-avg'))
+    expect(screen.getByText('AVG picks applied')).toBeInTheDocument()
+    expect(new Set(screen.getAllByLabelText(/confidence$/).map((select) => select.value)).size).toBe(4)
   })
 
   it('registers three players and keeps their Week 3 picks isolated', async () => {

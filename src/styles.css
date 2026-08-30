@@ -66,6 +66,8 @@ p { color: var(--muted); }
 .save-state { color: var(--success); font-size: .75rem; white-space: nowrap; }
 .save-state::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: .45rem; border-radius: 50%; background: currentColor; vertical-align: .08rem; }
 .pick-status { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; justify-content: flex-end; }
+.pick-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+.pick-actions button { color: var(--accent); background: transparent; font-size: .68rem; font-weight: 800; }
 .pick-completion { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 800; white-space: nowrap; }
 .pick-completion > span { display: inline-grid; width: 1rem; height: 1rem; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: .65rem; }
 .pick-completion.complete { color: var(--success); }
@@ -324,6 +326,7 @@ footer [data-testid="real-data-status"] { display: block; }
   .player-setup { grid-template-columns: 1fr; }
   .hero { align-items: end; }
   .section-title, .chart-heading { align-items: flex-start; flex-direction: column; }
+  .pick-actions { width: 100%; }
   .pick-status { justify-content: flex-start; }
   .save-state { align-self: flex-start; }
   .slate-head { display: none; }
@@ -408,12 +411,39 @@ footer [data-testid="real-data-status"] { display: block; }
   .gotw-state label { gap: .12rem; white-space: normal; font-size: .55rem; }
   .standings-card { padding: .55rem .45rem; }
   .standings-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
-  .standings-table th, .standings-table td { padding: .3rem .35rem; }
+  .standings-table { table-layout: fixed; width: 100%; }
+  .standings-table th, .standings-table td { padding: .2rem .08rem; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.05; }
+  .standings-table th { font-size: .48rem; letter-spacing: 0; }
+  .standings-table td { font-size: .58rem; }
+  .standings-table th:nth-child(1) { width: 8%; }
+  .standings-table th:nth-child(2) { width: 18%; }
+  .standings-table th:nth-child(3) { width: 8%; }
+  .standings-table th:nth-child(4) { width: 11%; }
+  .standings-table th:nth-child(5) { width: 14%; }
+  .standings-table th:nth-child(6) { width: 12%; }
+  .standings-table th:nth-child(7) { width: 10%; }
+  .standings-table th:nth-child(8) { width: 10%; }
+  .standings-table th:nth-child(9) { width: 9%; }
+  .pick-actions { gap: .25rem; }
+  .pick-actions button { padding: .3rem .35rem; font-size: .6rem; }
 }
 
 @media (max-width: 430px) {
   .overview-player strong { max-width: none; overflow: visible; text-overflow: clip; font-size: .52rem; letter-spacing: -.02em; }
   .overview-title > div:first-child h2 { display: none; }
+  .overview-table .overview-game-column { width: 2.7rem; min-width: 2.7rem; max-width: 2.7rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .overview-score-column { width: 1.9rem; min-width: 1.9rem; max-width: 1.9rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .game-metric { width: 1.25rem; min-width: 1.25rem; max-width: 1.25rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-player { min-width: 1.95rem; }
+  .overview-player strong { max-width: 1.95rem; overflow: hidden; text-overflow: ellipsis; font-size: .52rem; }
+  .overview-player b { font-size: .7rem; }
+  .overview-player span { font-size: .46rem; }
+  .overview-player small { max-width: 2rem; font-size: .4rem; }
+  .overview-matchup { font-size: .58rem; }
+  .overview-pick { width: 1.55rem; min-height: 1.55rem; padding: .04rem; }
+  .overview-pick .team-logo { width: 14px; height: 14px; }
+  .overview-pick span { font-size: .52rem; }
+  .game-metric { font-size: .4rem; }
   .models-table { table-layout: fixed; }
   .models-table th, .models-table td { padding: .28rem .2rem; text-align: center; }
   .models-table th:first-child, .models-table td:first-child { width: 6.1rem; text-align: left; }

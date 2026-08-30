@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, scorePick, standings, validateDraft } from '../src/domain.js'
+import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, scorePick, standings, validateDraft } from '../src/domain.js'
 import { gamesByPool, picksByUser, users } from '../src/fixtures.js'
 
 const games = [
@@ -54,6 +54,29 @@ describe('models', () => {
     expect(modelPicks(games, 'predictor').map((pick) => pick.gameId)).toEqual(['a', 'b'])
     expect(modelPicks(games, 'aggregate')).toHaveLength(2)
     expect(modelDisagreement(games[2])).toBeNull()
+  })
+
+  it('assigns model winners and confidence order without inventing missing inputs', () => {
+    const autopickGames = [
+      { id: 'near', away: 'A', home: 'AA', kickoff: '2099-09-01T12:00:00Z', predictorHome: .51, homeMoneyline: -101, awayMoneyline: 101, status: 'scheduled' },
+      { id: 'strong', away: 'B', home: 'BB', kickoff: '2099-09-01T13:00:00Z', predictorHome: .8, homeMoneyline: -200, awayMoneyline: 170, status: 'scheduled' },
+      { id: 'missing', away: 'C', home: 'CC', kickoff: '2099-09-01T14:00:00Z', predictorHome: null, homeMoneyline: null, awayMoneyline: null, status: 'scheduled' },
+    ]
+    expect(modelAutopick(autopickGames, 'predictor', [
+      { gameId: 'near', team: 'A', confidence: 3 },
+      { gameId: 'strong', team: 'B', confidence: 1 },
+      { gameId: 'missing', team: 'CC', confidence: 2 },
+    ])).toEqual([
+      { gameId: 'near', team: 'AA', confidence: 1 },
+      { gameId: 'strong', team: 'BB', confidence: 3 },
+      { gameId: 'missing', team: 'CC', confidence: 2 },
+    ])
+  })
+
+  it('computes model disagreement from FPI and moneyline only', () => {
+    const game = { predictorHome: .6, homeMoneyline: -150, awayMoneyline: 130, aggregateHome: .99 }
+    const withDifferentAggregate = { ...game, aggregateHome: .01 }
+    expect(modelDisagreement(game)).toBeCloseTo(modelDisagreement(withDifferentAggregate))
   })
 
   it('computes GQ from the two current FPI ratings', () => {

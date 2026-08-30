@@ -460,6 +460,43 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await expect(page.getByRole('cell', { name: 'Pat', exact: true })).toHaveCount(0)
 })
 
+test('iPhone 12 Pro keeps model overview and Charts standings inside the viewport', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
+  await page.goto('/?scenario=scheduled&pool=week-02')
+  await page.getByRole('button', { name: 'Overview' }).click()
+  await page.getByRole('checkbox', { name: 'Include model picks' }).check()
+  const overviewMetrics = page.locator('.overview-table tbody .game-metric')
+  await expect(overviewMetrics).toHaveCount(8)
+  await expect(page.locator('.overview-table .overview-game-column').first()).toHaveCSS('padding-right', '0px')
+  await expect(page.locator('.overview-table .overview-score-column').first()).toHaveCSS('padding-right', '0px')
+  await expect(overviewMetrics.first()).toHaveCSS('padding-right', '0px')
+  const overviewLayout = await page.evaluate(() => {
+    const scroll = document.querySelector('.overview-scroll')
+    const table = document.querySelector('.overview-table')
+    const game = document.querySelector('.overview-table .overview-game-column')
+    const metrics = [...document.querySelectorAll('.overview-table tbody .game-metric')]
+    return { tableWidth: table.getBoundingClientRect().width, scrollWidth: scroll.clientWidth, contentWidth: scroll.scrollWidth, documentWidth: document.documentElement.scrollWidth, viewport: window.innerWidth, gameWidth: game.getBoundingClientRect().width, metricWidths: metrics.map((metric) => metric.getBoundingClientRect().width) }
+  })
+  expect(overviewLayout.tableWidth).toBeLessThanOrEqual(overviewLayout.scrollWidth + 1)
+  expect(overviewLayout.contentWidth).toBeLessThanOrEqual(overviewLayout.scrollWidth + 1)
+  expect(overviewLayout.documentWidth).toBeLessThanOrEqual(overviewLayout.viewport)
+  expect(overviewLayout.gameWidth).toBeLessThanOrEqual(45)
+  expect(overviewLayout.metricWidths.every((width) => width <= 20)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('iphone12pro-overview-models.png'), fullPage: false })
+
+  await page.getByRole('button', { name: 'Charts' }).click()
+  const standingsScroll = page.locator('.standings-table').locator('..')
+  const standingsLayout = await page.evaluate(() => {
+    const scroll = document.querySelector('.standings-table').parentElement
+    const table = document.querySelector('.standings-table')
+    return { tableWidth: table.getBoundingClientRect().width, scrollWidth: scroll.clientWidth, contentWidth: scroll.scrollWidth }
+  })
+  expect(standingsLayout.tableWidth).toBeLessThanOrEqual(standingsLayout.scrollWidth + 1)
+  expect(standingsLayout.contentWidth).toBeLessThanOrEqual(standingsLayout.scrollWidth + 1)
+  await expect(standingsScroll).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('iphone12pro-charts-standings.png'), fullPage: false })
+})
+
 for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 'stale-data', 'validation-error', 'preseason-rehearsal']) {
   test(`captures ${state} state`, async ({ page }, testInfo) => {
     await page.goto(`/?scenario=${state}`)
