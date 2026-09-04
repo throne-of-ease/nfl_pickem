@@ -43,10 +43,10 @@ describe('sync-season Edge Function', () => {
     const result = await handler(new Request('https://example.supabase.co/functions/v1/sync-season', {
       method: 'POST',
       headers: { origin: 'https://throne-of-ease.github.io', 'x-cron-secret': 'cron-secret', 'content-type': 'application/json' },
-      body: JSON.stringify({ pool: 'preseason-03' }),
+      body: JSON.stringify({ pool: 'week-03' }),
     }))
     expect(result.status).toBe(200)
-    await expect(result.json()).resolves.toMatchObject({ synced: [{ key: 'preseason-03', games: 1 }], failures: [] })
+    await expect(result.json()).resolves.toMatchObject({ synced: [{ key: 'week-03', games: 1 }], failures: [] })
     const gameWrite = calls.find(([url]) => url.includes('/rest/v1/rpc/sync_pool_service'))
     expect(gameWrite[1].headers.apikey).toBe('secret')
     expect(JSON.parse(gameWrite[1].body).p_games[0]).toMatchObject({ locked_at: '2026-08-21T00:00:01Z', gotw: true, pregame_snapshot: { predictorHome: .52 } })
@@ -69,7 +69,7 @@ describe('sync-season Edge Function', () => {
     const result = await handler(new Request('https://example.supabase.co/functions/v1/sync-season', {
       method: 'POST',
       headers: { origin: 'https://throne-of-ease.github.io', 'x-cron-secret': 'cron-secret', 'content-type': 'application/json' },
-      body: JSON.stringify({ pool: 'preseason-03' }),
+      body: JSON.stringify({ pool: 'week-03' }),
     }))
     expect(result.status).toBe(200)
     const gameWrite = calls.find(([url]) => url.includes('/rest/v1/rpc/sync_pool_service'))

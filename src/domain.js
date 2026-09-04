@@ -9,17 +9,6 @@ const regular = Array.from({ length: 18 }, (_, i) => ({
 }))
 
 export const POOLS = [
-  { key: 'preseason-hof', label: 'Hall of Fame Game', phase: 'preseason', espnSeason: 2026, espnSeasonType: 1, espnWeek: 1, countsTowardSeason: false, acceptsLatePicks: true },
-  ...Array.from({ length: 3 }, (_, i) => ({
-    key: `preseason-${String(i + 1).padStart(2, '0')}`,
-    label: `Preseason ${i + 1}`,
-    phase: 'preseason',
-    espnSeason: 2026,
-    espnSeasonType: 1,
-    espnWeek: i + 2,
-    countsTowardSeason: false,
-    acceptsLatePicks: true,
-  })),
   ...regular,
   ...[
     ['wild-card', 'Wild Card', 1],
@@ -49,7 +38,12 @@ export function modelPicks(games, kind) {
       Number.isFinite(predictor) && Number.isFinite(moneyline) ? (predictor + moneyline) / 2 : null
     return Number.isFinite(homeProbability) ? [{ ...game, homeProbability, separation: Math.abs(homeProbability - 0.5) }] : []
   }).sort((a, b) => a.separation - b.separation || new Date(a.kickoff) - new Date(b.kickoff) || a.id.localeCompare(b.id))
-  return valid.map((game, index) => ({ gameId: game.id, team: game.homeProbability >= 0.5 ? game.home : game.away, confidence: index + 1, probability: game.homeProbability }))
+  return valid.map((game, index) => ({
+    gameId: game.id,
+    team: game.homeProbability >= 0.5 ? game.home : game.away,
+    confidence: index + 1,
+    probability: Math.max(game.homeProbability, 1 - game.homeProbability),
+  }))
 }
 
 export function modelAutopick(games, kind, existing = [], { now = new Date(), acceptsLatePicks = false } = {}) {
@@ -199,14 +193,12 @@ export function standings(users, games, picksByUser, provisional = false) {
     .sort((a, b) => b.points - a.points || b.potential - a.potential || a.name.localeCompare(b.name))
 }
 
-export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional = false, throughPoolKey = null, includePreseason = false) {
-  const seasonPools = POOLS.filter((pool) => (pool.countsTowardSeason || includePreseason && pool.phase === 'preseason') && gamesByPool[pool.key])
+export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional = false, throughPoolKey = null) {
+  const seasonPools = POOLS.filter((pool) => pool.countsTowardSeason && gamesByPool[pool.key])
   const selectedIndex = seasonPools.findIndex((pool) => pool.key === throughPoolKey)
   const lastPlayedIndex = seasonPools.reduce((last, pool, index) => gamesByPool[pool.key].some((game) => game.status !== 'scheduled') ? index : last, 0)
   const includedPools = seasonPools.slice(0, (selectedIndex >= 0 ? selectedIndex : lastPlayedIndex) + 1)
-  const labels = includedPools.map((pool) => pool.phase === 'preseason'
-    ? pool.key === 'preseason-hof' ? 'HOF' : `P${pool.espnWeek - 1}`
-    : pool.phase === 'regular' ? `W${pool.espnWeek}` : ({ 'wild-card': 'WC', divisional: 'DIV', conference: 'CONF', 'super-bowl': 'SB' })[pool.key])
+  const labels = includedPools.map((pool) => pool.phase === 'regular' ? `W${pool.espnWeek}` : ({ 'wild-card': 'WC', divisional: 'DIV', conference: 'CONF', 'super-bowl': 'SB' })[pool.key])
   const rows = Object.fromEntries(users.map((user) => [user.id, includedPools.map((pool) => {
     const games = gamesByPool[pool.key]
     const picks = picksByUser[user.id]?.[pool.key] ?? []

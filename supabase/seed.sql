@@ -25,9 +25,7 @@ insert into public.profiles(id,display_name,is_admin,username) values
 on conflict(id) do nothing;
 
 insert into public.pools(key,label,phase,espn_season,espn_season_type,espn_week,counts_toward_season,accepts_late_picks)
-select 'preseason-hof','Hall of Fame Game','preseason',2026,1,1,false,true
-union all select 'preseason-'||lpad(week::text,2,'0'),'Preseason '||week,'preseason',2026,1,week+1,false,true from generate_series(1,3) week
-union all select 'week-'||lpad(week::text,2,'0'),'Week '||week,'regular',2026,2,week,true,false from generate_series(1,18) week
+select 'week-'||lpad(week::text,2,'0'),'Week '||week,'regular',2026,2,week,true,false from generate_series(1,18) week
 union all values ('wild-card','Wild Card','postseason',2026,3,1,true,false),('divisional','Divisional','postseason',2026,3,2,true,false),('conference','Conference','postseason',2026,3,3,true,false),('super-bowl','Super Bowl','postseason',2026,3,5,true,false)
 on conflict(key) do nothing;
 

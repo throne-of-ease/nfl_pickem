@@ -6,8 +6,8 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/a.espncdn.com/**', (route) => route.fulfill({ contentType: 'image/png', body: ONE_PIXEL_PNG }))
 })
 
-test('registers three Week 3 players with isolated persistent picks', async ({ page }, testInfo) => {
-  await page.goto('/?scenario=scheduled&pool=preseason-03')
+test('registers three Week 2 players with isolated persistent picks', async ({ page }, testInfo) => {
+  await page.goto('/?scenario=scheduled&pool=week-02')
   await page.getByRole('button', { name: 'Set up 3 players' }).click()
   await page.getByLabel('Player 1 name').fill('Pat')
   await page.getByLabel('Player 2 name').fill('Quinn')
@@ -16,42 +16,42 @@ test('registers three Week 3 players with isolated persistent picks', async ({ p
   await page.getByRole('button', { name: 'My picks' }).click()
 
   const switcher = page.getByLabel('Active user')
-  await expect(page.locator('.game')).toHaveCount(16)
-  await expect(page.getByRole('img', { name: /logo$/ })).toHaveCount(32)
+  await expect(page.locator('.game')).toHaveCount(4)
+  await expect(page.getByRole('img', { name: /logo$/ })).toHaveCount(8)
   if (testInfo.project.name !== 'iphone12pro') await expect.poll(() => page.getByRole('img', { name: /logo$/ }).evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))).toBe(true)
-  await expect(page.getByLabel('Week')).toHaveValue('preseason-03')
+  await expect(page.getByLabel('Week')).toHaveValue('week-02')
   await expect(page.getByText('2026 season', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/Rehearsal.*does not count/)).toHaveCount(0)
 
-  await page.getByRole('radio', { name: /PIT/ }).check()
-  await page.getByLabel('PIT at BUF confidence').selectOption('16')
+  await page.getByRole('radio', { name: /DAL/ }).check()
+  await page.getByLabel('DAL at PHI confidence').selectOption('4')
   await switcher.selectOption({ label: 'Quinn' })
-  await page.getByRole('radio', { name: /BUF/ }).check()
-  await page.getByLabel('PIT at BUF confidence').selectOption('15')
+  await page.getByRole('radio', { name: /PHI/ }).check()
+  await page.getByLabel('DAL at PHI confidence').selectOption('3')
   await switcher.selectOption({ label: 'Riley' })
-  await page.getByRole('radio', { name: /PIT/ }).check()
-  await page.getByLabel('PIT at BUF confidence').selectOption('14')
+  await page.getByRole('radio', { name: /DAL/ }).check()
+  await page.getByLabel('DAL at PHI confidence').selectOption('2')
 
   await page.reload()
   await expect(switcher).toHaveValue(/local-/)
   await page.getByRole('button', { name: 'My picks' }).click()
-  await expect(page.getByRole('radio', { name: /PIT/ })).toBeChecked()
-  await expect(page.getByLabel('PIT at BUF confidence')).toHaveValue('16')
+  await expect(page.getByRole('radio', { name: /DAL/ })).toBeChecked()
+  await expect(page.getByLabel('DAL at PHI confidence')).toHaveValue('4')
   await switcher.selectOption({ label: 'Quinn' })
-  await expect(page.getByRole('radio', { name: /BUF/ })).toBeChecked()
-  await expect(page.getByLabel('PIT at BUF confidence')).toHaveValue('15')
+  await expect(page.getByRole('radio', { name: /PHI/ })).toBeChecked()
+  await expect(page.getByLabel('DAL at PHI confidence')).toHaveValue('3')
   await switcher.selectOption({ label: 'Riley' })
-  await expect(page.getByRole('radio', { name: /PIT/ })).toBeChecked()
-  await expect(page.getByLabel('PIT at BUF confidence')).toHaveValue('14')
+  await expect(page.getByRole('radio', { name: /DAL/ })).toBeChecked()
+  await expect(page.getByLabel('DAL at PHI confidence')).toHaveValue('2')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.screenshot({ path: testInfo.outputPath('week-3-three-players.png'), fullPage: true })
+  await page.screenshot({ path: testInfo.outputPath('week-2-three-players.png'), fullPage: true })
 })
 
 test('four users, charts, pools, and responsive states work', async ({ page }, testInfo) => {
   const errors = []
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto('/?scenario=preseason-rehearsal&pool=preseason-01')
+  await page.goto('/?scenario=final&pool=week-01')
   await expect(page.getByText("NFL Pick'em '26", { exact: true })).toBeVisible()
   await expect(page.getByText('Pool', { exact: true })).toHaveCount(0)
   if (testInfo.project.name === 'desktop') await expect(page.getByRole('heading', { name: 'Game overview' })).toBeVisible()
@@ -73,7 +73,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   }
   await expect(page.getByText('2026 season', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/Rehearsal.*does not count/)).toHaveCount(0)
-  await page.getByLabel('Week').selectOption('week-02')
+  await page.getByLabel('Week', { exact: true }).selectOption('week-02')
   await page.getByRole('button', { name: 'Charts' }).click()
   await expect(page.locator('svg.chart')).toHaveCount(4)
   await expect(page.getByRole('button', { name: 'Download chart as PNG' })).toHaveCount(4)
@@ -101,12 +101,12 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await expect(page.getByRole('columnheader', { name: 'FPI', exact: true })).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(4)
   await page.getByTestId('models-sort-fpi').click()
-  await expect(page.locator('tbody tr').first()).toContainText('KC')
+  await expect(page.locator('tbody tr').first()).toContainText('TB')
   await page.getByTestId('models-sort-fpi').click()
   await expect(page.locator('tbody tr').first()).toContainText('DAL')
   await page.getByTestId('models-sort-disagreement').click()
   await page.getByTestId('models-sort-game').click()
-  await expect(page.locator('tbody tr').first()).toContainText('DAL')
+  await expect(page.locator('tbody tr').first()).toContainText('CIN')
   await page.screenshot({ path: testInfo.outputPath('models.png'), fullPage: true })
   expect(errors).toEqual([])
 })
@@ -155,7 +155,8 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(rankBox.y).toBeLessThan(probabilityBox.y)
 
   await page.getByRole('button', { name: 'Charts' }).click()
-  for (const heading of ['Total points', 'GOTW points', 'GOTW % of total', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  for (const heading of ['Total points', 'GOTW points', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()
@@ -197,6 +198,29 @@ test('dragging a pick row swaps confidence and team buttons remain clickable', a
   await expect(source).not.toHaveClass(/moved/)
 })
 
+test('probability selector follows autopick without changing picks', async ({ page }) => {
+  await page.goto('/?scenario=scheduled&pool=week-02')
+  await page.getByRole('button', { name: 'My picks' }).click()
+  const selector = page.getByLabel('Pick probability model')
+  await expect(selector).toHaveValue('aggregate')
+  await page.getByTestId('autopick-fpi').click()
+  await expect(selector).toHaveValue('predictor')
+  await expect(page.getByTitle('FPI pregame win probability')).toHaveCount(8)
+  const picks = await page.locator('.teams input:checked').evaluateAll((items) => items.map((item) => item.parentElement.querySelector('span').textContent))
+  const ranks = await page.getByLabel(/confidence$/).evaluateAll((items) => items.map((item) => item.value))
+  await selector.selectOption('moneyline')
+  await expect(page.getByTitle('ML pregame win probability')).toHaveCount(8)
+  expect(await page.locator('.teams input:checked').evaluateAll((items) => items.map((item) => item.parentElement.querySelector('span').textContent))).toEqual(picks)
+  expect(await page.getByLabel(/confidence$/).evaluateAll((items) => items.map((item) => item.value))).toEqual(ranks)
+  await page.getByTestId('autopick-avg').click()
+  await expect(selector).toHaveValue('aggregate')
+
+  await page.getByRole('button', { name: 'Win probs.' }).click()
+  const probabilities = await page.locator('.model-pick-probability').allTextContents()
+  expect(probabilities.every((value) => Number.parseFloat(value) >= 50)).toBe(true)
+  await expect(page.getByTestId('models-sort-probability')).toContainText('Pick probabilities FPI')
+})
+
 test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
   await page.goto('/?scenario=scheduled&pool=week-02')
@@ -219,10 +243,10 @@ test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page
   await page.screenshot({ path: testInfo.outputPath('iphone12pro-my-picks.png'), fullPage: false })
 })
 
-test('iPhone 12 Pro overview fits the compact 16-game table', async ({ page }, testInfo) => {
+test('iPhone 12 Pro overview fits the compact game table', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
-  await page.goto('/?scenario=final&pool=preseason-03')
-  await expect(page.locator('[data-testid^="overview-row-"]')).toHaveCount(16)
+  await page.goto('/?scenario=final&pool=week-02')
+  await expect(page.locator('[data-testid^="overview-row-"]')).toHaveCount(4)
   expect(await page.evaluate(() => window.innerWidth)).toBe(390)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await expect(page.getByRole('heading', { name: 'Game overview' })).toBeHidden()
@@ -244,7 +268,7 @@ test('production registration starts a session without email confirmation', asyn
   await page.route('**/cdn.espn.com/**', (route) => route.abort())
   await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))
   await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: { access_token: 'access', refresh_token: 'refresh', expires_in: 3600, user: { id: 'real-user', email: 'pat@example.com' } } }))
-  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'week-01', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } }))
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
   await page.goto('/')
   await expect(page.getByText('Email is optional and never required.')).toBeVisible()
@@ -252,7 +276,7 @@ test('production registration starts a session without email confirmation', asyn
   await page.getByLabel('Display name').fill('Pat')
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
-  await expect(page.getByLabel('Week')).toHaveValue('preseason-03')
+  await expect(page.getByLabel('Week', { exact: true })).toHaveValue('week-01')
   await expect(page.getByText('2026 season', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/Rehearsal.*does not count/)).toHaveCount(0)
   await expect(page.locator('.signed-in')).toContainText('Pat')
@@ -296,7 +320,7 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   const summary = { gamepackageJSON: { winprobability: [{ homeWinPercentage: .46 }, { homeWinPercentage: .72 }], pickcenter: [{ homeTeamOdds: { moneyLine: -150 }, awayTeamOdds: { moneyLine: 130 } }] } }
   await page.route('**/rest/v1/rpc/get_season_data', async (route) => {
     seasonRequests += 1
-    await route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'preseason-03', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } })
+    await route.fulfill({ json: { games: [{ id: 'g1', pool_key: 'week-01', kickoff: currentKickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'real-user', name: 'Pat' }], revealedPicks: [], viewer: { id: 'real-user', name: 'Pat', username: 'pat', isAdmin: false }, asOf: currentKickoff } })
   })
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
   await page.route('**/rest/v1/rpc/get_registration_status', (route) => route.fulfill({ json: { registrationOpen: true } }))
@@ -459,7 +483,7 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await page.getByRole('radio', { name: /Assign C @ D/ }).check()
   await expect(page.getByText('GAME OF THE WEEK ASSIGNED')).toBeVisible()
   await page.getByRole('tab', { name: 'GOTW overview' }).click()
-  await expect(page.getByTestId('gotw-overview-table').locator('tbody tr')).toHaveCount(26)
+  await expect(page.getByTestId('gotw-overview-table').locator('tbody tr')).toHaveCount(22)
   await expect(page.getByTestId('gotw-overview-table')).toContainText('Week 7')
   await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
@@ -509,7 +533,7 @@ test('iPhone 12 Pro keeps model overview and Charts standings inside the viewpor
   await page.screenshot({ path: testInfo.outputPath('iphone12pro-charts-standings.png'), fullPage: false })
 })
 
-for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 'stale-data', 'validation-error', 'preseason-rehearsal']) {
+for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 'stale-data', 'validation-error']) {
   test(`captures ${state} state`, async ({ page }, testInfo) => {
     await page.goto(`/?scenario=${state}`)
     if (state === 'playoff') await page.getByLabel('Week').selectOption('super-bowl')

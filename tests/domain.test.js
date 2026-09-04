@@ -9,14 +9,12 @@ const games = [
 ]
 
 describe('pool contract', () => {
-  it('maps all 26 pools without ESPN defaults or Pro Bowl week', () => {
-    expect(POOLS).toHaveLength(26)
+  it('maps the 22 regular and postseason pools without preseason or Pro Bowl week', () => {
+    expect(POOLS).toHaveLength(22)
     expect(POOLS.every((pool) => pool.espnSeason === 2026 && pool.espnSeasonType && pool.espnWeek)).toBe(true)
     expect(POOLS.find((pool) => pool.key === 'super-bowl').espnWeek).toBe(5)
-    expect(POOLS.filter((pool) => pool.phase === 'preseason').every((pool) => !pool.countsTowardSeason)).toBe(true)
-    expect(POOLS.find((pool) => pool.key === 'preseason-hof')).toMatchObject({ label: 'Hall of Fame Game', espnWeek: 1 })
-    expect(POOLS.find((pool) => pool.key === 'preseason-03')).toMatchObject({ label: 'Preseason 3', espnWeek: 4 })
-    expect(POOLS.filter((pool) => pool.acceptsLatePicks).map((pool) => pool.key)).toEqual(['preseason-hof', 'preseason-01', 'preseason-02', 'preseason-03'])
+    expect(POOLS.some((pool) => pool.phase === 'preseason')).toBe(false)
+    expect(POOLS.every((pool) => pool.countsTowardSeason)).toBe(true)
     expect(POOLS.some((pool) => pool.phase === 'postseason' && pool.espnWeek === 4)).toBe(false)
   })
 
@@ -32,14 +30,6 @@ describe('pool contract', () => {
     expect(presetConfidencePicks(games).map((pick) => [pick.gameId, pick.confidence])).toEqual([['b', 1], ['a', 2], ['c', 3]])
   })
 
-  it('contains the official 16-game 2026 preseason Week 3 slate', () => {
-    const week = gamesByPool['preseason-03']
-    expect(week).toHaveLength(16)
-    expect(week[0]).toMatchObject({ id: '401873298', away: 'PIT', home: 'BUF', kickoff: '2026-08-27T23:00:00Z' })
-    expect(week.at(-1)).toMatchObject({ id: '401874394', away: 'CHI', home: 'TEN', kickoff: '2026-08-29T22:00:00Z' })
-    expect(new Set(week.flatMap((game) => [game.away, game.home])).size).toBe(32)
-    expect(week.every((game) => Number.isFinite(game.homeMoneyline) && Number.isFinite(game.awayMoneyline))).toBe(true)
-  })
 })
 
 describe('models', () => {
@@ -54,6 +44,13 @@ describe('models', () => {
     expect(modelPicks(games, 'predictor').map((pick) => pick.gameId)).toEqual(['a', 'b'])
     expect(modelPicks(games, 'aggregate')).toHaveLength(2)
     expect(modelDisagreement(games[2])).toBeNull()
+  })
+
+  it('reports the selected team probability at or above 50 percent', () => {
+    const picks = modelPicks(games, 'predictor')
+    expect(picks.find((pick) => pick.gameId === 'a')).toMatchObject({ team: 'A', probability: .6 })
+    expect(picks.find((pick) => pick.gameId === 'b')).toMatchObject({ team: 'BB', probability: .6 })
+    expect(picks.every((pick) => pick.probability >= .5)).toBe(true)
   })
 
   it('assigns model winners and confidence order without inventing missing inputs', () => {
@@ -88,7 +85,7 @@ describe('models', () => {
 
 describe('drafts and scoring', () => {
   it('accepts unique partial drafts and requires 1..N for completion', () => {
-    expect(validateDraft(games, [{ gameId: 'a', team: 'A', confidence: 2 }]).ok).toBe(true)
+    expect(validateDraft(games, [{ gameId: 'a', team: 'A', confidence: 2 }], { now: new Date('2026-08-01') }).ok).toBe(true)
     expect(validateDraft(games, [{ gameId: 'a', confidence: 2 }, { gameId: 'b', confidence: 2 }]).code).toBe('INVALID_CONFIDENCE_SET')
     expect(validateDraft(games, [{ gameId: 'a', confidence: 1 }], { complete: true }).code).toBe('INVALID_CONFIDENCE_SET')
     expect(validateDraft(games, [{ gameId: 'x', confidence: 1 }]).code).toBe('UNKNOWN_GAME')
@@ -101,7 +98,7 @@ describe('drafts and scoring', () => {
     expect(validateDraft(games, changed, { previous, now: new Date('2026-09-02') }).code).toBe('LOCKED_GAME_CHANGED')
   })
 
-  it('allows the explicitly reopened preseason weeks to change after kickoff', () => {
+  it('allows an explicitly reopened pool to change after kickoff', () => {
     const previous = [{ gameId: 'b', team: 'B', confidence: 1 }]
     const changed = [{ gameId: 'b', team: 'BB', confidence: 1 }]
     expect(validateDraft(games, changed, { previous, now: new Date('2026-09-02'), acceptsLatePicks: true }).ok).toBe(true)
@@ -145,8 +142,8 @@ describe('drafts and scoring', () => {
 })
 
 describe('tracker-compatible analytics', () => {
-  it('provides all 26 fixture pools and complete seeded drafts', () => {
-    expect(Object.keys(gamesByPool)).toHaveLength(26)
+  it('provides all 22 fixture pools and complete seeded drafts', () => {
+    expect(Object.keys(gamesByPool)).toHaveLength(22)
     expect(POOLS.every((pool) => gamesByPool[pool.key]?.length > 0)).toBe(true)
     expect(users.every((user) => POOLS.every((pool) => picksByUser[user.id][pool.key].length === gamesByPool[pool.key].length))).toBe(true)
   })
@@ -174,7 +171,7 @@ describe('tracker-compatible analytics', () => {
     expect(poolMetrics([{ id: 'p', name: 'Pat' }], partialGames.map((game) => ({ ...game, status: 'scheduled', kickoff: '2099-01-01T00:00:00Z' })), { p: [] })[0].potential).toBe(3)
   })
 
-  it('excludes preseason, includes playoffs, and computes points versus leader', () => {
+  it('includes regular season and playoffs and computes points versus leader', () => {
     const history = buildSeasonHistory(users, gamesByPool, picksByUser, true, 'super-bowl')
     expect(history.weeks).toHaveLength(22)
     expect(history.weeks.slice(-4)).toEqual(['WC', 'DIV', 'CONF', 'SB'])
