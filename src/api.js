@@ -248,3 +248,17 @@ export async function loadChartData(token) {
   }
   return { users, gamesByPool, picksByUser }
 }
+
+export const loadDivisionWinnerData = (token) => request('/rest/v1/rpc/get_division_winner_data', { method: 'POST', headers: bearer(token), body: '{}' })
+
+export const saveDivisionWinnerPicks = (token, expectedRevision, picks) => request('/rest/v1/rpc/replace_division_winner_picks', {
+  method: 'POST',
+  headers: bearer(token),
+  body: JSON.stringify({ p_expected_revision: expectedRevision, p_picks: picks }),
+})
+
+export const setDivisionWinnerSettings = (token, lockWeek, lockAt, pointsPerCorrect) => request('/rest/v1/rpc/set_division_winner_settings', {
+  method: 'POST',
+  headers: bearer(token),
+  body: JSON.stringify({ p_lock_week: lockWeek, p_lock_at: lockAt, p_points_per_correct: pointsPerCorrect }),
+})

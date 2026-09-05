@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { POOLS, gameQuality, presetConfidencePicks } from './domain.js'
-import { deleteAdminOverride, deleteAdminPlayer, loadAdminData, loadAdminGotwData, loadAdminOverrideHistory, resetAdminPassword, saveAdminPicks, setGameOfWeek, setRegistrationOpen } from './api.js'
+import { deleteAdminOverride, deleteAdminPlayer, loadAdminData, loadAdminGotwData, loadAdminOverrideHistory, loadDivisionWinnerData, resetAdminPassword, saveAdminPicks, setDivisionWinnerSettings, setGameOfWeek, setRegistrationOpen } from './api.js'
 import { TeamLogo } from './overview.jsx'
 import { formatCETKickoff } from './time.js'
+import { DEFAULT_DIVISION_SETTINGS, resolveDivisionDeadline } from './divisionWinners.js'
 
 const formatKickoff = formatCETKickoff
 
@@ -32,6 +33,9 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
   const [resetPassword, setResetPassword] = useState(null)
   const [deleteOverrideId, setDeleteOverrideId] = useState(null)
   const [gotwSort, setGotwSort] = useState({ key: 'quality', direction: 'descending' })
+  const [divisionSettings, setDivisionSettings] = useState(DEFAULT_DIVISION_SETTINGS)
+  const [divisionMessage, setDivisionMessage] = useState('')
+  const [divisionBusy, setDivisionBusy] = useState(false)
   const sortGotwBy = (key) => setGotwSort((current) => ({ key, direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   const gotwSortIndicator = (key) => gotwSort.key === key ? (gotwSort.direction === 'ascending' ? ' ▲' : ' ▼') : ''
   const gotwSortOrder = (key) => gotwSort.key === key ? gotwSort.direction === 'ascending' ? 'ascending' : 'descending' : 'none'
@@ -86,6 +90,22 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
   }, [selectedUserId, selectedGameId, data])
 
   useEffect(() => { setSelectedGotwGameId(assignedGotwGameId) }, [gotwPoolKey, gotwData])
+
+  useEffect(() => {
+    if (adminTab !== 'division') return
+    let active = true
+    setDivisionBusy(true)
+    loadDivisionWinnerData(token)
+      .then((result) => {
+        if (!active) return
+        const settings = result?.settings ?? {}
+        setDivisionSettings({ lockWeek: Number(settings.lockWeek ?? settings.division_lock_week ?? DEFAULT_DIVISION_SETTINGS.lockWeek), lockAt: settings.lockAt ?? settings.division_lock_at ?? DEFAULT_DIVISION_SETTINGS.lockAt, pointsPerCorrect: Number(settings.pointsPerCorrect ?? settings.division_points_per_correct ?? DEFAULT_DIVISION_SETTINGS.pointsPerCorrect) })
+        setDivisionMessage('')
+      })
+      .catch((error) => { if (active) setDivisionMessage((error.code ?? 'DIVISION_SETTINGS_LOAD_FAILED').replaceAll('_', ' ')) })
+      .finally(() => { if (active) setDivisionBusy(false) })
+    return () => { active = false }
+  }, [adminTab, token])
 
   const toggleRegistration = async () => {
     setBusy(true)
@@ -178,11 +198,30 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
     finally { setGotwBusy(false) }
   }
 
+  const saveDivisionSettings = async (event) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const lockWeek = Number(form.get('divisionLockWeek'))
+    const pointsPerCorrect = Number(form.get('divisionPoints'))
+    const previous = divisionSettings
+    setDivisionBusy(true)
+    setDivisionMessage('Resolving the Sunday kickoff...')
+    try {
+      const lockAt = await resolveDivisionDeadline({ week: lockWeek })
+      const saved = await setDivisionWinnerSettings(token, lockWeek, lockAt, pointsPerCorrect)
+      setDivisionSettings({ lockWeek, lockAt: saved?.lockAt ?? lockAt, pointsPerCorrect })
+      setDivisionMessage('DIVISION WINNER SETTINGS SAVED')
+    } catch (error) {
+      setDivisionSettings(previous)
+      setDivisionMessage((error.code ?? error.message ?? 'DIVISION_SETTINGS_UPDATE_FAILED').replaceAll('_', ' '))
+    } finally { setDivisionBusy(false) }
+  }
+
   if (!data) return <section><p className="notice" role="status">Loading admin tools...</p></section>
 
   return <section className="admin-panel">
     <div className="section-title"><div><h2>Admin</h2><p>Manage players, set the weekly spotlight, and correct submitted picks.</p></div><button type="button" onClick={load} disabled={busy}>{busy ? 'Working...' : 'Refresh'}</button></div>
-    <div className="admin-tabs" role="tablist" aria-label="Admin sections"><button type="button" role="tab" aria-selected={adminTab === 'players'} className={adminTab === 'players' ? 'active' : ''} onClick={() => setAdminTab('players')}>Players</button><button type="button" role="tab" aria-selected={adminTab === 'gotw'} className={adminTab === 'gotw' ? 'active' : ''} onClick={() => setAdminTab('gotw')}>Game of the Week</button><button type="button" role="tab" aria-selected={adminTab === 'gotw-overview'} className={adminTab === 'gotw-overview' ? 'active' : ''} onClick={() => setAdminTab('gotw-overview')}>GOTW overview</button><button type="button" role="tab" aria-selected={adminTab === 'overrides'} className={adminTab === 'overrides' ? 'active' : ''} onClick={() => setAdminTab('overrides')}>Pick overrides</button></div>
+    <div className="admin-tabs" role="tablist" aria-label="Admin sections"><button type="button" role="tab" aria-selected={adminTab === 'players'} className={adminTab === 'players' ? 'active' : ''} onClick={() => setAdminTab('players')}>Players</button><button type="button" role="tab" aria-selected={adminTab === 'gotw'} className={adminTab === 'gotw' ? 'active' : ''} onClick={() => setAdminTab('gotw')}>Game of the Week</button><button type="button" role="tab" aria-selected={adminTab === 'gotw-overview'} className={adminTab === 'gotw-overview' ? 'active' : ''} onClick={() => setAdminTab('gotw-overview')}>GOTW overview</button><button type="button" role="tab" aria-selected={adminTab === 'division'} className={adminTab === 'division' ? 'active' : ''} onClick={() => setAdminTab('division')}>Division winners</button><button type="button" role="tab" aria-selected={adminTab === 'overrides'} className={adminTab === 'overrides' ? 'active' : ''} onClick={() => setAdminTab('overrides')}>Pick overrides</button></div>
 
     {adminTab === 'players' && <>
       <div className="admin-registration"><strong>Player registration</strong><span>{data.registrationOpen === false ? 'Closed' : 'Open'}</span><button type="button" onClick={toggleRegistration} disabled={busy}>{data.registrationOpen === false ? 'Allow new registrations' : 'Stop new registrations'}</button></div>
@@ -195,6 +234,7 @@ export default function AdminPanel({ poolKey, token, onPicksUpdated, onPlayerDel
 
     {adminTab === 'gotw-overview' && <section className="admin-gotw-overview" aria-label="Game of the Week overview"><div className="section-title"><div><h3>Game of the Week overview</h3><p>One row per week for a quick view of the five-point assignments.</p></div></div><div className="table-scroll"><table data-testid="gotw-overview-table"><thead><tr><th>Week</th><th>Game of the Week</th><th>Kickoff</th><th>GQ</th><th>State</th></tr></thead><tbody>{gotwOverview.map(({ pool, game }) => <tr key={pool.key}><th scope="row">{pool.label}</th><td>{game ? <span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span> : 'Not assigned'}</td><td>{game ? <time dateTime={game.kickoff}>{formatKickoff(game.kickoff)}</time> : '—'}</td><td>{gameQuality(game) == null ? '—' : gameQuality(game).toFixed(1)}</td><td>{game ? <b>ASSIGNED</b> : '—'}</td></tr>)}</tbody></table></div></section>}
 
+    {adminTab === 'division' && <section className="admin-division" aria-label="Division winners settings"><div className="section-title"><div><h3>Division winners</h3><p>Lock or reopen the separate eight-division picks. Changes are audit-logged.</p></div></div><form className="admin-division-form" onSubmit={saveDivisionSettings}><label>Lock week<select name="divisionLockWeek" value={divisionSettings.lockWeek} onChange={(event) => setDivisionSettings((current) => ({ ...current, lockWeek: Number(event.target.value) }))}>{Array.from({ length: 18 }, (_, index) => <option key={index + 1} value={index + 1}>Week {index + 1}</option>)}</select></label><label>Points per correct pick<input name="divisionPoints" type="number" min="0" max="100" step="1" value={divisionSettings.pointsPerCorrect} onChange={(event) => setDivisionSettings((current) => ({ ...current, pointsPerCorrect: Number(event.target.value) }))} required /></label><div className="admin-division-deadline"><span>Resolved deadline</span><strong>{formatKickoff(divisionSettings.lockAt)} Berlin time</strong></div><button type="submit" disabled={divisionBusy}>{divisionBusy ? 'Working...' : 'Save division settings'}</button></form>{divisionMessage && <p className={`notice ${divisionMessage === 'DIVISION WINNER SETTINGS SAVED' ? '' : 'error'}`} role="status">{divisionMessage}</p>}<p className="notice">The browser resolves the earliest Sunday kickoff at or after 13:00 America/New_York. If ESPN schedule resolution fails, the previous setting is kept.</p></section>}
     {message && <p className="notice" role="status">{message}</p>}
   </section>
 }

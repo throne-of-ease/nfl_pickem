@@ -51,7 +51,8 @@ nav button.active { color: var(--ink); border-bottom-color: var(--accent); }
 
 main { max-width: 1040px; margin: auto; padding: 1.5rem 1rem 4rem; }
 .hero, .section-title, .chart-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-.hero-actions { display: flex; align-items: center; gap: .45rem; }
+.hero-actions { display: flex; align-items: center; gap: .45rem; width: 100%; }
+.hero-actions label { margin-right: auto; }
 .hero { padding: .45rem 0 1.15rem; border-bottom: 1px solid var(--line); }
 .hero h1 { font-size: clamp(1.55rem, 4vw, 2.35rem); line-height: 1; margin: .15rem 0; letter-spacing: -.045em; }
 .hero label { display: flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; }
@@ -163,7 +164,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
 .overview-table { width: 100%; min-width: 0; margin: 0; table-layout: fixed; }
 .overview-table th, .overview-table td { padding: 0; text-align: center; }
-.overview-table .overview-game-column { width: 4.45rem; min-width: 4.45rem; text-align: center; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
+.overview-table .overview-game-column { width: calc(4.45rem + 2px); min-width: calc(4.45rem + 2px); text-align: center; position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 var(--line); }
 .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
 .overview-table .overview-game-column .table-sort-button, .overview-table .overview-score-column .table-sort-button { font-size: .47rem; }
 .overview-table thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-raised); }
@@ -201,6 +202,8 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; margin: .55rem 0 0; font-size: .65rem; }
 .overview-legend span { width: 7px; height: 7px; border-radius: 50%; margin-left: .4rem; }
 .game-metric { width: 2.1rem; min-width: 2.1rem; padding-inline: 0 !important; color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; }
+.overview-dev-column { width: calc(2.1rem - 2px); min-width: calc(2.1rem - 2px); }
+.overview-table .game-metric:last-child { width: calc(2.1rem - 2px); min-width: calc(2.1rem - 2px); }
 .table-sort-button { padding: 0; border: 0; background: transparent; color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
 .table-sort-button:hover, .table-sort-button:focus-visible { color: var(--ink); background: transparent; }
 .correct-dot { background: var(--success); }
@@ -287,6 +290,35 @@ footer [data-testid="real-data-status"] { display: block; }
 .override-picks { color: var(--muted); font-size: .72rem; }
 .danger-button { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--line)); background: transparent; font-size: .7rem; font-weight: 800; }
 .admin-gotw, .admin-gotw-overview { display: grid; gap: .75rem; }
+.admin-division { display: grid; gap: .75rem; }
+.admin-division-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: .6rem; align-items: end; padding: .75rem; border: 1px solid var(--line); background: var(--surface); }
+.admin-division-form label, .admin-division-deadline { display: grid; gap: .25rem; color: var(--muted); font-size: .7rem; }
+.admin-division-deadline strong { color: var(--ink); font-size: .8rem; }
+.division-winners { display: grid; gap: .75rem; }
+.division-winners-heading { padding-top: .35rem; }
+.division-winners-actions { display: flex; gap: .45rem; flex-wrap: wrap; }
+.division-winners-live { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .7rem .8rem; border: 1px solid var(--line); background: var(--surface); }
+.division-winners-live strong { color: var(--accent); }
+.division-winners-live span { color: var(--muted); font-size: .76rem; }
+.division-winners-live .complete { color: var(--success); }
+.division-winners-live .incomplete { color: var(--warning); }
+.division-editor { display: grid; gap: .45rem; }
+.division-row { min-width: 0; padding: .65rem .75rem .75rem; border: 1px solid var(--line); background: var(--surface); }
+.division-row legend { display: flex; justify-content: space-between; gap: .75rem; width: 100%; padding: 0; color: var(--ink); }
+.division-row legend span { color: var(--muted); font-size: .72rem; }
+.division-teams { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; margin-top: .45rem; }
+.division-teams label { display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0; padding: .35rem .2rem; border: 1px solid var(--line); color: var(--muted); font-weight: 800; }
+.division-teams label.selected { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
+.division-teams input { margin: 0; accent-color: var(--accent); }
+.division-teams .team-logo { width: 24px; height: 24px; }
+.division-results, .division-matrix { min-width: 0; padding: .75rem; border: 1px solid var(--line); background: var(--surface); }
+.division-results h3, .division-matrix h3 { margin-top: 0; }
+.division-results table { margin-top: 0; }
+.division-matrix .table-scroll { overflow-x: auto; }
+.division-matrix table { min-width: 720px; margin-top: 0; }
+.division-matrix td.correct { color: var(--success); }
+.division-matrix td.incorrect { color: var(--live); }
+.division-matrix td.pending { color: var(--muted); }
 .admin-gotw > .section-title { align-items: end; padding: .75rem; border: 1px solid var(--line); background: var(--surface); }
 .admin-gotw > .section-title label { display: grid; gap: .25rem; color: var(--muted); font-size: .7rem; }
 .gotw-table { min-width: 620px; margin-top: 0; }
@@ -359,6 +391,8 @@ footer [data-testid="real-data-status"] { display: block; }
   .leaderboard li { grid-template-columns: 2rem 1fr auto; }
   .leaderboard small { grid-column: 2 / -1; text-align: left; }
   .standings-options { align-items: flex-start; justify-content: flex-start; flex-direction: column; gap: .35rem; }
+  .admin-division-form { grid-template-columns: 1fr; }
+  .division-teams label { font-size: .72rem; }
 }
 
 @media (max-width: 430px) {
@@ -376,9 +410,11 @@ footer [data-testid="real-data-status"] { display: block; }
   .overview-scroll { overflow-x: auto; }
   .overview-table { width: 100%; min-width: 0; }
   .overview-table th, .overview-table td { padding: 0; }
-  .overview-table .overview-game-column { width: 3.3rem; min-width: 3.3rem; }
+  .overview-table .overview-game-column { width: calc(3.3rem + 2px); min-width: calc(3.3rem + 2px); }
   .overview-table .overview-score-column { width: 2.2rem; min-width: 2.2rem; }
   .overview-table .game-metric { width: 2rem; min-width: 2rem; }
+  .overview-table .overview-dev-column { width: calc(2rem - 2px); min-width: calc(2rem - 2px); }
+  .overview-table .game-metric:last-child { width: calc(2rem - 2px); min-width: calc(2rem - 2px); }
   .overview-player { min-width: 2.35rem; display: grid; grid-template-columns: 1fr; justify-items: center; gap: .04rem; }
   .overview-player strong { max-width: 2.3rem; text-align: center; font-size: .58rem; line-height: 1; }
   .overview-player b { font-size: .78rem; line-height: 1; }
@@ -434,9 +470,11 @@ footer [data-testid="real-data-status"] { display: block; }
 @media (max-width: 430px) {
   .overview-player strong { max-width: none; overflow: visible; text-overflow: clip; font-size: .52rem; letter-spacing: -.02em; }
   .overview-title > div:first-child h2 { display: none; }
-  .overview-table .overview-game-column { width: 2.7rem; min-width: 2.7rem; max-width: 2.7rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .overview-game-column { width: calc(2.7rem + 2px); min-width: calc(2.7rem + 2px); max-width: calc(2.7rem + 2px); padding-left: 0 !important; padding-right: 0 !important; }
   .overview-table .overview-score-column { width: 1.9rem; min-width: 1.9rem; max-width: 1.9rem; padding-left: 0 !important; padding-right: 0 !important; }
   .overview-table .game-metric { width: 2rem; min-width: 2rem; max-width: 2rem; padding-left: 0 !important; padding-right: 0 !important; }
+  .overview-table .overview-dev-column { width: calc(2rem - 2px); min-width: calc(2rem - 2px); max-width: calc(2rem - 2px); }
+  .overview-table .game-metric:last-child { width: calc(2rem - 2px); min-width: calc(2rem - 2px); max-width: calc(2rem - 2px); }
   .overview-table .model-moneyline-column { width: 2.8rem; min-width: 2.8rem; max-width: 2.8rem; padding-left: 0 !important; padding-right: 0 !important; }
   .overview-table .model-moneyline-column .overview-player strong { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
   .overview-player { min-width: 1.95rem; }

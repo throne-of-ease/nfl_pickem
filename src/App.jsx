@@ -4,14 +4,16 @@ import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
 import AdminPanel from "./adminPanel.jsx";
+import DivisionWinnersView from "./divisionWinners.jsx";
 import { authenticate, clearSession, isCurrentPool, loadChartData, loadPool, loadRegistrationStatus, refreshLivePool, restoreSession, savePicks, updateDisplayName, updatePassword } from "./api.js";
 import { buildPickBackup, downloadPickBackup, recordPickBackup } from "./backup.js";
 import { formatCETTime, formatCETWeekday } from "./time.js";
+import { DIVISION_DEFINITIONS } from "./divisionWinners.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const STORAGE_KEY = "nfl-pickem-rehearsal-v1";
 
-const TEST_SCENARIOS = new Set(["scheduled", "live", "final", "playoff", "missing-data", "stale-data", "validation-error"]);
+const TEST_SCENARIOS = new Set(["scheduled", "live", "final", "playoff", "missing-data", "stale-data", "validation-error", "division-locked"]);
 
 function loadLocalState(useFixtures) {
   try {
@@ -307,6 +309,8 @@ export default function App() {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
   const [tab, setTab] = useState("overview");
+  const [divisionWinnersOpen, setDivisionWinnersOpen] = useState(false);
+  const [divisionStandingsStatus, setDivisionStandingsStatus] = useState(null);
   const [provisional, setProvisional] = useState(true);
   const [pickProbabilityKind, setPickProbabilityKind] = useState("aggregate");
   const [message, setMessage] = useState(activeScenario === "validation-error" ? "INVALID CONFIDENCE SET" : "All changes saved");
@@ -362,6 +366,15 @@ export default function App() {
             : game,
   );
   const userPicks = picksByUser[userId]?.[poolKey] ?? [];
+  const divisionFixturePicks = Object.fromEntries(appUsers.map((player, playerIndex) => [player.id, Object.fromEntries(DIVISION_DEFINITIONS.map((division, divisionIndex) => [division.id, division.teams[(divisionIndex + playerIndex) % division.teams.length]]))]));
+  const divisionFixtureData = activeScenario === "division-locked" ? {
+    settings: { lockWeek: 5, lockAt: "2026-09-01T17:00:00.000Z", pointsPerCorrect: 7 },
+    locked: true,
+    viewerDraft: { revision: 1, picks: divisionFixturePicks[userId] ?? {} },
+    players: appUsers,
+    drafts: appUsers.map((player) => ({ userId: player.id, name: player.name, picks: divisionFixturePicks[player.id] })),
+    divisions: DIVISION_DEFINITIONS.map((division) => ({ ...division, evaluated: true, leader: division.teams[0], allZero: false })),
+  } : null;
   const [includeChartModels, setIncludeChartModels] = useState(false);
   const chartGamesByPool = {
     ...(chartData?.gamesByPool ?? loadedGamesByPool),
@@ -838,7 +851,7 @@ export default function App() {
         </a>
         <nav aria-label="Main navigation">
           {[["overview", "Overview"], ["games", "My picks"], ["charts", "Charts"], ["models", "Win probs."], ...(isAdmin ? [["admin", "Admin"]] : [])].map(([item, label]) => (
-            <button key={item} className={`${tab === item ? "active" : ""} ${item === "models" ? "models-tab" : ""}`} onClick={() => setTab(item)}>
+            <button key={item} className={`${tab === item ? "active" : ""} ${item === "models" ? "models-tab" : ""}`} onClick={() => { setTab(item); if (item !== "games") setDivisionWinnersOpen(false); }}>
               {item === "models" ? (
                 <>
                   Win <span className="models-word-second">probs.</span>
@@ -971,7 +984,7 @@ export default function App() {
                 <button type="submit">Create players</button>
               </form>
             )}
-            <section className="hero">
+            {!divisionWinnersOpen && <section className="hero">
               <div className="hero-actions">
                 <label>
                   <span className="sr-only">Week</span>
@@ -988,8 +1001,9 @@ export default function App() {
                     {isRefreshing ? "Refreshing…" : "Refresh"}
                   </button>
                 )}
+                {tab === "games" && <button type="button" onClick={() => { setTab("games"); setDivisionWinnersOpen(true); }}>Division winners</button>}
               </div>
-            </section>
+            </section>}
             {!useFixtures && showPasswordForm && (
               <form className="password-form" onSubmit={submitPasswordChange}>
                 <h2>Change password</h2>
@@ -1011,29 +1025,30 @@ export default function App() {
                 </button>
               </form>
             )}
-            {dataState.loading && (
+            {!divisionWinnersOpen && dataState.loading && (
               <p className="notice" role="status">
                 Loading the real ESPN schedule and pregame probabilities…
               </p>
             )}
-            {dataState.error && (
+            {!divisionWinnersOpen && dataState.error && (
               <p className="notice error" role="alert">
                 {dataState.error}
               </p>
             )}
-            {activeScenario === "stale-data" && (
+            {!divisionWinnersOpen && activeScenario === "stale-data" && (
               <p className="notice" role="status">
                 Showing last-good data · updated 24 hours ago
               </p>
             )}
-            {activeScenario === "missing-data" && (
+            {!divisionWinnersOpen && activeScenario === "missing-data" && (
               <p className="notice" role="status">
                 Some model data is unavailable. Picks and scores remain available.
               </p>
             )}
-            {tab === "overview" && <Overview players={appUsers} games={games} picksByUser={Object.fromEntries(appUsers.map((user) => [user.id, picksByUser[user.id]?.[poolKey] ?? []]))} history={chartHistory} modelHistory={overviewModelHistory} pool={pool} provisional={provisional} onProvisional={setProvisional} />}
-            {tab === "games" && <AutopickActions onAutopick={applyModelPicks} probabilityKind={pickProbabilityKind} onProbabilityKind={setPickProbabilityKind} />}
-            {tab === "games" && (
+            {tab === "overview" && !divisionWinnersOpen && <Overview players={appUsers} games={games} picksByUser={Object.fromEntries(appUsers.map((user) => [user.id, picksByUser[user.id]?.[poolKey] ?? []]))} history={chartHistory} modelHistory={overviewModelHistory} pool={pool} provisional={provisional} onProvisional={setProvisional} />}
+            {tab === "games" && divisionWinnersOpen && <DivisionWinnersView token={session?.access_token} viewerId={userId} players={appUsers} useFixtures={useFixtures} fixtureData={divisionFixtureData} onBack={() => setDivisionWinnersOpen(false)} onStatusChange={setDivisionStandingsStatus} />}
+            {tab === "games" && !divisionWinnersOpen && <AutopickActions onAutopick={applyModelPicks} probabilityKind={pickProbabilityKind} onProbabilityKind={setPickProbabilityKind} />}
+            {tab === "games" && !divisionWinnersOpen && (
               <section>
                 <div className="section-title">
                   <div>
@@ -1323,13 +1338,18 @@ export default function App() {
                 <p>Official scoring uses finals only. Provisional scoring uses the score leader, then live win probability when tied.</p>
                 <h3>Models</h3>
                 <p>FPI, no-vig moneyline, and their equal-weight AVG receive unique confidence ranks from least to greatest probability separation.</p>
+                <h3>Division winners</h3>
+                <p>Choose one team from each of the eight divisions by the configured Week 5 Sunday deadline, shown in Berlin time. Before locking, only your draft is visible and standings evaluation is provisional after completed games. After locking, all selections are revealed and evaluated from ESPN standings; an ESPN outage keeps the last good standings and is marked stale.</p>
+                <p>Division-winner points are hypothetical and are excluded from weekly picks, Game of the Week, season totals, charts, and standings.</p>
               </section>
             )}
           </>
         )}
       </main>
       <footer>
-        {useFixtures ? (
+        {divisionWinnersOpen && divisionStandingsStatus ? (
+          <span data-testid="real-data-status">{divisionStandingsStatus}</span>
+        ) : useFixtures ? (
           "Deterministic test scenario"
         ) : games.length > 0 ? (
           <span data-testid="real-data-status">

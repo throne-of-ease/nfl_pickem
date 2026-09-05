@@ -179,3 +179,13 @@ export function CurrentWeekChart({ current }) {
   const data = currentWeekChartData(current, mode)
   return <ChartFrame id="current-week" title="Current week" description="Earned points and remaining potential." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
 }
+
+export function DivisionWinnersChart({ rows, pointsPerCorrect }) {
+  const data = rows.map((row, colorIndex) => ({ name: row.name, colorIndex, value: row.points }))
+  return <ChartFrame
+    id="division-winners-points"
+    title="Division winners points"
+    description={`Hypothetical points: correct picks × ${pointsPerCorrect}.`}
+    table={<AccessibleTable caption="Division winners hypothetical points" columns={['Player', 'Correct', 'Points']} rows={rows.map((row) => [row.name, row.correct, row.points])} />}
+  ><BarSvg data={data} ariaLabel="Division winners hypothetical points" /></ChartFrame>
+}
