@@ -521,8 +521,10 @@ test('iPhone 12 Pro keeps model overview and Charts standings inside the viewpor
   expect(overviewLayout.tableWidth).toBeLessThanOrEqual(overviewLayout.scrollWidth + 1)
   expect(overviewLayout.contentWidth).toBeLessThanOrEqual(overviewLayout.scrollWidth + 1)
   expect(overviewLayout.documentWidth).toBeLessThanOrEqual(overviewLayout.viewport)
-  expect(overviewLayout.gameWidth).toBeLessThanOrEqual(47)
-  expect(overviewLayout.metricWidths.every((width) => width >= 30 && width <= 34)).toBe(true)
+  expect(overviewLayout.gameWidth).toBeGreaterThanOrEqual(50)
+  expect(overviewLayout.gameWidth).toBeLessThanOrEqual(54)
+  expect(overviewLayout.metricWidths.filter((_, index) => index % 2 === 0).every((width) => width >= 30 && width <= 34)).toBe(true)
+  expect(overviewLayout.metricWidths.filter((_, index) => index % 2 === 1).every((width) => width >= 23 && width <= 27)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('iphone12pro-overview-models.png'), fullPage: false })
 
   await page.getByRole('button', { name: 'Charts' }).click()
