@@ -85,7 +85,8 @@ begin
   select division_lock_at into v_lock_at from app_settings where key = 'division_winners';
   if not found then raise exception 'DIVISION_SETTINGS_MISSING'; end if;
   if v_lock_at <= now() then raise exception 'DIVISION_WINNERS_LOCKED'; end if;
-  if p_picks is null or jsonb_typeof(p_picks) <> 'object' or jsonb_object_length(p_picks) > 8 then raise exception 'MALFORMED_DIVISION_PICKS'; end if;
+  if p_picks is null or jsonb_typeof(p_picks) <> 'object' then raise exception 'MALFORMED_DIVISION_PICKS'; end if;
+  if (select count(*) from jsonb_object_keys(p_picks)) > 8 then raise exception 'MALFORMED_DIVISION_PICKS'; end if;
 
   insert into division_winner_drafts(user_id) values(auth.uid()) on conflict do nothing;
   select revision into v_current_revision from division_winner_drafts where user_id = auth.uid() for update;

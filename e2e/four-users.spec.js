@@ -560,6 +560,32 @@ test('Division winners opens as an accessible eight-row mobile subview with isol
   await expect(page.getByRole('heading', { name: 'Make your picks' })).toBeVisible()
 })
 
+test('Division winner draft saves through the authenticated RPC path', async ({ page }) => {
+  const session = { access_token: 'division-access', refresh_token: 'division-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'division-user', email: 'division@accounts.nfl-pickem.invalid' } }
+  let savedPicks = {}
+  await page.addInitScript((value) => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
+  await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => route.fulfill({ json: session }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [{ id: 'division-game', pool_key: 'week-02', kickoff: '2026-10-01T17:00:00Z', away_team: 'BUF', home_team: 'MIA', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null }], profiles: [{ id: 'division-user', name: 'Division player' }], revealedPicks: [], viewer: { id: 'division-user', name: 'Division player', username: 'division', isAdmin: false }, asOf: '2026-09-05T00:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 0, picks: [] } }))
+  await page.route('**/rest/v1/rpc/get_chart_data', (route) => route.fulfill({ json: { profiles: [], games: [], revealedPicks: [] } }))
+  await page.route('**/rest/v1/rpc/get_division_winner_data', (route) => route.fulfill({ json: { settings: { lockWeek: 5, lockAt: '2026-10-11T17:00:00.000Z', pointsPerCorrect: 5 }, locked: false, viewerDraft: { revision: 0, picks: savedPicks }, players: [], drafts: [] } }))
+  await page.route('**/rest/v1/rpc/replace_division_winner_picks', async (route) => {
+    const body = JSON.parse(route.request().postData())
+    expect(body.p_expected_revision).toBe(0)
+    savedPicks = body.p_picks
+    await route.fulfill({ json: { draftRevision: 1, picks: savedPicks } })
+  })
+  await page.route('**/site.web.api.espn.com/**', (route) => route.abort())
+  await page.route('**/cdn.espn.com/**', (route) => route.abort())
+
+  await page.goto('/?pool=week-02')
+  await page.getByRole('button', { name: 'My picks' }).click()
+  await page.getByRole('button', { name: 'Division winners' }).click()
+  await page.locator('.division-row').first().locator('input[value="BUF"]').check()
+  await expect(page.getByText('All changes saved')).toBeVisible()
+  expect(savedPicks).toEqual({ 'afc-east': 'BUF' })
+})
+
 test('locked Division winners reveals summary, chart, and player matrix', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone12pro', 'This is the iPhone-sized visual contract')
   await page.goto('/?scenario=division-locked&pool=week-02')

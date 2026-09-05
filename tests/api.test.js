@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, updateDisplayName, updatePassword } from '../src/api.js'
+import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, saveDivisionWinnerPicks, updateDisplayName, updatePassword } from '../src/api.js'
 
 afterEach(() => localStorage.clear())
 
@@ -62,6 +62,22 @@ describe('direct ESPN live refresh', () => {
     expect(JSON.parse(calls[0][1].body)).toEqual({ p_display_name: 'New Name' })
     expect(calls[1][0]).toBe('https://example.supabase.co/rest/v1/rpc/delete_admin_override')
     expect(JSON.parse(calls[1][1].body)).toEqual({ p_override_id: 7 })
+  })
+
+  it('sends authenticated division winner drafts to the deployed RPC contract', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    const calls = []
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+      calls.push([url, options])
+      return { ok: true, json: async () => ({ draftRevision: 1, picks: { 'afc-east': 'BUF' } }) }
+    }))
+
+    await saveDivisionWinnerPicks('player-access', 0, { 'afc-east': 'BUF' })
+
+    expect(calls[0][0]).toBe('https://example.supabase.co/rest/v1/rpc/replace_division_winner_picks')
+    expect(calls[0][1].headers.authorization).toBe('Bearer player-access')
+    expect(JSON.parse(calls[0][1].body)).toEqual({ p_expected_revision: 0, p_picks: { 'afc-east': 'BUF' } })
   })
 
   it('syncs an existing GOTW pool when stored quality is missing', async () => {
