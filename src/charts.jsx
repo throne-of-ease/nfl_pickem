@@ -65,23 +65,29 @@ export function svgToPngBlob(svg) {
   })
 }
 
-export async function downloadSvgAsPng(svg, filename) {
-  const blob = await svgToPngBlob(svg)
+export function downloadPngBlob(blob, filename) {
   const link = document.createElement('a')
   link.download = filename
   link.href = URL.createObjectURL(blob)
   link.click()
-  URL.revokeObjectURL(link.href)
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+}
+
+export async function sharePngBlob(blob, filename) {
+  const file = new File([blob], filename, { type: 'image/png' })
+  if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) return navigator.share({ title: 'NFL Pick’em 2026', files: [file] })
+  return downloadPngBlob(blob, filename)
+}
+
+export async function downloadSvgAsPng(svg, filename) {
+  downloadPngBlob(await svgToPngBlob(svg), filename)
 }
 
 export async function shareSvgAsPng(svg, filename) {
-  const blob = await svgToPngBlob(svg)
-  const file = new File([blob], filename, { type: 'image/png' })
-  if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) return navigator.share({ title: 'NFL Pick’em 2026', files: [file] })
-  return downloadSvgAsPng(svg, filename)
+  return sharePngBlob(await svgToPngBlob(svg), filename)
 }
 
-function ChartIcon({ type }) {
+export function ChartIcon({ type }) {
   return type === 'share'
     ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 5 8 2 5 5M8 2v8M3 8v5h10V8" /></svg>
     : <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 12v2h10v-2" /></svg>

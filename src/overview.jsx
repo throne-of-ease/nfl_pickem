@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { gameQuality, isLocked, modelPicks, pickDeviation, poolMetrics, scorePick } from './domain.js'
+import { ChartIcon, downloadPngBlob, sharePngBlob } from './charts.jsx'
+import { tableToPngBlob } from './tableExport.js'
 import { formatCETDate, formatCETTime } from './time.js'
 
 const ESPN_CODES = { WAS: 'wsh' }
@@ -47,6 +49,23 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
 }
 
 export function Overview({ players, games, picksByUser, history, modelHistory, pool, provisional, onProvisional }) {
+  const tableRef = useRef(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const exportTable = async (share) => {
+    setExporting(true)
+    setExportError('')
+    try {
+      const blob = await tableToPngBlob(tableRef.current, `${pool.label} · ${provisional ? 'Includes provisional live scores' : 'Final scores only'}`)
+      const filename = `nfl-overview-${pool.id || pool.label}.png`.replace(/[^a-z0-9._-]/gi, '-')
+      if (share) await sharePngBlob(blob, filename)
+      else downloadPngBlob(blob, filename)
+    } catch (error) {
+      if (error?.name !== 'AbortError') setExportError('Could not export the table. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
   const [showModels, setShowModels] = useState(false)
   const [showGameMetrics, setShowGameMetrics] = useState(true)
   const [sort, setSort] = useState({ key: 'score', direction: 'ascending' })
@@ -86,13 +105,18 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
       <div className="overview-options"><label className="provisional-toggle"><input type="checkbox" checked={showModels} onChange={(event) => setShowModels(event.target.checked)} /><span className="option-label">Include model picks</span></label><label className="provisional-toggle"><input type="checkbox" checked={showGameMetrics} onChange={(event) => setShowGameMetrics(event.target.checked)} /><span className="option-label">Show GQ / Dev</span></label><label className="provisional-toggle"><input type="checkbox" checked={provisional} onChange={(event) => onProvisional(event.target.checked)} /><span className="option-label">Include provisional live scores</span></label></div>
     </div>
     <div className="overview-scroll">
-      <table className="overview-table" aria-label={`All player picks for ${pool.label}`}>
+      <table ref={tableRef} className="overview-table" aria-label={`All player picks for ${pool.label}`}>
          <thead><tr><th className="overview-game-column" aria-sort={sort.key === 'game' ? sort.direction : 'none'}><button className="table-sort-button" type="button" data-testid="overview-sort-game" onClick={() => sortBy('game')}>Game{sortIndicator('game')}</button></th><th className="overview-score-column" aria-sort={sort.key === 'score' ? sort.direction : 'none'} title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)"><button className="table-sort-button" type="button" data-testid="overview-sort-score" onClick={() => sortBy('score')}>Score{sortIndicator('score')}</button></th>{columns.map((player, index) => <th key={player.id} className={player.model ? `model-column ${player.id === 'model-moneyline' ? 'model-moneyline-column' : ''}` : ''}>
           <div className="overview-player"><strong>{player.name}</strong><b title="Total season score">{player.displayTotal}</b><span>{!player.model && index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="This week: points / points lost / points left">{player.points}/-{player.pointsLost}/{player.potential}</small></div>
          </th>)}{showGameMetrics && <><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th className="game-metric overview-dev-column"><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}</tr></thead>
         <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? `model-column ${player.id === 'model-moneyline' ? 'model-moneyline-column' : ''}` : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
       </table>
     </div>
+    <div className="chart-actions chart-actions-bottom">
+      <button type="button" title="Share table as PNG" aria-label="Share table as PNG" disabled={exporting} onClick={() => exportTable(true)}><ChartIcon type="share" /></button>
+      <button type="button" title="Download table as PNG" aria-label="Download table as PNG" disabled={exporting} onClick={() => exportTable(false)}><ChartIcon type="download" /></button>
+    </div>
+    {exportError && <p role="alert">{exportError}</p>}
     <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> hidden until kickoff</p>
   </section>
 }
