@@ -22,7 +22,8 @@ const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 
 function GameSummary({ game }) {
   return <div className="overview-game">
-    <span className="overview-game-line"><strong className="overview-matchup">{game.away}@{game.home}</strong>{(game.status === 'live' || game.status === 'in') && <b className="overview-live live-badge">LIVE</b>}</span>
+    <span className="overview-game-line"><strong className="overview-matchup">{game.away}@{game.home}</strong></span>
+    {(game.status === 'live' || game.status === 'in') && <b className="overview-live live-badge">LIVE</b>}
     {game.gotw && <b className="overview-gotw" title="Game of the Week">GOTW +5</b>}
   </div>
 }
