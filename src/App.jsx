@@ -1088,7 +1088,8 @@ export default function App() {
                     return (
                       <article
                         data-testid={`game-row-${game.id}`}
-                        className={`game ${game.status} ${pick?.team ? "picked" : ""} ${draggedGameId === game.id ? "dragging" : ""} ${highlightedGameId === game.id ? "moved" : ""} ${dragOverGameId === game.id ? "drop-target" : ""}`}
+                        className={`game ${game.status} ${locked ? "locked" : ""} ${pick?.team ? "picked" : ""} ${draggedGameId === game.id ? "dragging" : ""} ${highlightedGameId === game.id ? "moved" : ""} ${dragOverGameId === game.id ? "drop-target" : ""}`}
+                        aria-disabled={locked}
                         key={game.id}
                         draggable={!locked && Number.isInteger(pick?.confidence)}
                         title={locked ? "This game is locked" : "Drag this row to change its confidence rank"}

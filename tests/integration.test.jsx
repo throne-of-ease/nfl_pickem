@@ -100,6 +100,22 @@ describe('four-user application flow', () => {
     expect(document.querySelectorAll('.game.live .live-badge')).toHaveLength(1)
   })
 
+  it('visually marks locked pick rows and leaves future games active', async () => {
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
+
+    const lockedRow = document.querySelector('.game.live')
+    expect(lockedRow).toHaveClass('locked')
+    expect(lockedRow).toHaveAttribute('aria-disabled', 'true')
+    for (const input of within(lockedRow).getAllByRole('radio')) expect(input).toBeDisabled()
+    expect(within(lockedRow).getByRole('combobox')).toBeDisabled()
+
+    const futureRows = screen.getAllByTestId(/game-row-/).filter((row) => row !== lockedRow)
+    expect(futureRows.every((row) => !row.classList.contains('locked'))).toBe(true)
+    expect(futureRows.every((row) => row.getAttribute('aria-disabled') === 'false')).toBe(true)
+  })
+
   it('shows scheduled kickoff in Central European time in the score column', () => {
     history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
     render(<App />)
