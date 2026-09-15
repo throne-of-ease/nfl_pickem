@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { modelPicks } from './domain.js'
+import { isLocked, modelPicks } from './domain.js'
 
 export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#7aa8ff']
 
@@ -43,7 +43,7 @@ export function aggressivenessChartData(players, gamesByPool, picksByUser, kind,
       for (const pick of picksByUser[player.id]?.[poolKey] ?? []) {
         const game = games.find((item) => item.id === pick.gameId)
         const model = models.get(pick.gameId)
-        if (!game || !model || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) continue
+        if (!game || !isLocked(game) || !model || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) continue
         const signed = pick.team === game.home ? pick.confidence : -pick.confidence
         const modelSigned = model.team === game.home ? model.confidence : -model.confidence
         comparisons[player.id].push(Math.abs(signed - modelSigned))
@@ -227,8 +227,8 @@ export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKey
   const modelControl = <label>Model <select aria-label="Aggressiveness index model" value={kind} onChange={(event) => setKind(event.target.value)}><option value="predictor">FPI</option><option value="moneyline">Moneyline</option><option value="aggregate">FPI + moneyline average</option></select></label>
   const table = view === 'weekly'
     ? <AccessibleTable caption="Weekly aggressiveness index" columns={['Player', ...weekLabels]} rows={weekly.map((item) => [item.name, ...item.values])} />
-    : <AccessibleTable caption={view === 'selected_week' ? 'Selected week aggressiveness index' : 'Season average aggressiveness index'} columns={['Player', 'Index', 'Compared picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
-  return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence." modes={[{ value: 'weekly', label: 'Weekly by player' }, { value: 'selected_week', label: 'Selected week' }, { value: 'season_average', label: 'Season average' }]} mode={view} onMode={setView} modeLabel="View" controls={modelControl} table={table}>{view === 'weekly' ? <LineSvg series={weekly} labels={weekLabels} ariaLabel={`Aggressiveness index by week, ${kind}`} /> : <BarSvg data={data} ariaLabel={`Aggressiveness index ${view === 'selected_week' ? 'for selected week' : 'season average'}, ${kind}`} />}</ChartFrame>
+    : <AccessibleTable caption={view === 'selected_week' ? 'Selected week aggressiveness index' : 'Season average aggressiveness index'} columns={['Player', 'Index', 'Compared locked picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
+  return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence, using locked picks only." modes={[{ value: 'weekly', label: 'Weekly by player' }, { value: 'selected_week', label: 'Selected week' }, { value: 'season_average', label: 'Season average' }]} mode={view} onMode={setView} modeLabel="View" controls={modelControl} table={table}>{view === 'weekly' ? <LineSvg series={weekly} labels={weekLabels} ariaLabel={`Aggressiveness index by week, ${kind}`} /> : <BarSvg data={data} ariaLabel={`Aggressiveness index ${view === 'selected_week' ? 'for selected week' : 'season average'}, ${kind}`} />}</ChartFrame>
 }
 
 export function DivisionWinnersChart({ rows, pointsPerCorrect }) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addPregameData, applyFpiRatings, applyLiveSample, fetchEspnPool, ingestEspnResponse, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
+import { addPregameData, applyFpiRatings, applyLiveSample, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
   it.each([['pre','scheduled'],['in','live'],['post','final']])('normalizes %s to %s', (input, expected) => {
@@ -18,6 +18,11 @@ describe('ESPN fixture ingestion', () => {
     const later = applyLiveSample(live, { status: 'live', predictorHome: .9, capturedAt: 't2' })
     expect(live.locked).toBe(true)
     expect(later.pregameSnapshot).toEqual(live.pregameSnapshot)
+  })
+
+  it('does not erase stored pregame model inputs when an ESPN refresh omits them', () => {
+    const stored = { predictorHome: .61, homeMoneyline: -150, awayMoneyline: 130, matchupQuality: 84.2 }
+    expect(mergeLatestGame(stored, { predictorHome: null, homeMoneyline: null, awayMoneyline: null, matchupQuality: null })).toMatchObject(stored)
   })
 
   it('normalizes every real scoreboard event and enriches pregame probabilities', async () => {

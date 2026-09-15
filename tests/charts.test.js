@@ -51,9 +51,9 @@ describe('tracker-compatible chart transformations', () => {
 
   it('treats equal confidence on opposite teams as the sum of both confidences', () => {
     const games = [
-      { id: 'g1', home: 'H1', away: 'A1', kickoff: '2026-09-01T12:00:00Z', predictorHome: .51 },
-      { id: 'g2', home: 'H2', away: 'A2', kickoff: '2026-09-01T13:00:00Z', predictorHome: .60 },
-      { id: 'g3', home: 'H3', away: 'A3', kickoff: '2026-09-01T14:00:00Z', predictorHome: .90 },
+      { id: 'g1', home: 'H1', away: 'A1', locked: true, predictorHome: .51 },
+      { id: 'g2', home: 'H2', away: 'A2', locked: true, predictorHome: .60 },
+      { id: 'g3', home: 'H3', away: 'A3', locked: true, predictorHome: .90 },
     ]
     const result = aggressivenessChartData(
       [{ id: 'alex', name: 'Alex' }],
@@ -65,7 +65,7 @@ describe('tracker-compatible chart transformations', () => {
   })
 
   it('switches between FPI, moneyline, and their average', () => {
-    const game = { id: 'g1', home: 'HOME', away: 'AWAY', kickoff: '2026-09-01T12:00:00Z', predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
+    const game = { id: 'g1', home: 'HOME', away: 'AWAY', locked: true, predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
     const args = [[{ id: 'alex', name: 'Alex' }], { 'week-01': [game] }, { alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }] } }]
     expect(aggressivenessChartData(...args, 'predictor')[0].value).toBe(0)
     expect(aggressivenessChartData(...args, 'moneyline')[0].value).toBe(2)
@@ -74,9 +74,9 @@ describe('tracker-compatible chart transformations', () => {
 
   it('calculates each player\'s aggressiveness separately by week', () => {
     const games = [
-      { id: 'g1', home: 'H1', away: 'A1', kickoff: '2026-09-01T12:00:00Z', predictorHome: .51 },
-      { id: 'g2', home: 'H2', away: 'A2', kickoff: '2026-09-01T13:00:00Z', predictorHome: .60 },
-      { id: 'g3', home: 'H3', away: 'A3', kickoff: '2026-09-01T14:00:00Z', predictorHome: .90 },
+      { id: 'g1', home: 'H1', away: 'A1', locked: true, predictorHome: .51 },
+      { id: 'g2', home: 'H2', away: 'A2', locked: true, predictorHome: .60 },
+      { id: 'g3', home: 'H3', away: 'A3', locked: true, predictorHome: .90 },
     ]
     const series = weeklyAggressivenessSeries(
       [{ id: 'alex', name: 'Alex' }],
@@ -86,5 +86,13 @@ describe('tracker-compatible chart transformations', () => {
       ['week-01', 'week-02'],
     )
     expect(series).toEqual([{ name: 'Alex', values: [6, 0] }])
+  })
+
+  it('ignores unlocked picks and compares every locked game in a full slate', () => {
+    const lockedGames = Array.from({ length: 16 }, (_, index) => ({ id: `g${index + 1}`, home: `H${index + 1}`, away: `A${index + 1}`, locked: true, predictorHome: .51 + index / 100 }))
+    const unlocked = { id: 'future', home: 'HF', away: 'AF', kickoff: '2099-09-01T12:00:00Z', predictorHome: .9 }
+    const picks = [...lockedGames.map((game, index) => ({ gameId: game.id, team: game.home, confidence: index + 1 })), { gameId: 'future', team: 'AF', confidence: 17 }]
+    const [result] = aggressivenessChartData([{ id: 'alex', name: 'Alex' }], { 'week-01': [...lockedGames, unlocked] }, { alex: { 'week-01': picks } }, 'predictor')
+    expect(result).toMatchObject({ value: 0, comparisons: 16 })
   })
 })

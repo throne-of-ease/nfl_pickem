@@ -42,6 +42,9 @@ const isOlderGameState = (current, incoming) => {
 
 export function mergeLatestGame(current, incoming) {
   const merged = { ...current, ...incoming }
+  for (const key of ['predictorHome', 'homeMoneyline', 'awayMoneyline', 'matchupQuality']) {
+    if (incoming[key] == null && current?.[key] != null) merged[key] = current[key]
+  }
   if (!isOlderGameState(current, incoming)) return merged
   for (const key of ['status', 'awayScore', 'homeScore', 'period', 'displayClock', 'statusDetail']) {
     if (current[key] !== undefined) merged[key] = current[key]
