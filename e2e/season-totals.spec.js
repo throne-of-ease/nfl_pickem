@@ -25,6 +25,9 @@ test('production season totals recover historical scores while viewing an unplay
   await page.getByLabel('Display name').fill('Pat')
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
+  // Select explicitly: the hosted-base redirect can drop the initial query string.
+  await page.getByLabel('Week', { exact: true }).selectOption('week-02')
+  await expect(page.getByTestId('overview-row-next')).toBeVisible()
   await expect(page.locator('.overview-player b')).toHaveText('6')
   await expect(page.locator('.overview-player small')).toHaveText('0/-0/1')
   await page.getByRole('button', { name: 'Charts', exact: true }).click()
