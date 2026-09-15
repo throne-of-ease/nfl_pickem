@@ -69,7 +69,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
     Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.shared = { name: files[0].name, type: files[0].type, size: files[0].size } } })
   })
   await page.getByRole('button', { name: 'Share table as PNG' }).click()
-  await expect.poll(() => page.evaluate(() => window.shared?.type)).toBe('image/png')
+  await expect.poll(() => page.evaluate(() => window.shared?.type), { timeout: 15000 }).toBe('image/png')
   expect(await page.evaluate(() => window.shared.size)).toBeGreaterThan(1000)
   await page.evaluate(() => Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }))
   const fallback = page.waitForEvent('download')

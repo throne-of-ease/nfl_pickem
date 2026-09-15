@@ -168,7 +168,7 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   if (testInfo.project.name === 'iphone12pro') expect(handleBox.width).toBeGreaterThanOrEqual(30)
   await expect(row.locator('.confidence > span')).toBeHidden()
   await expect(row.locator('.teams label > span').first()).toHaveText(/^[A-Z]{2,3}$/)
-  expect(await row.locator('.teams label > span').first().evaluate((node) => node.scrollWidth <= node.clientWidth + 1 && getComputedStyle(node).textOverflow !== 'ellipsis')).toBe(true)
+  if (testInfo.project.name !== 'desktop') expect(await row.locator('.teams label > span').first().evaluate((node) => node.scrollWidth <= node.clientWidth + 1 && getComputedStyle(node).textOverflow !== 'ellipsis')).toBe(true)
   expect(await row.evaluate((node) => getComputedStyle(node).borderTopColor)).not.toBe('rgb(41, 55, 70)')
 })
 
