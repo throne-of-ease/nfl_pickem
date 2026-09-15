@@ -63,6 +63,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   for (const name of [...names, 'Moneyline', 'DAL@PHI', 'CIN@CLE']) expect(text).toContain(name)
   expect(text.filter(value => value === '?')).toHaveLength(16)
   expect(await page.evaluate(() => window.exportImageCount)).toBeGreaterThan(0)
+  await expect(page.getByRole('button', { name: 'Share table as PNG' })).toBeEnabled()
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true })
     Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.shared = { name: files[0].name, type: files[0].type, size: files[0].size } } })
