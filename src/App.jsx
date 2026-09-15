@@ -5,7 +5,7 @@ import { CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart }
 import { Overview, TeamLogo } from "./overview.jsx";
 import AdminPanel from "./adminPanel.jsx";
 import DivisionWinnersView from "./divisionWinners.jsx";
-import { authenticate, clearSession, isCurrentPool, loadChartData, loadPool, loadRegistrationStatus, refreshLivePool, restoreSession, savePicks, updateDisplayName, updatePassword } from "./api.js";
+import { authenticate, clearSession, isCurrentPool, loadChartData, loadPool, loadRegistrationStatus, mergeGames, refreshLivePool, restoreSession, savePicks, updateDisplayName, updatePassword } from "./api.js";
 import { buildPickBackup, downloadPickBackup, recordPickBackup } from "./backup.js";
 import { formatCETTime, formatCETWeekday } from "./time.js";
 import { DIVISION_DEFINITIONS } from "./divisionWinners.js";
@@ -329,6 +329,7 @@ export default function App() {
   const pointerDrag = useRef(null);
   const [session, setSession] = useState(null);
   const [chartData, setChartData] = useState(null);
+  const [seasonError, setSeasonError] = useState("");
   const [authReady, setAuthReady] = useState(useFixtures);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
@@ -385,7 +386,7 @@ export default function App() {
   const [includeChartModels, setIncludeChartModels] = useState(false);
   const chartGamesByPool = {
     ...(chartData?.gamesByPool ?? loadedGamesByPool),
-    [poolKey]: games,
+    [poolKey]: mergeGames(games, chartData?.gamesByPool?.[poolKey] ?? []),
   };
   const normalPicksByUser = Object.fromEntries([...new Set([...Object.keys(chartData?.picksByUser ?? {}), ...Object.keys(picksByUser)])].map((id) => [id, { ...(chartData?.picksByUser?.[id] ?? {}), ...(picksByUser[id] ?? {}) }]));
   const modelPicksByUser = Object.fromEntries(MODEL_DEFINITIONS.map((model) => [model.id, Object.fromEntries(Object.entries(chartGamesByPool).map(([key, poolGames]) => [key, modelPicks(poolGames, model.kind)]))]));
@@ -465,15 +466,18 @@ export default function App() {
   useEffect(() => {
     if (useFixtures || !session?.access_token) return;
     let active = true;
-    loadChartData(session.access_token)
+    loadChartData(session.access_token, { forceRefresh: refreshRequest.force })
       .then((result) => {
-        if (active) setChartData(result);
+        if (active) {
+          setChartData(result);
+          setSeasonError(result.failedPools.length ? "Some season scores could not be refreshed. Totals may be incomplete. Use Refresh to retry." : "");
+        }
       })
-      .catch(() => {});
+      .catch(() => { if (active) setSeasonError("Season totals could not be loaded. Use Refresh to retry."); });
     return () => {
       active = false;
     };
-  }, [useFixtures, session?.access_token]);
+  }, [useFixtures, session?.access_token, poolKey, refreshRequest.version]);
 
   useEffect(() => {
     if (useFixtures || !session?.refresh_token) return;
@@ -1031,6 +1035,7 @@ export default function App() {
                 </button>
               </form>
             )}
+            {!divisionWinnersOpen && seasonError && <p role="alert">{seasonError}</p>}
             {!divisionWinnersOpen && dataState.loading && (
               <p className="notice" role="status">
                 Loading the real ESPN schedule and pregame probabilities…

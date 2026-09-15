@@ -127,7 +127,7 @@ export function isCurrentPool(games = [], now = Date.now()) {
   return now >= Math.min(...kickoffs) - CURRENT_POOL_PADDING && now <= Math.max(...kickoffs) + CURRENT_POOL_PADDING
 }
 
-function mergeGames(serverGames, espnGames) {
+export function mergeGames(serverGames, espnGames) {
   const updates = new Map(espnGames.map((game) => [game.id, game]))
   const merged = serverGames.map((game) => {
     const update = updates.get(game.id)
@@ -143,7 +143,9 @@ export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGam
   if (!pool) throw apiError('UNKNOWN_POOL', 404)
   const cached = readEspnCache(poolKey)
   const current = currentWeek ?? isCurrentPool([...serverGames, ...(cached?.games ?? [])])
-  if (!current && !forceRefresh) {
+  const unfinishedPastGames = mergeGames(serverGames, cached?.games ?? []).some((game) =>
+    Date.parse(game.kickoff) < Date.now() && !['final', 'post'].includes(game.status))
+  if (!current && !forceRefresh && !unfinishedPastGames) {
     if (cached?.games?.length) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'historical' }
     if (serverGames.length) {
       const value = { games: serverGames, asOf: serverAsOf ?? new Date().toISOString(), source: 'Supabase schedule cache', cached: true, freshness: 'cached', cacheScope: 'historical' }
@@ -153,7 +155,7 @@ export async function refreshEspnPool(poolKey, { forceRefresh = false, serverGam
     return { games: [], asOf: serverAsOf ?? new Date().toISOString(), source: 'historical cache miss', cached: true, freshness: 'cached', cacheScope: 'historical' }
   }
   const maxAge = 2 * 60 * 1000
-  if (!forceRefresh && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'current' }
+  if (!forceRefresh && cached?.source === 'ESPN' && cached?.games?.length && Date.now() - Date.parse(cached.asOf) < maxAge) return { ...cached, cached: true, freshness: 'cached', cacheScope: 'current' }
   const fresh = await fetchEspnPool(pool, { fetcher, signal, includeFpi })
   const value = { ...fresh, games: current ? mergeGames(cached?.games ?? [], fresh.games) : fresh.games, cached: false }
   writeEspnCache(poolKey, value)
@@ -235,7 +237,7 @@ export const updateDisplayName = (token, displayName) => {
   return request('/rest/v1/rpc/update_my_display_name', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_display_name: value }) })
 }
 
-export async function loadChartData(token) {
+export async function loadChartData(token, { forceRefresh = false } = {}) {
   const data = await request('/rest/v1/rpc/get_chart_data', { method: 'POST', headers: bearer(token), body: '{}' })
   const users = data?.profiles ?? []
   const gamesByPool = {}
@@ -246,7 +248,18 @@ export async function loadChartData(token) {
     if (!userPicks[pick.poolKey]) userPicks[pick.poolKey] = []
     userPicks[pick.poolKey].push({ gameId: pick.gameId, team: pick.team, confidence: pick.confidence })
   }
-  return { users, gamesByPool, picksByUser }
+  // Stored schedules do not necessarily contain final scores: ESPN is browser-owned.
+  const failedPools = []
+  await Promise.all(Object.entries(gamesByPool).map(async ([key, games]) => {
+    if (!POOLS.some((pool) => pool.key === key && pool.countsTowardSeason) ||
+        !games.some((game) => Date.parse(game.kickoff) <= Date.now())) return
+    try {
+      const scores = await refreshEspnPool(key, { forceRefresh, serverGames: games, includeFpi: false, signal: AbortSignal.timeout(15000) })
+      gamesByPool[key] = mergeGames(games, scores.games)
+      if (gamesByPool[key].some((game) => Date.parse(game.kickoff) < Date.now() && game.status === 'scheduled')) failedPools.push(key)
+    } catch { failedPools.push(key) }
+  }))
+  return { users, gamesByPool, picksByUser, failedPools }
 }
 
 export const loadDivisionWinnerData = (token) => request('/rest/v1/rpc/get_division_winner_data', { method: 'POST', headers: bearer(token), body: '{}' })

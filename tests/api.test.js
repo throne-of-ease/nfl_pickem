@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, refreshEspnPool, refreshLivePool, resetAdminPassword, saveDivisionWinnerPicks, updateDisplayName, updatePassword } from '../src/api.js'
+import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, loadChartData, mergeGames, refreshEspnPool, refreshLivePool, resetAdminPassword, saveDivisionWinnerPicks, updateDisplayName, updatePassword } from '../src/api.js'
+import { buildSeasonHistory } from '../src/domain.js'
 
 afterEach(() => localStorage.clear())
 
@@ -19,6 +20,42 @@ const summary = { gamepackageJSON: {
 } }
 
 describe('direct ESPN live refresh', () => {
+  it('scores previous weeks from ESPN even when the database and historical cache still say scheduled', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    const kickoff = new Date(Date.now() - 14 * 86400000).toISOString()
+    const stored = { id: 'g1', pool_key: 'week-01', kickoff, away_team: 'PIT', home_team: 'BUF', status: 'scheduled', gotw: true, locked_at: kickoff }
+    localStorage.setItem('nfl-pickem-espn-cache-v2:week-01', JSON.stringify({ asOf: kickoff, games: [{ id: 'g1', kickoff, status: 'scheduled' }] }))
+    const finalScoreboard = structuredClone(scoreboard)
+    finalScoreboard.content.sbData.events[0].date = kickoff
+    finalScoreboard.content.sbData.events[0].status.type.state = 'post'
+    const fetcher = vi.fn(async (url) => ({ ok: true, json: async () =>
+      url.includes('get_chart_data') ? {
+        profiles: [{ id: 'u1', name: 'Alex' }],
+        games: [stored, { ...stored, id: 'g2', pool_key: 'week-02', kickoff: '2099-09-20T17:00:00Z', locked_at: null }],
+        revealedPicks: [{ userId: 'u1', poolKey: 'week-01', gameId: 'g1', team: 'BUF', confidence: 1 }],
+      } : url.includes('scoreboard') ? finalScoreboard : {} }))
+    vi.stubGlobal('fetch', fetcher)
+    const result = await loadChartData('player-access')
+    expect(result.failedPools).toEqual([])
+    expect(result.gamesByPool['week-01'][0]).toMatchObject({ status: 'final', homeScore: 14, awayScore: 10, gotw: true, locked: true })
+    expect(buildSeasonHistory(result.users, result.gamesByPool, result.picksByUser).users[0]).toMatchObject({ cumulative: [6], correct: [1] })
+    expect(mergeGames([{ id: 'g1', status: 'scheduled', gotw: true }], result.gamesByPool['week-01'])[0].status).toBe('final')
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('scoreboard'))).toHaveLength(1)
+    await loadChartData('player-access')
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('scoreboard'))).toHaveLength(1)
+  })
+
+  it('reports unavailable historical scores instead of silently presenting complete season totals', async () => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (!url.includes('get_chart_data')) throw new Error('offline')
+      return { ok: true, json: async () => ({ profiles: [], games: [{ id: 'g1', pool_key: 'week-01', kickoff: '2020-09-01T17:00:00Z', status: 'scheduled' }] }) }
+    }))
+    expect((await loadChartData('player-access')).failedPools).toEqual(['week-01'])
+  })
+
   it('only treats a slate inside its kickoff window as current', () => {
     const now = Date.parse('2026-08-29T12:00:00Z')
     expect(isCurrentPool([{ kickoff: '2026-08-29T00:00:00Z' }], now)).toBe(true)
