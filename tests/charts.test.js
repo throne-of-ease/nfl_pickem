@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyChartSeries } from '../src/charts.jsx'
+import { aggressivenessChartData, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyChartSeries } from '../src/charts.jsx'
 
 const history = {
   weeks: ['W1', 'W2'],
@@ -47,5 +47,28 @@ describe('tracker-compatible chart transformations', () => {
       { name: 'Alex', colorIndex: 0, value: 0, potential: 0 },
       { name: 'Blair', colorIndex: 1, value: 5, potential: 4 },
     ])
+  })
+
+  it('treats equal confidence on opposite teams as the sum of both confidences', () => {
+    const games = [
+      { id: 'g1', home: 'H1', away: 'A1', kickoff: '2026-09-01T12:00:00Z', predictorHome: .51 },
+      { id: 'g2', home: 'H2', away: 'A2', kickoff: '2026-09-01T13:00:00Z', predictorHome: .60 },
+      { id: 'g3', home: 'H3', away: 'A3', kickoff: '2026-09-01T14:00:00Z', predictorHome: .90 },
+    ]
+    const result = aggressivenessChartData(
+      [{ id: 'alex', name: 'Alex' }],
+      { 'week-01': games },
+      { alex: { 'week-01': [{ gameId: 'g3', team: 'A3', confidence: 3 }] } },
+      'predictor',
+    )
+    expect(result[0]).toMatchObject({ name: 'Alex', value: 6, comparisons: 1 })
+  })
+
+  it('switches between FPI, moneyline, and their average', () => {
+    const game = { id: 'g1', home: 'HOME', away: 'AWAY', kickoff: '2026-09-01T12:00:00Z', predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
+    const args = [[{ id: 'alex', name: 'Alex' }], { 'week-01': [game] }, { alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }] } }]
+    expect(aggressivenessChartData(...args, 'predictor')[0].value).toBe(0)
+    expect(aggressivenessChartData(...args, 'moneyline')[0].value).toBe(2)
+    expect(aggressivenessChartData(...args, 'aggregate')[0].value).toBe(0)
   })
 })

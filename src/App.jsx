@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
-import { CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
+import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
 import AdminPanel from "./adminPanel.jsx";
 import DivisionWinnersView from "./divisionWinners.jsx";
@@ -1198,6 +1198,7 @@ export default function App() {
                 <StandingsTable players={chartUsers} history={chartHistory} provisional={provisional} onProvisional={setProvisional} includeModels={includeChartModels} onIncludeModels={setIncludeChartModels} />
                 <div className="charts">
                   <CumulativePointsChart history={chartHistory} />
+                  <AggressivenessChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} poolKeys={chartHistory.pools} />
                   {games.length > 0 && <CurrentWeekChart current={current} />}
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />

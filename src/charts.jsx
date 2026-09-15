@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { modelPicks } from './domain.js'
 
 export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#7aa8ff']
 
@@ -32,6 +33,30 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       ? (user.gotwPlayed ? user.gotwCorrect / user.gotwPlayed * 100 : 0)
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+
+export function aggressivenessChartData(players, gamesByPool, picksByUser, kind, poolKeys = Object.keys(gamesByPool)) {
+  const comparisons = Object.fromEntries(players.map((player) => [player.id, []]))
+  for (const poolKey of poolKeys) {
+    const games = gamesByPool[poolKey] ?? []
+    const models = new Map(modelPicks(games, kind).map((pick) => [pick.gameId, pick]))
+    for (const player of players) {
+      for (const pick of picksByUser[player.id]?.[poolKey] ?? []) {
+        const game = games.find((item) => item.id === pick.gameId)
+        const model = models.get(pick.gameId)
+        if (!game || !model || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) continue
+        const signed = pick.team === game.home ? pick.confidence : -pick.confidence
+        const modelSigned = model.team === game.home ? model.confidence : -model.confidence
+        comparisons[player.id].push(Math.abs(signed - modelSigned))
+      }
+    }
+  }
+  return players.flatMap((player, colorIndex) => comparisons[player.id].length ? [{
+    name: player.name,
+    colorIndex,
+    value: comparisons[player.id].reduce((sum, value) => sum + value, 0) / comparisons[player.id].length,
+    comparisons: comparisons[player.id].length,
+  }] : []).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+}
 
 export function currentWeekChartData(current, mode) {
   const leader = Math.max(0, ...current.map((item) => item.points))
@@ -100,13 +125,13 @@ function ChartActions({ id, chartRef }) {
   </div>
 }
 
-function ChartFrame({ id, title, description, modes = [], mode, onMode, children, table, footer }) {
+function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', children, table, footer }) {
   const ref = useRef(null)
   return <section className="chart-card" aria-labelledby={`${id}-title`}>
     <div className="chart-heading">
       <div><h3 id={`${id}-title`}>{title}</h3><p>{description}</p></div>
       <div className="chart-actions">
-        {modes.length > 0 && <label>Display <select aria-label={`${title} display mode`} value={mode} onChange={(event) => onMode(event.target.value)}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}
+        {modes.length > 0 && <label>{modeLabel} <select aria-label={`${title} ${modeLabel === 'Display' ? 'display mode' : modeLabel.toLowerCase()}`} value={mode} onChange={(event) => onMode(event.target.value)}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}
       </div>
     </div>
     <div className="chart-scroll">{React.cloneElement(children, { chartRef: ref })}</div>
@@ -184,6 +209,12 @@ export function CurrentWeekChart({ current }) {
   const [mode, setMode] = useState('vs_total_leader')
   const data = currentWeekChartData(current, mode)
   return <ChartFrame id="current-week" title="Current week" description="Earned points and remaining potential." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
+}
+
+export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys }) {
+  const [kind, setKind] = useState('aggregate')
+  const data = aggressivenessChartData(players, gamesByPool, picksByUser, kind, poolKeys)
+  return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence across season picks." modes={[{ value: 'predictor', label: 'FPI' }, { value: 'moneyline', label: 'Moneyline' }, { value: 'aggregate', label: 'FPI + moneyline average' }]} mode={kind} onMode={setKind} modeLabel="Model" table={<AccessibleTable caption="Aggressiveness index" columns={['Player', 'Index', 'Compared picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />}><BarSvg data={data} ariaLabel={`Aggressiveness index versus ${kind}`} /></ChartFrame>
 }
 
 export function DivisionWinnersChart({ rows, pointsPerCorrect }) {
