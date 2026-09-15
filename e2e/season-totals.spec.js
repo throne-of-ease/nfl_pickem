@@ -12,7 +12,7 @@ test('production season totals recover historical scores while viewing an unplay
     const week = route.request().postDataJSON().p_pool_key
     return route.fulfill({ json: { profiles: players, games: [week === 'week-01' ? old : upcoming], revealedPicks: [], viewer: { id: 'pat', name: 'Pat', isAdmin: false } } })
   })
-  await page.route('**/rest/v1/rpc/get_my_draft', route => route.fulfill({ json: { draftRevision: 0, picks: route.request().postDataJSON().p_pool_key === 'week-01' ? [{ gameId: 'old', team: 'BUF', confidence: 1 }] : [] } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', route => route.fulfill({ json: { draftRevision: 0, picks: [{ gameId: route.request().postDataJSON().p_pool_key === 'week-01' ? 'old' : 'next', team: 'BUF', confidence: 1 }] } }))
   await page.route('**/cdn.espn.com/core/nfl/scoreboard*', route => route.fulfill({ json: { content: { sbData: { events: [{
     id: 'old', date: kickoff, status: { type: { state: 'post' } }, competitions: [{ competitors: [
       { homeAway: 'home', score: '24', team: { abbreviation: 'BUF' } },
@@ -25,7 +25,7 @@ test('production season totals recover historical scores while viewing an unplay
   await page.getByLabel('Display name').fill('Pat')
   await page.getByLabel('Password').fill('long-enough')
   await page.getByRole('button', { name: 'Register and play' }).click()
-  // Select explicitly: the hosted-base redirect can drop the initial query string.
+  // Select the week under test explicitly after signing in.
   await page.getByLabel('Week', { exact: true }).selectOption('week-02')
   await expect(page.getByTestId('overview-row-next')).toBeVisible()
   await expect(page.locator('.overview-player b')).toHaveText('6')
