@@ -75,6 +75,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await expect(page.getByText(/Rehearsal.*does not count/)).toHaveCount(0)
   await page.getByLabel('Week', { exact: true }).selectOption('week-02')
   await page.getByRole('button', { name: 'Charts' }).click()
+  await expect(page.getByLabel('Current week display mode')).toHaveValue('vs_total_leader')
   await expect(page.locator('svg.chart')).toHaveCount(4)
   await expect(page.getByRole('button', { name: 'Download chart as PNG' })).toHaveCount(4)
   await expect(page.getByRole('button', { name: 'Share chart as PNG' })).toHaveCount(4)
@@ -155,7 +156,8 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(rankBox.y).toBeLessThan(probabilityBox.y)
 
   await page.getByRole('button', { name: 'Charts' }).click()
-  for (const heading of ['Total points', 'GOTW points', 'Without GOTW']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  for (const heading of ['Total points', 'GOTW points', 'Without GOTW', 'Correct', 'Incorrect']) await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Points', exact: true })).toHaveCount(0)
   await expect(page.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'My picks' }).click()
@@ -165,6 +167,8 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(handleBox.x).toBeLessThan(metaBox.x)
   if (testInfo.project.name === 'iphone12pro') expect(handleBox.width).toBeGreaterThanOrEqual(30)
   await expect(row.locator('.confidence > span')).toBeHidden()
+  await expect(row.locator('.teams label > span').first()).toHaveText(/^[A-Z]{2,3}$/)
+  expect(await row.locator('.teams label > span').first().evaluate((node) => node.scrollWidth <= node.clientWidth + 1 && getComputedStyle(node).textOverflow !== 'ellipsis')).toBe(true)
   expect(await row.evaluate((node) => getComputedStyle(node).borderTopColor)).not.toBe('rgb(41, 55, 70)')
 })
 

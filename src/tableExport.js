@@ -1,8 +1,16 @@
+const waitForImage = (image) => image.complete ? Promise.resolve() : new Promise((resolve) => {
+  const done = () => { clearTimeout(timeout); resolve() }
+  const timeout = setTimeout(done, 2000)
+  image.addEventListener('load', done, { once: true })
+  image.addEventListener('error', done, { once: true })
+})
+
 // Render the displayed cells, so hidden picks never enter the exported image.
-export function tableToPngBlob(table, title) {
+export async function tableToPngBlob(table, title) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas is unavailable')
+  await Promise.all([...table.querySelectorAll('.overview-pick .team-logo')].map(waitForImage))
   const rows = [...table.rows].map((row) => [...row.cells].map((cell) => {
     const player = cell.querySelector('.overview-player')
     const pick = cell.querySelector('.overview-pick')
@@ -10,9 +18,9 @@ export function tableToPngBlob(table, title) {
     const lines = player
       ? [...player.children].map((child) => child.textContent)
       : pick
-        ? [pick.querySelector('.pick-team').textContent, pick.querySelector('span').textContent]
+        ? [pick.querySelector('span').textContent]
         : cell.innerText.trim().split(/\n/).filter(Boolean)
-    return { lines, color: getComputedStyle(content).color }
+    return { lines, color: getComputedStyle(content).color, image: pick?.querySelector('.team-logo') }
   }))
   context.font = 'bold 14px Arial'
   const widths = rows[0].map((_, column) => Math.max(64, ...rows.flatMap((row) => row[column].lines.map((line) => context.measureText(line).width + 24))))
@@ -40,7 +48,16 @@ export function tableToPngBlob(table, title) {
       context.font = index === 0 ? 'bold 14px Arial' : '14px Arial'
       context.fillStyle = cell.color
       context.textAlign = 'center'
-      cell.lines.forEach((line, lineIndex) => context.fillText(line, x + widths[column] / 2, y + (heights[index] - cell.lines.length * 20) / 2 + 15 + lineIndex * 20))
+      if (cell.image?.complete && cell.image.naturalWidth) {
+        const logoSize = 26
+        const gap = 6
+        const textWidth = context.measureText(cell.lines[0]).width
+        const logoX = x + (widths[column] - logoSize - gap - textWidth) / 2
+        context.drawImage(cell.image, logoX, y + (heights[index] - logoSize) / 2, logoSize, logoSize)
+        context.fillText(cell.lines[0], logoX + logoSize + gap + textWidth / 2, y + heights[index] / 2 + 5)
+      } else {
+        cell.lines.forEach((line, lineIndex) => context.fillText(line, x + widths[column] / 2, y + (heights[index] - cell.lines.length * 20) / 2 + 15 + lineIndex * 20))
+      }
       x += widths[column]
     })
     y += heights[index]

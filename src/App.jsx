@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, standings, validateDraft } from "./domain.js";
+import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
@@ -58,35 +58,41 @@ const MODEL_DEFINITIONS = [
   { id: "model-avg", name: "AVG", kind: "aggregate" },
 ];
 
-function StandingsTable({ board, history, pool, provisional, onProvisional, includeModels, onIncludeModels }) {
+function StandingsTable({ players, history, provisional, onProvisional, includeModels, onIncludeModels }) {
   const [sort, setSort] = useState({ key: "rank", direction: "ascending" });
   const seasonByPlayer = new Map((history?.users ?? []).map((user) => [user.id, user]));
-  const rows = board.map((player, index) => {
+  const rows = players.map((player) => {
     const season = seasonByPlayer.get(player.id);
-    const totalPoints = season?.cumulative?.at(-1) ?? player.points;
+    const totalPoints = season?.cumulative?.at(-1) ?? 0;
     const gotwPoints = season?.gotw ?? 0;
+    const correct = season?.correct?.reduce((sum, value) => sum + value, 0) ?? 0;
+    const played = season?.played?.reduce((sum, value) => sum + value, 0) ?? 0;
+    const maximum = season?.possible?.reduce((sum, value) => sum + value, 0) ?? 0;
     return {
       player,
-      rank: index + 1,
-      points: player.points,
       totalPoints,
       gotwPoints,
       withoutGotw: totalPoints - gotwPoints,
-      pickPercentage: player.played ? (player.correct / player.played) * 100 : null,
-      pointPercentage: player.maximum ? (player.points / player.maximum) * 100 : null,
-      gamesPicked: player.picksMade,
+      correct,
+      incorrect: played - correct,
+      pickPercentage: played ? (correct / played) * 100 : null,
+      pointPercentage: maximum ? (totalPoints / maximum) * 100 : null,
+      gamesPicked: season?.picksMade?.reduce((sum, value) => sum + value, 0) ?? 0,
+      potentialTotal: totalPoints + (season?.remaining?.at(-1) ?? 0),
     };
-  });
+  }).sort((a, b) => b.totalPoints - a.totalPoints || b.potentialTotal - a.potentialTotal || a.player.name.localeCompare(b.player.name))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
   const columns = [
     ["rank", "Rank"],
     ["name", "Player"],
-    ["points", "Points"],
     ["totalPoints", "Total points"],
     ["gotwPoints", "GOTW points"],
     ["withoutGotw", "Without GOTW"],
     ["pickPercentage", "Pick %"],
     ["pointPercentage", "Point %"],
     ["gamesPicked", "Games picked"],
+    ["correct", "Correct"],
+    ["incorrect", "Incorrect"],
   ];
   const sortBy = (key) =>
     setSort((current) => ({
@@ -136,19 +142,20 @@ function StandingsTable({ board, history, pool, provisional, onProvisional, incl
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map(({ player, rank, totalPoints, gotwPoints, withoutGotw, pickPercentage, pointPercentage, gamesPicked }) => (
+            {sortedRows.map(({ player, rank, totalPoints, gotwPoints, withoutGotw, pickPercentage, pointPercentage, gamesPicked, correct, incorrect }) => (
               <tr key={player.id}>
                 <th scope="row">{rank}</th>
                 <td>
                   <strong>{player.name}</strong>
                 </td>
-                <td>{player.points}</td>
                 <td data-testid={`total-points-${player.id}`}>{totalPoints}</td>
                 <td data-testid={`gotw-points-${player.id}`}>{gotwPoints}</td>
                 <td data-testid={`without-gotw-${player.id}`}>{withoutGotw}</td>
                 <td>{pickPercentage == null ? "—" : `${pickPercentage.toFixed(1)}%`}</td>
                 <td>{pointPercentage == null ? "—" : `${pointPercentage.toFixed(1)}%`}</td>
-                <td>{gamesPicked}</td>
+                <td data-testid={`games-picked-${player.id}`}>{gamesPicked}</td>
+                <td data-testid={`correct-${player.id}`}>{correct}</td>
+                <td data-testid={`incorrect-${player.id}`}>{incorrect}</td>
               </tr>
             ))}
           </tbody>
@@ -384,9 +391,8 @@ export default function App() {
   const modelPicksByUser = Object.fromEntries(MODEL_DEFINITIONS.map((model) => [model.id, Object.fromEntries(Object.entries(chartGamesByPool).map(([key, poolGames]) => [key, modelPicks(poolGames, model.kind)]))]));
   const chartUsers = includeChartModels ? [...appUsers, ...MODEL_DEFINITIONS.map(({ id, name }) => ({ id, name, model: true }))] : appUsers;
   const chartPicksByUser = includeChartModels ? { ...normalPicksByUser, ...modelPicksByUser } : normalPicksByUser;
-  const board = standings(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional);
-  const chartHistory = buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, provisional, poolKey);
-  const overviewModelHistory = buildSeasonHistory(MODEL_DEFINITIONS, chartGamesByPool, modelPicksByUser, provisional, poolKey);
+  const chartHistory = buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, provisional);
+  const overviewModelHistory = buildSeasonHistory(MODEL_DEFINITIONS, chartGamesByPool, modelPicksByUser, provisional);
   const seasonTotals = new Map(chartHistory.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]));
   const current = poolMetrics(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional).map(({ id, name, points, potential, correct, played, maximum }) => ({
     id,
@@ -1184,7 +1190,7 @@ export default function App() {
             )}
             {tab === "charts" && (
               <section>
-                <StandingsTable board={board} history={chartHistory} pool={pool} provisional={provisional} onProvisional={setProvisional} includeModels={includeChartModels} onIncludeModels={setIncludeChartModels} />
+                <StandingsTable players={chartUsers} history={chartHistory} provisional={provisional} onProvisional={setProvisional} includeModels={includeChartModels} onIncludeModels={setIncludeChartModels} />
                 <div className="charts">
                   <CumulativePointsChart history={chartHistory} />
                   {games.length > 0 && <CurrentWeekChart current={current} />}

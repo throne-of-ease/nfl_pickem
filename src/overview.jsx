@@ -11,9 +11,9 @@ export function TeamLogo({ team, size = 'small' }) {
   const code = ESPN_CODES[team] ?? team.toLowerCase()
   return <img
     className={`team-logo ${size === 'large' ? 'large' : ''}`}
+    crossOrigin="anonymous"
     src={`https://a.espncdn.com/i/teamlogos/nfl/500/${code}.png`}
     alt={`${team} logo`}
-    loading="lazy"
     onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = NFL_FALLBACK }}
   />
 }

@@ -36,6 +36,10 @@ jobs:
           test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
       - name: Run tests
         run: npm test -- --pool=forks --maxWorkers=1
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Run browser tests
+        run: npm run test:e2e
       - name: Build Pages bundle
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}

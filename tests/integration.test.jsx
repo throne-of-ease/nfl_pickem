@@ -24,6 +24,21 @@ describe('four-user application flow', () => {
     expect([...document.querySelectorAll('.overview-player small')].every((item) => /^\d+\/-\d+\/\d+$/.test(item.textContent))).toBe(true)
   })
 
+  it('keeps season totals independent of the week being viewed', async () => {
+    render(<App />)
+    const alex = [...document.querySelectorAll('.overview-player')].find((header) => header.querySelector('strong').textContent === 'Alex')
+    expect(alex.querySelector('b')).toHaveTextContent('21')
+    expect(alex.querySelector('span')).toHaveTextContent('-2')
+    expect(alex.querySelector('small')).toHaveTextContent('15/-0/0')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Charts' }))
+    expect(screen.getByTestId('total-points-u1')).toHaveTextContent('21')
+    expect(screen.getByTestId('games-picked-u1')).toHaveTextContent('8')
+    expect(screen.getByTestId('correct-u1')).toHaveTextContent('5')
+    expect(screen.getByTestId('incorrect-u1')).toHaveTextContent('1')
+    expect(screen.getByRole('img', { name: 'Points per week, absolute' })).toHaveTextContent('W2')
+  })
+
   it('orders the overview by kickoff when the Score header is selected', async () => {
     history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
     const user = userEvent.setup()
@@ -168,6 +183,7 @@ describe('four-user application flow', () => {
     expect(screen.getByRole('img', { name: /Points per week, correct_percentage/ })).toBeInTheDocument()
     const currentWeekMode = screen.getByLabelText('Current week display mode')
     expect(within(currentWeekMode).getAllByRole('option')).toHaveLength(5)
+    expect(currentWeekMode).toHaveValue('vs_total_leader')
     await user.selectOptions(currentWeekMode, 'vs_leader')
     const relativeChart = screen.getByRole('img', { name: /Current week points, vs_leader/ })
     expect([...relativeChart.querySelectorAll('rect[height]')].every((rect) => Number(rect.getAttribute('height')) >= 0)).toBe(true)
@@ -183,7 +199,8 @@ describe('four-user application flow', () => {
     expect(screen.getAllByTestId(/standings-table/)).toHaveLength(1)
     const standings = screen.getByRole('table', { name: 'Current standings' })
     expect(within(standings).queryByRole('columnheader', { name: 'Up to' })).not.toBeInTheDocument()
-    for (const name of ['Total points', 'GOTW points', 'Without GOTW', 'Pick %', 'Point %', 'Games picked']) expect(within(standings).getByRole('columnheader', { name })).toBeInTheDocument()
+    for (const name of ['Total points', 'GOTW points', 'Without GOTW', 'Pick %', 'Point %', 'Games picked', 'Correct', 'Incorrect']) expect(within(standings).getByRole('columnheader', { name })).toBeInTheDocument()
+    expect(within(standings).queryByRole('columnheader', { name: 'Points', exact: true })).not.toBeInTheDocument()
     expect(within(standings).queryByRole('columnheader', { name: 'GOTW % of total' })).not.toBeInTheDocument()
     const total = Number(screen.getByTestId('total-points-u1').textContent)
     const withoutGotw = Number(screen.getByTestId('without-gotw-u1').textContent)
@@ -198,7 +215,7 @@ describe('four-user application flow', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     const table = screen.getByRole('table', { name: 'Current standings' })
-    for (const key of ['rank', 'name', 'points', 'totalPoints', 'gotwPoints', 'withoutGotw', 'pickPercentage', 'pointPercentage', 'gamesPicked']) expect(screen.getByTestId(`standings-sort-${key}`)).toBeInTheDocument()
+    for (const key of ['rank', 'name', 'totalPoints', 'gotwPoints', 'withoutGotw', 'pickPercentage', 'pointPercentage', 'gamesPicked', 'correct', 'incorrect']) expect(screen.getByTestId(`standings-sort-${key}`)).toBeInTheDocument()
     expect(screen.getByTestId('standings-sort-rank').closest('th')).toHaveAttribute('aria-sort', 'ascending')
 
     await user.click(screen.getByTestId('standings-sort-name'))
@@ -208,10 +225,10 @@ describe('four-user application flow', () => {
     await user.click(screen.getByTestId('standings-sort-name'))
     expect([...table.querySelectorAll('tbody tr')].map((row) => row.cells[1].textContent)).toEqual([...namesAscending].reverse())
 
-    await user.click(screen.getByTestId('standings-sort-points'))
+    await user.click(screen.getByTestId('standings-sort-totalPoints'))
     const pointsAscending = [...table.querySelectorAll('tbody tr')].map((row) => Number(row.cells[2].textContent))
     expect(pointsAscending).toEqual([...pointsAscending].sort((a, b) => a - b))
-    expect(screen.getByTestId('standings-sort-points').closest('th')).toHaveAttribute('aria-sort', 'ascending')
+    expect(screen.getByTestId('standings-sort-totalPoints').closest('th')).toHaveAttribute('aria-sort', 'ascending')
   })
 
   it('keeps model rankings and charts opt-in on the Charts tab', async () => {

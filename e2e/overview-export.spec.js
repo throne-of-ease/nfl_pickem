@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
 
 const names = ['Hicham', 'Istvan', 'Marek', 'NFLsuperfan']
+const ONE_PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/a.espncdn.com/**', route => route.abort())
+  await page.route('**/a.espncdn.com/**', route => route.fulfill({ contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: ONE_PIXEL_PNG }))
   await page.addInitScript((names) => {
     localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({
       users: names.map((name, index) => ({ id: `u${index + 1}`, name })), picksByUser: {},
@@ -41,8 +42,11 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   // Record the actual canvas text: complete names, all rows and no unrevealed picks.
   await page.evaluate(() => {
     window.exportText = []
+    window.exportImageCount = 0
     const fillText = CanvasRenderingContext2D.prototype.fillText
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage
     CanvasRenderingContext2D.prototype.fillText = function(text, ...args) { window.exportText.push(text); return fillText.call(this, text, ...args) }
+    CanvasRenderingContext2D.prototype.drawImage = function(...args) { window.exportImageCount += 1; return drawImage.apply(this, args) }
   })
   const downloadEvent = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download table as PNG' }).click()
@@ -58,6 +62,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   const text = await page.evaluate(() => window.exportText)
   for (const name of [...names, 'Moneyline', 'DAL@PHI', 'CIN@CLE']) expect(text).toContain(name)
   expect(text.filter(value => value === '?')).toHaveLength(16)
+  expect(await page.evaluate(() => window.exportImageCount)).toBeGreaterThan(0)
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true })
     Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.shared = { name: files[0].name, type: files[0].type, size: files[0].size } } })

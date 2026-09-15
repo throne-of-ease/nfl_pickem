@@ -10,8 +10,8 @@ export default defineConfig({
   },
   use: { baseURL: 'http://127.0.0.1:5173', trace: 'retain-on-failure' },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
-    { name: 'mobile', use: { ...devices['Pixel 7'], channel: 'chrome' } },
-    { name: 'iphone12pro', use: { ...devices['iPhone 12 Pro'], browserName: 'chromium', channel: 'chrome' } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], browserName: 'chromium' } },
+    { name: 'mobile', use: { ...devices['Pixel 7'], browserName: 'chromium' } },
+    { name: 'iphone12pro', use: { ...devices['iPhone 12 Pro'], browserName: 'chromium' } },
   ],
 })

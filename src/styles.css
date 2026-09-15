@@ -382,8 +382,10 @@ footer [data-testid="real-data-status"] { display: block; }
   .game-status, .gotw { font-size: .5rem; letter-spacing: .05em; }
   .game-status small { font-size: .48rem; }
   .teams label { height: 30px; gap: .2rem; padding-inline: .25rem; font-size: .72rem; }
-  .teams input { width: 11px; height: 11px; }
+  .teams input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .teams label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
   .team-logo { width: 18px; height: 18px; }
+  .teams span:not(.at) { flex: 0 0 auto; overflow: visible; text-overflow: clip; font-size: .65rem; }
   .teams b { margin-left: auto; font-size: .68rem; }
   .confidence-cell { gap: .15rem; padding-left: .25rem; }
   .drag-handle { width: 34px; height: 32px; font-size: .78rem; }
@@ -459,18 +461,19 @@ footer [data-testid="real-data-status"] { display: block; }
   .standings-table th, .standings-table td { padding: .2rem .08rem; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.05; }
   .standings-table th { font-size: .48rem; letter-spacing: 0; }
   .standings-table td { font-size: .58rem; }
-  .standings-table th:nth-child(1) { width: 7%; }
-  .standings-table th:nth-child(2) { width: 17%; }
-  .standings-table th:nth-child(3) { width: 8%; }
-  .standings-table th:nth-child(4) { width: 11%; }
-  .standings-table th:nth-child(5) { width: 11%; }
-  .standings-table th:nth-child(6) { width: 13%; }
-  .standings-table th:nth-child(7) { width: 11%; }
-  .standings-table th:nth-child(8) { width: 11%; }
-  .standings-table th:nth-child(9) { width: 11%; }
+  .standings-table th:nth-child(1) { width: 6%; }
+  .standings-table th:nth-child(2) { width: 16%; }
+  .standings-table th:nth-child(3) { width: 11%; }
+  .standings-table th:nth-child(4) { width: 10%; }
+  .standings-table th:nth-child(5) { width: 12%; }
+  .standings-table th:nth-child(n+6) { width: 9%; }
   .pick-actions { gap: .25rem; }
   .pick-actions button { padding: .3rem .35rem; font-size: .6rem; }
   .pick-tools { align-items: flex-end; }
+}
+
+@media (max-width: 350px) {
+  .teams b { display: none; }
 }
 
 @media (max-width: 430px) {
