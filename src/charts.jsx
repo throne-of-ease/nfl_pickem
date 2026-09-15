@@ -51,11 +51,17 @@ export function aggressivenessChartData(players, gamesByPool, picksByUser, kind,
     }
   }
   return players.flatMap((player, colorIndex) => comparisons[player.id].length ? [{
+    id: player.id,
     name: player.name,
     colorIndex,
     value: comparisons[player.id].reduce((sum, value) => sum + value, 0) / comparisons[player.id].length,
     comparisons: comparisons[player.id].length,
   }] : []).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+}
+
+export function weeklyAggressivenessSeries(players, gamesByPool, picksByUser, kind, poolKeys) {
+  const weeks = poolKeys.map((poolKey) => new Map(aggressivenessChartData(players, gamesByPool, picksByUser, kind, [poolKey]).map((item) => [item.id, item.value])))
+  return players.map((player) => ({ name: player.name, values: weeks.map((week) => week.get(player.id) ?? null) }))
 }
 
 export function currentWeekChartData(current, mode) {
@@ -125,13 +131,14 @@ function ChartActions({ id, chartRef }) {
   </div>
 }
 
-function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', children, table, footer }) {
+function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', controls, children, table, footer }) {
   const ref = useRef(null)
   return <section className="chart-card" aria-labelledby={`${id}-title`}>
     <div className="chart-heading">
       <div><h3 id={`${id}-title`}>{title}</h3><p>{description}</p></div>
       <div className="chart-actions">
         {modes.length > 0 && <label>{modeLabel} <select aria-label={`${title} ${modeLabel === 'Display' ? 'display mode' : modeLabel.toLowerCase()}`} value={mode} onChange={(event) => onMode(event.target.value)}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}
+        {controls}
       </div>
     </div>
     <div className="chart-scroll">{React.cloneElement(children, { chartRef: ref })}</div>
@@ -142,8 +149,9 @@ function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabe
 }
 
 const safeRange = (values) => {
-  const min = Math.min(0, ...values)
-  const max = Math.max(1, ...values)
+  const finite = values.filter(Number.isFinite)
+  const min = Math.min(0, ...finite)
+  const max = Math.max(1, ...finite)
   return { min, max, span: max - min || 1 }
 }
 
@@ -159,9 +167,9 @@ function LineSvg({ series, labels, chartRef, ariaLabel }) {
     {[0, 1, 2, 3, 4].map((tick) => { const value = min + span * tick / 4; return <g key={tick}><line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" /><text x={left - 8} y={y(value) + 4} textAnchor="end">{Math.round(value)}</text></g> })}
     {labels.map((label, index) => <text key={label} x={x(index)} y={height - 18} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
-      <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />
-      {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />}
-      {item.values.map((value, index) => <circle key={index} cx={x(index)} cy={y(value)} r="5"><title>{item.name}, {labels[index]}: {value.toFixed(1)}</title></circle>)}
+      <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />
+      {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />}
+      {item.values.map((value, index) => Number.isFinite(value) ? <circle key={index} cx={x(index)} cy={y(value)} r="5"><title>{item.name}, {labels[index]}: {value.toFixed(1)}</title></circle> : null)}
     </g>)}
   </svg>
 }
@@ -183,7 +191,7 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
 }
 
 function AccessibleTable({ caption, columns, rows }) {
-  return <details><summary>View chart data</summary><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></details>
+  return <details><summary>View chart data</summary><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell == null ? '—' : typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></details>
 }
 
 export function WeeklyPointsChart({ history }) {
@@ -211,10 +219,16 @@ export function CurrentWeekChart({ current }) {
   return <ChartFrame id="current-week" title="Current week" description="Earned points and remaining potential." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
 }
 
-export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys }) {
+export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys, weekLabels, selectedPoolKey }) {
   const [kind, setKind] = useState('aggregate')
-  const data = aggressivenessChartData(players, gamesByPool, picksByUser, kind, poolKeys)
-  return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence across season picks." modes={[{ value: 'predictor', label: 'FPI' }, { value: 'moneyline', label: 'Moneyline' }, { value: 'aggregate', label: 'FPI + moneyline average' }]} mode={kind} onMode={setKind} modeLabel="Model" table={<AccessibleTable caption="Aggressiveness index" columns={['Player', 'Index', 'Compared picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />}><BarSvg data={data} ariaLabel={`Aggressiveness index versus ${kind}`} /></ChartFrame>
+  const [view, setView] = useState('weekly')
+  const weekly = weeklyAggressivenessSeries(players, gamesByPool, picksByUser, kind, poolKeys)
+  const data = aggressivenessChartData(players, gamesByPool, picksByUser, kind, view === 'selected_week' ? [selectedPoolKey] : poolKeys)
+  const modelControl = <label>Model <select aria-label="Aggressiveness index model" value={kind} onChange={(event) => setKind(event.target.value)}><option value="predictor">FPI</option><option value="moneyline">Moneyline</option><option value="aggregate">FPI + moneyline average</option></select></label>
+  const table = view === 'weekly'
+    ? <AccessibleTable caption="Weekly aggressiveness index" columns={['Player', ...weekLabels]} rows={weekly.map((item) => [item.name, ...item.values])} />
+    : <AccessibleTable caption={view === 'selected_week' ? 'Selected week aggressiveness index' : 'Season average aggressiveness index'} columns={['Player', 'Index', 'Compared picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
+  return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence." modes={[{ value: 'weekly', label: 'Weekly by player' }, { value: 'selected_week', label: 'Selected week' }, { value: 'season_average', label: 'Season average' }]} mode={view} onMode={setView} modeLabel="View" controls={modelControl} table={table}>{view === 'weekly' ? <LineSvg series={weekly} labels={weekLabels} ariaLabel={`Aggressiveness index by week, ${kind}`} /> : <BarSvg data={data} ariaLabel={`Aggressiveness index ${view === 'selected_week' ? 'for selected week' : 'season average'}, ${kind}`} />}</ChartFrame>
 }
 
 export function DivisionWinnersChart({ rows, pointsPerCorrect }) {

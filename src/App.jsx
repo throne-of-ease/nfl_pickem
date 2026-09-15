@@ -1198,10 +1198,10 @@ export default function App() {
                 <StandingsTable players={chartUsers} history={chartHistory} provisional={provisional} onProvisional={setProvisional} includeModels={includeChartModels} onIncludeModels={setIncludeChartModels} />
                 <div className="charts">
                   <CumulativePointsChart history={chartHistory} />
-                  <AggressivenessChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} poolKeys={chartHistory.pools} />
                   {games.length > 0 && <CurrentWeekChart current={current} />}
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />
+                  <AggressivenessChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />
                 </div>
               </section>
             )}

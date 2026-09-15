@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggressivenessChartData, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyChartSeries } from '../src/charts.jsx'
+import { aggressivenessChartData, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 
 const history = {
   weeks: ['W1', 'W2'],
@@ -70,5 +70,21 @@ describe('tracker-compatible chart transformations', () => {
     expect(aggressivenessChartData(...args, 'predictor')[0].value).toBe(0)
     expect(aggressivenessChartData(...args, 'moneyline')[0].value).toBe(2)
     expect(aggressivenessChartData(...args, 'aggregate')[0].value).toBe(0)
+  })
+
+  it('calculates each player\'s aggressiveness separately by week', () => {
+    const games = [
+      { id: 'g1', home: 'H1', away: 'A1', kickoff: '2026-09-01T12:00:00Z', predictorHome: .51 },
+      { id: 'g2', home: 'H2', away: 'A2', kickoff: '2026-09-01T13:00:00Z', predictorHome: .60 },
+      { id: 'g3', home: 'H3', away: 'A3', kickoff: '2026-09-01T14:00:00Z', predictorHome: .90 },
+    ]
+    const series = weeklyAggressivenessSeries(
+      [{ id: 'alex', name: 'Alex' }],
+      { 'week-01': games, 'week-02': games },
+      { alex: { 'week-01': [{ gameId: 'g3', team: 'A3', confidence: 3 }], 'week-02': [{ gameId: 'g3', team: 'H3', confidence: 3 }] } },
+      'predictor',
+      ['week-01', 'week-02'],
+    )
+    expect(series).toEqual([{ name: 'Alex', values: [6, 0] }])
   })
 })
