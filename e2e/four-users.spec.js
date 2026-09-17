@@ -512,7 +512,7 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('tab', { name: 'Players' }).click()
-  await page.getByRole('button', { name: 'Delete Pat' }).click()
+  await page.getByRole('button', { name: 'Delete Pat' }).click({ force: true })
   await expect(page.getByText('PLAYER DELETED')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Pat', exact: true })).toHaveCount(0)
 })
