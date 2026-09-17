@@ -390,22 +390,24 @@ test('future week stays cached until its manual refresh', async ({ page }) => {
 
 test('admin manages registration and overrides a submitted pick', async ({ page }, testInfo) => {
   const session = { access_token: 'admin-access', refresh_token: 'admin-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'admin-user', email: 'admin@accounts.nfl-pickem.invalid' } }
-  const game = { id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z', matchup_quality: 74.5 }
+  const game = { id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T23:00:00Z', away_team: 'A', home_team: 'B', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-01T23:00:00Z', matchup_quality: 0.5 }
+  const overviewGame = { ...game, matchup_quality: 1.7 }
   const futureGameLow = { id: 'g6', pool_key: 'week-07', kickoff: '2026-10-24T17:00:00Z', away_team: 'E', home_team: 'F', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null, matchup_quality: 60.4 }
   const futureGame = { id: 'g7', pool_key: 'week-07', kickoff: '2026-10-25T17:00:00Z', away_team: 'C', home_team: 'D', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null, matchup_quality: 91.2 }
+  const futureLateGame = { id: 'g8', pool_key: 'week-07', kickoff: '2026-10-26T01:20:00Z', away_team: 'G', home_team: 'H', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null, matchup_quality: 50.2 }
   let gotwGames = [game]
   let overrideHistory = []
   await page.addInitScript((value) => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
   await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => route.fulfill({ json: session }))
   await page.route('**/cdn.espn.com/**', (route) => route.abort())
-  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [game], profiles: [{ id: 'admin-user', name: 'Admin' }, { id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
+  await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: { games: [overviewGame], profiles: [{ id: 'admin-user', name: 'Admin' }, { id: 'player-1', name: 'Pat', username: 'pat' }], revealedPicks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }], viewer: { id: 'admin-user', name: 'Admin', username: 'admin', isAdmin: true }, registrationOpen: true, asOf: '2026-09-02T00:00:00Z' } }))
   await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [{ gameId: 'g1', team: 'B', confidence: 1 }] } }))
   await page.route('**/rest/v1/rpc/get_admin_data', (route) => route.fulfill({ json: { registrationOpen: true, players: [{ id: 'player-1', name: 'Pat', username: 'pat', contactEmail: null }], games: [game], picks: [{ userId: 'player-1', gameId: 'g1', team: 'A', confidence: 1 }] } }))
   await page.route('**/rest/v1/rpc/get_division_winner_data', (route) => route.fulfill({ json: { settings: { lockWeek: 5, lockAt: '2026-10-11T17:00:00.000Z', pointsPerCorrect: 5 }, locked: false, viewerDraft: { revision: 0, picks: {} }, players: [], drafts: [] } }))
   await page.route('**/rest/v1/rpc/get_admin_override_history', (route) => route.fulfill({ json: { overrides: overrideHistory } }))
   let adminGotwLoads = 0
   await page.route('**/rest/v1/rpc/get_admin_gotw_data', (route) => { adminGotwLoads += 1; return route.fulfill({ json: { games: adminGotwLoads === 1 ? [{ ...game, matchup_quality: null }] : gotwGames } }) })
-  await page.route('**/functions/v1/sync-season', async (route) => { gotwGames = [game, futureGameLow, futureGame]; await route.fulfill({ json: { synced: [{ key: 'week-07', games: 2 }], failures: [] } }) })
+  await page.route('**/functions/v1/sync-season', async (route) => { gotwGames = [game, futureGameLow, futureGame, futureLateGame]; await route.fulfill({ json: { synced: [{ key: 'week-07', games: 3 }], failures: [] } }) })
   await page.route('**/rest/v1/rpc/set_registration_open', (route) => route.fulfill({ json: { registrationOpen: false } }))
   await page.route('**/rest/v1/rpc/admin_replace_picks', async (route) => {
     const body = JSON.parse(route.request().postData())
@@ -487,10 +489,14 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
     await page.locator('.admin-gotw').screenshot({ path: testInfo.outputPath('iphone12pro-admin-gotw.png') })
   }
   await expect(page.getByRole('columnheader', { name: 'GQ' })).toBeVisible()
-  await expect(page.getByRole('cell', { name: '74.5', exact: true })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '1.7', exact: true })).toBeVisible()
   await page.getByRole('radio', { name: /Assign A @ B/ }).check()
   await expect(page.getByText('GAME OF THE WEEK ASSIGNED')).toBeVisible()
   await page.getByLabel('GOTW week').selectOption('week-07')
+  await expect(page.getByRole('radio', { name: /C @ D/ })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /G @ H/ })).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Before midnight only' }).check()
+  await expect(page.getByRole('radio', { name: /G @ H/ })).toHaveCount(0)
   await expect(page.getByRole('radio', { name: /C @ D/ })).toBeVisible()
   await expect(page.getByRole('cell', { name: '91.2', exact: true })).toBeVisible()
   await expect(page.locator('.gotw-table tbody tr').first()).toContainText('C@D')

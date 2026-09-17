@@ -1335,6 +1335,7 @@ export default function App() {
               <AdminPanel
                 poolKey={poolKey}
                 token={session.access_token}
+                browserGamesByPool={{ ...loadedGamesByPool, [poolKey]: games }}
                 onPicksUpdated={(playerId, picks) =>
                   setPicks((all) => ({
                     ...all,
