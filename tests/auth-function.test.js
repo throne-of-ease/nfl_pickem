@@ -45,11 +45,11 @@ describe('direct Supabase authentication', () => {
     const calls = []
     vi.stubGlobal('fetch', vi.fn(async (url, options) => {
       calls.push([url, options])
-      if (url.endsWith('/get_season_data')) return { ok: true, json: async () => ({ games: [{ id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T00:00:00Z', away_team: 'A', home_team: 'B', status: 'scheduled', locked_at: null }], profiles: [{ id: 'u1', name: 'Pat' }], revealedPicks: [], asOf: '2026-08-28T00:00:00Z' }) }
+      if (url.endsWith('/get_season_data')) return { ok: true, json: async () => ({ games: [{ id: 'g1', pool_key: 'week-01', kickoff: '2026-09-01T00:00:00Z', away_team: 'A', home_team: 'B', status: 'scheduled', locked_at: null }], profiles: [{ id: 'u1', name: 'Pat' }, { id: 'u2', name: 'Quinn' }], revealedPicks: [], hiddenPickStatuses: [{ userId: 'u2', gameId: 'g1' }], asOf: '2026-08-28T00:00:00Z' }) }
       return { ok: true, json: async () => ({ draftRevision: 3, picks: [{ gameId: 'g1', team: null, confidence: 1 }] }) }
     }))
     const result = await loadPool('week-01', 'access', { fetchEspn: false })
-    expect(result).toMatchObject({ draftRevision: 3, users: [{ id: 'u1', name: 'Pat' }], games: [{ id: 'g1', away: 'A', home: 'B' }] })
+    expect(result).toMatchObject({ draftRevision: 3, users: [{ id: 'u1', name: 'Pat' }, { id: 'u2', name: 'Quinn' }], games: [{ id: 'g1', away: 'A', home: 'B' }], picksByUser: { u1: [], u2: [{ gameId: 'g1', saved: true }] } })
     expect(calls).toHaveLength(2)
     expect(calls.every(([url]) => url.includes('/rest/v1/rpc/'))).toBe(true)
     expect(calls.every(([, options]) => options.headers.authorization === 'Bearer access')).toBe(true)

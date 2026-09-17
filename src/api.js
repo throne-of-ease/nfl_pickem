@@ -108,6 +108,7 @@ const mapSeason = (season, draft) => {
   const users = season?.profiles ?? []
   const picksByUser = Object.fromEntries(users.map((profile) => [profile.id, []]))
   for (const pick of season?.revealedPicks ?? []) (picksByUser[pick.userId] ??= []).push({ gameId: pick.gameId, team: pick.team, confidence: pick.confidence })
+  for (const pick of season?.hiddenPickStatuses ?? []) (picksByUser[pick.userId] ??= []).push({ gameId: pick.gameId, saved: true })
   return { games, users, picksByUser, viewer: season?.viewer ?? null, registrationOpen: season?.registrationOpen ?? true, draftRevision: draft?.draftRevision ?? 0, ownPicks: draft?.picks ?? [], asOf: season?.asOf }
 }
 

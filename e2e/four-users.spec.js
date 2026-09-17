@@ -122,7 +122,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
 
 test('overview hides scheduled picks and scores live picks for all four users', async ({ page }) => {
   await page.goto('/?scenario=scheduled&pool=week-02')
-  await expect(page.getByLabel('Pick hidden until kickoff')).toHaveCount(16)
+  await expect(page.getByLabel('Pick saved; hidden until kickoff')).toHaveCount(16)
 
   await page.goto('/?scenario=live&pool=week-02')
   await expect(page.locator('.overview-pick')).toHaveCount(4)

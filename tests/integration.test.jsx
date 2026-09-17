@@ -69,7 +69,10 @@ describe('four-user application flow', () => {
   it('hides every player pick before kickoff and reveals live picks as pending when provisional scoring is off', async () => {
     history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
     const { unmount } = render(<App />)
-    expect(screen.getAllByLabelText('Pick hidden until kickoff')).toHaveLength(16)
+    expect(screen.getAllByLabelText('Pick saved; hidden until kickoff')).toHaveLength(16)
+    const hidden = screen.getAllByLabelText('Pick saved; hidden until kickoff')[0]
+    expect(hidden).toHaveTextContent('?')
+    expect(hidden.outerHTML).not.toMatch(/ATL|confidence/i)
     unmount()
 
     history.replaceState({}, '', '/?scenario=live&pool=week-02')
@@ -78,6 +81,14 @@ describe('four-user application flow', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Include provisional live scores' }))
     expect(document.querySelectorAll('.overview-pick.pending')).toHaveLength(4)
     expect(document.querySelectorAll('.overview-pick.correct, .overview-pick.incorrect')).toHaveLength(0)
+  })
+
+  it('marks an unrevealed game with no saved pick without exposing a team', () => {
+    localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({ users: [{ id: 'u1', name: 'Alex' }], picksByUser: { u1: { 'week-02': [] } } }))
+    history.replaceState({}, '', '/?scenario=scheduled&pool=week-02')
+    render(<App />)
+    expect(screen.getAllByLabelText('No pick saved yet')).toHaveLength(4)
+    expect(screen.getAllByLabelText('No pick saved yet').every((item) => item.textContent === '–')).toBe(true)
   })
 
   it('shows tracker metrics by default, includes live clock detail, and sorts by GQ and Dev', async () => {

@@ -38,7 +38,10 @@ function ScoreCell({ game }) {
 }
 
 function PickCell({ game, pick, provisional, publicPick = false }) {
-  if (!publicPick && !isRevealed(game)) return <span className="pick-hidden" aria-label="Pick hidden until kickoff">?</span>
+  if (!publicPick && !isRevealed(game)) {
+    const saved = Boolean(pick?.saved || (pick?.team && Number.isFinite(pick.confidence)))
+    return <span className="pick-hidden" aria-label={saved ? 'Pick saved; hidden until kickoff' : 'No pick saved yet'}>{saved ? '?' : '–'}</span>
+  }
   if (!pick?.team || !Number.isFinite(pick.confidence)) return <span className="pick-empty" aria-label="No pick">-</span>
   const score = scorePick(pick, game, provisional)
   const state = score.scored ? score.correct ? 'correct' : 'incorrect' : 'pending'
@@ -118,6 +121,6 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
       <button type="button" title="Download table as PNG" aria-label="Download table as PNG" disabled={exporting} onClick={() => exportTable(false)}><ChartIcon type="download" /></button>
     </div>
     {exportError && <p role="alert">{exportError}</p>}
-    <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> hidden until kickoff</p>
+    <p className="overview-legend"><span className="correct-dot" /> correct <span className="incorrect-dot" /> incorrect <span className="pending-dot" /> pending <strong>?</strong> saved, hidden <strong>–</strong> not saved</p>
   </section>
 }
