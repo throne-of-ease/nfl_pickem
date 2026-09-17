@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { addPregameData, applyFpiRatings, applyLiveSample, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
+import { addPregameData, applyFpiRatings, applyLiveSample, currentPoolKeyFromScoreboard, fetchEspnCurrentPoolKey, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
+  it('uses ESPN scoreboard metadata for the current pickem week', async () => {
+    const payload = { content: { sbData: { season: { year: 2026, type: 2 }, week: { number: 2 } } } }
+    const fetcher = async () => ({ ok: true, json: async () => payload })
+    expect(currentPoolKeyFromScoreboard(payload)).toBe('week-02')
+    await expect(fetchEspnCurrentPoolKey({ fetcher })).resolves.toBe('week-02')
+  })
+
   it.each([['pre','scheduled'],['in','live'],['post','final']])('normalizes %s to %s', (input, expected) => {
     expect(normalizeEvent({ id: 1, date: '2026-08-27T18:00:00Z', status: { type: { state: input } } }).status).toBe(expected)
   })

@@ -9,6 +9,7 @@ import { authenticate, clearSession, isCurrentPool, loadChartData, loadPool, loa
 import { buildPickBackup, downloadPickBackup, recordPickBackup } from "./backup.js";
 import { formatCETTime, formatCETWeekday } from "./time.js";
 import { DIVISION_DEFINITIONS } from "./divisionWinners.js";
+import { fetchEspnCurrentPoolKey } from "./espnAdapter.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const STORAGE_KEY = "nfl-pickem-rehearsal-v1";
@@ -291,9 +292,11 @@ export default function App() {
   const useFixtures = import.meta.env.MODE === "test" || (import.meta.env.DEV && TEST_SCENARIOS.has(scenario));
   const activeScenario = useFixtures ? scenario : null;
   const enabledPools = POOLS;
+  const requestedPoolKey = POOLS.some((pool) => pool.key === params.get("pool")) ? params.get("pool") : null;
   const [localState] = useState(() => loadLocalState(useFixtures));
   const [appUsers, setAppUsers] = useState(localState.users);
-  const [poolKey, setPoolKey] = useState(activeScenario === "playoff" ? "super-bowl" : POOLS.some((pool) => pool.key === params.get("pool")) ? params.get("pool") : "week-01");
+  const [poolKey, setPoolKey] = useState(activeScenario === "playoff" ? "super-bowl" : requestedPoolKey ?? "week-01");
+  const [currentPoolReady, setCurrentPoolReady] = useState(useFixtures || Boolean(requestedPoolKey));
   const [userId, setUserId] = useState(localState.users[0]?.id ?? "");
   const [picksByUser, setPicks] = useState(localState.picksByUser);
   const [loadedGamesByPool, setLoadedGamesByPool] = useState(() => (useFixtures ? gamesByPool : {}));
@@ -464,7 +467,26 @@ export default function App() {
   }, [useFixtures]);
 
   useEffect(() => {
-    if (useFixtures || !session?.access_token) return;
+    if (useFixtures || requestedPoolKey) return;
+    let active = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    fetchEspnCurrentPoolKey({ signal: controller.signal })
+      .then((key) => { if (active) setPoolKey(key); })
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(timeout);
+        if (active) setCurrentPoolReady(true);
+      });
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [useFixtures, requestedPoolKey]);
+
+  useEffect(() => {
+    if (useFixtures || !session?.access_token || !currentPoolReady) return;
     let active = true;
     loadChartData(session.access_token, { forceRefresh: refreshRequest.force })
       .then((result) => {
@@ -477,7 +499,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [useFixtures, session?.access_token, poolKey, refreshRequest.version]);
+  }, [useFixtures, session?.access_token, poolKey, refreshRequest.version, currentPoolReady]);
 
   useEffect(() => {
     if (useFixtures || !session?.refresh_token) return;
@@ -497,7 +519,7 @@ export default function App() {
   }, [useFixtures, session?.refresh_token, session?.expires_at]);
 
   useEffect(() => {
-    if (useFixtures || !session?.access_token) return;
+    if (useFixtures || !session?.access_token || !currentPoolReady) return;
     const loadKey = `${session.user.id}:${poolKey}`;
     const initial = initialLoadKey.current !== loadKey;
     const controller = new AbortController();
@@ -581,7 +603,7 @@ export default function App() {
     };
     load();
     return () => controller.abort();
-  }, [poolKey, useFixtures, session?.access_token, session?.user?.id, refreshRequest.version]);
+  }, [poolKey, useFixtures, session?.access_token, session?.user?.id, refreshRequest.version, currentPoolReady]);
 
   useEffect(() => {
     if (useFixtures || !session?.access_token) return;
@@ -852,6 +874,12 @@ export default function App() {
       </main>
     );
   if (!useFixtures && !session) return <AuthPanel onSession={setSession} />;
+  if (!currentPoolReady)
+    return (
+      <main className="auth-shell">
+        <p>Finding the current NFL week...</p>
+      </main>
+    );
 
   return (
     <>

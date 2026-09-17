@@ -1,4 +1,4 @@
-import { freezePregameSnapshot } from './domain.js'
+import { POOLS, freezePregameSnapshot } from './domain.js'
 
 const STATUS = { pre: 'scheduled', in: 'live', post: 'final', scheduled: 'scheduled', live: 'live', final: 'final' }
 const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
@@ -11,6 +11,19 @@ const probability = (value) => {
   return number === null ? null : number > 1 ? number / 100 : number
 }
 const cacheBusted = (url) => `${url}&_nfl_pickem=${Date.now()}`
+
+export function currentPoolKeyFromScoreboard(payload) {
+  const { season, week } = payload?.content?.sbData ?? {}
+  return POOLS.find((pool) => pool.espnSeason === Number(season?.year) && pool.espnSeasonType === Number(season?.type) && pool.espnWeek === Number(week?.number))?.key ?? null
+}
+
+export async function fetchEspnCurrentPoolKey({ fetcher = fetch, signal } = {}) {
+  const response = await fetcher(cacheBusted(SCOREBOARD), { signal, cache: 'no-store' })
+  if (!response.ok) throw new Error(`ESPN scoreboard HTTP ${response.status}`)
+  const poolKey = currentPoolKeyFromScoreboard(await response.json())
+  if (!poolKey) throw new Error('ESPN current week is not in the pickem schedule')
+  return poolKey
+}
 
 const statusRank = (status) => status === 'final' || status === 'post' ? 2 : status === 'live' || status === 'in' ? 1 : 0
 const scoreValue = (value) => Number.isFinite(Number(value)) ? Number(value) : null
