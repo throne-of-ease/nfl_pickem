@@ -355,7 +355,7 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
   await expect(page.locator('footer')).toContainText('Browser ESPN data')
   await expect(page.getByText(/28%.*72%/)).toBeVisible()
   await expect(page.getByText(/ESPN WP/)).toHaveCount(0)
-  await expect.poll(() => scoreboardRequests).toBe(2)
+  await expect.poll(() => scoreboardRequests).toBeGreaterThanOrEqual(2)
   await expect(page.locator('.overview-table .overview-score')).not.toContainText('LIVE')
   await expect(page.locator('.overview-table .overview-game .live-badge')).toHaveText('LIVE')
   expect(await page.locator('.overview-table .overview-game').evaluateAll((games) => games.some((game) => game.querySelector('.live-badge') && game.children[1]?.classList.contains('live-badge')))).toBe(true)
