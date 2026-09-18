@@ -9,7 +9,7 @@ import { authenticate, clearSession, isCurrentPool, loadChartData, loadPool, loa
 import { buildPickBackup, downloadPickBackup, recordPickBackup } from "./backup.js";
 import { formatCETTime, formatCETWeekday } from "./time.js";
 import { DIVISION_DEFINITIONS } from "./divisionWinners.js";
-import { fetchEspnCurrentPoolKey } from "./espnAdapter.js";
+import { espnGameUrl, fetchEspnCurrentPoolKey } from "./espnAdapter.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const STORAGE_KEY = "nfl-pickem-rehearsal-v1";
@@ -1161,10 +1161,12 @@ export default function App() {
                         }}
                       >
                         <div className="game-meta">
-                          <time dateTime={game.kickoff}>
-                            <span>{formatCETWeekday(kickoff)}</span>
-                            <strong>{formatCETTime(kickoff)}</strong>
-                          </time>
+                          <a className="espn-game-link" href={espnGameUrl(game.id)} target="_blank" rel="noopener noreferrer">
+                            <time dateTime={game.kickoff}>
+                              <span>{formatCETWeekday(kickoff)}</span>
+                              <strong>{formatCETTime(kickoff)}</strong>
+                            </time>
+                          </a>
                           <span className={`game-status ${liveGame(game) ? "live-status" : ""}`}>
                             {liveGame(game) ? <span className="live-badge">LIVE</span> : locked ? "locked" : gameStateLabel(game)}
                             {liveDetail(game) && <small>{liveDetail(game)}</small>}

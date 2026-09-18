@@ -5,6 +5,8 @@ const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
 const GAME = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event='
 const FPI = 'https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex'
 
+export const espnGameUrl = (gameId) => `https://www.espn.com/nfl/game/_/gameId/${encodeURIComponent(gameId)}`
+
 const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
 const probability = (value) => {
   const number = finite(value)

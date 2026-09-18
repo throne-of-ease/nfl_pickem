@@ -123,6 +123,8 @@ p { color: var(--muted); }
 .game.moved { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .drag-handle { grid-area: drag; width: 2rem; height: 32px; display: grid; place-items: center; color: var(--muted); border: 1px dashed #5c6d7f; cursor: grab; font-size: .92rem; line-height: 1; user-select: none; touch-action: none; }
 .game-meta { grid-area: meta; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: .15rem; }
+.espn-game-link { color: inherit; text-decoration: none; }
+.espn-game-link:hover { text-decoration: underline; }
 .game-meta time { display: flex; align-items: baseline; gap: .38rem; }
 .game-meta time span { color: var(--accent); font-size: .64rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 .game-meta time strong { font-size: .83rem; font-variant-numeric: tabular-nums; }

@@ -21,6 +21,12 @@ describe('four-user application flow', () => {
     const gotw = screen.getByTitle('Game of the Week')
     expect(gotw).toHaveTextContent('GOTW +5')
     expect(gotw.previousElementSibling).toHaveClass('overview-game-line')
+    expect([...document.querySelectorAll('.overview-game .espn-game-link')].map((link) => link.href)).toEqual([
+      'https://www.espn.com/nfl/game/_/gameId/week-01-g1',
+      'https://www.espn.com/nfl/game/_/gameId/week-01-g2',
+      'https://www.espn.com/nfl/game/_/gameId/week-01-g3',
+      'https://www.espn.com/nfl/game/_/gameId/week-01-g4',
+    ])
     expect([...document.querySelectorAll('.overview-player small')].every((item) => /^\d+\/-\d+\/\d+$/.test(item.textContent))).toBe(true)
   })
 
@@ -121,6 +127,8 @@ describe('four-user application flow', () => {
     history.replaceState({}, '', '/?scenario=live&pool=week-02')
     render(<App />)
     await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    expect(document.querySelectorAll('.game-meta .espn-game-link')).toHaveLength(4)
+    expect(document.querySelector('.game-meta .espn-game-link')).toHaveAttribute('target', '_blank')
     expect(screen.getAllByTitle('ESPN real-time win probability')).toHaveLength(2)
     expect(screen.getAllByTitle('ESPN real-time win probability').map((item) => item.textContent)).toEqual(['32%', '68%'])
     expect(document.querySelectorAll('.game.live .live-badge')).toHaveLength(1)

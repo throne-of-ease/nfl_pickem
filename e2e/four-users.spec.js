@@ -252,6 +252,8 @@ test('iPhone 12 Pro My Picks keeps every game in one compact row', async ({ page
   expect(Math.max(...heights)).toBeLessThanOrEqual(50)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await expect(page.locator('.game-meta time')).toHaveCount(4)
+  await expect(page.locator('.game-meta .espn-game-link')).toHaveCount(4)
+  await expect(page.locator('.game-meta .espn-game-link').first()).toHaveAttribute('href', /https:\/\/www\.espn\.com\/nfl\/game\/_\/gameId\/week-02-g\d/)
   await page.screenshot({ path: testInfo.outputPath('iphone12pro-my-picks.png'), fullPage: false })
 })
 
@@ -262,6 +264,8 @@ test('iPhone 12 Pro overview fits the compact game table', async ({ page }, test
   expect(await page.evaluate(() => window.innerWidth)).toBe(390)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await expect(page.getByRole('heading', { name: 'Game overview' })).toBeHidden()
+  await expect(page.locator('.overview-game .espn-game-link')).toHaveCount(4)
+  await expect(page.locator('.overview-game .espn-game-link').first()).toHaveAttribute('target', '_blank')
   expect(await page.locator('.overview-player strong').first().evaluate((item) => getComputedStyle(item).fontSize)).toBe('8.32px')
   expect(await page.locator('.overview-pick .pick-team').evaluateAll((items) => items.every((item) => getComputedStyle(item).display === 'none'))).toBe(true)
   expect(await page.locator('.overview-player small').evaluateAll((items) => items.length > 0 && items.every((item) => getComputedStyle(item).display !== 'none' && item.textContent.includes('/')))).toBe(true)

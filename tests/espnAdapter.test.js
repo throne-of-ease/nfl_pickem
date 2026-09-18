@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { addPregameData, applyFpiRatings, applyLiveSample, currentPoolKeyFromScoreboard, fetchEspnCurrentPoolKey, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
+import { addPregameData, applyFpiRatings, applyLiveSample, currentPoolKeyFromScoreboard, espnGameUrl, fetchEspnCurrentPoolKey, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
+  it('builds the public ESPN game page URL from the event ID', () => {
+    expect(espnGameUrl('401872933')).toBe('https://www.espn.com/nfl/game/_/gameId/401872933')
+  })
+
   it('uses ESPN scoreboard metadata for the current pickem week', async () => {
     const payload = { content: { sbData: { season: { year: 2026, type: 2 }, week: { number: 2 } } } }
     const fetcher = async () => ({ ok: true, json: async () => payload })

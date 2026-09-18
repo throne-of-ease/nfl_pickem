@@ -3,6 +3,7 @@ import { gameQuality, isLocked, modelPicks, pickDeviation, poolMetrics, scorePic
 import { ChartIcon, downloadPngBlob, sharePngBlob } from './charts.jsx'
 import { tableToPngBlob } from './tableExport.js'
 import { formatCETDate, formatCETTime } from './time.js'
+import { espnGameUrl } from './espnAdapter.js'
 
 const ESPN_CODES = { WAS: 'wsh' }
 const NFL_FALLBACK = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nfl.png&w=100&h=100&transparent=true'
@@ -22,7 +23,7 @@ const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 
 function GameSummary({ game }) {
   return <div className="overview-game">
-    <span className="overview-game-line"><strong className="overview-matchup">{game.away}@{game.home}</strong></span>
+    <span className="overview-game-line"><a className="espn-game-link" href={espnGameUrl(game.id)} target="_blank" rel="noopener noreferrer"><strong className="overview-matchup">{game.away}@{game.home}</strong></a></span>
     {(game.status === 'live' || game.status === 'in') && <b className="overview-live live-badge">LIVE</b>}
     {game.gotw && <b className="overview-gotw" title="Game of the Week">GOTW +5</b>}
   </div>
