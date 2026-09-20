@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { isLocked, modelPicks } from './domain.js'
 
-export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#7aa8ff']
+export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#b795ff']
 
 export function toDisplay(value, mode, maximum = 1, leader = 0) {
   if (mode === 'percent') return maximum ? (value / maximum) * 100 : 0
@@ -155,21 +155,57 @@ const safeRange = (values) => {
   return { min, max, span: max - min || 1 }
 }
 
-function LineSvg({ series, labels, chartRef, ariaLabel }) {
-  const width = 800, height = 360, left = 54, right = 24, top = 44, bottom = 48
+export function chartLegendLayout(series, left, availableWidth) {
+  let x = left, row = 0
+  return series.map((item) => {
+    const width = Math.max(96, item.name.length * 7.5 + 42)
+    if (x > left && x + width > left + availableWidth) { x = left; row += 1 }
+    const position = { x, y: 20 + row * 22, width, row }
+    x += width
+    return position
+  })
+}
+
+function spreadEndLabels(items, minY, maxY) {
+  const sorted = [...items].sort((a, b) => a.targetY - b.targetY)
+  const gap = Math.min(15, sorted.length > 1 ? (maxY - minY) / (sorted.length - 1) : 15)
+  sorted.forEach((item, index) => { item.labelY = Math.max(item.targetY, index ? sorted[index - 1].labelY + gap : minY) })
+  const overflow = (sorted.at(-1)?.labelY ?? maxY) - maxY
+  if (overflow > 0) sorted.forEach((item) => { item.labelY -= overflow })
+  return sorted
+}
+
+const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toFixed(1)
+
+function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false }) {
+  const width = 800, height = 360, left = 54, right = endValues ? 74 : 24, bottom = 48
+  const legend = chartLegendLayout(series, left, width - left - 24)
+  const top = 44 + (legend.at(-1)?.row ?? 0) * 22
   const values = series.flatMap((item) => [...item.values, ...(item.potentialValues ?? [])])
   const { min, max, span } = safeRange(values)
   const x = (index) => labels.length === 1 ? (width - right + left) / 2 : left + index * (width - left - right) / (labels.length - 1)
   const y = (value) => top + (max - value) * (height - top - bottom) / span
+  const endLabels = endValues ? spreadEndLabels(series.flatMap((item, seriesIndex) => [
+    { item, seriesIndex, kind: 'earned', values: item.values },
+    ...(item.potentialValues ? [{ item, seriesIndex, kind: 'potential', values: item.potentialValues }] : []),
+  ]).flatMap((entry) => {
+    const index = entry.values.findLastIndex(Number.isFinite)
+    return index < 0 ? [] : [{ ...entry, value: entry.values[index], targetX: x(index), targetY: y(entry.values[index]) }]
+  }), top + 7, height - bottom - 7) : []
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
-    {series.map((item, index) => <g key={`legend-${item.name}`} transform={`translate(${left + index * 120} 20)`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><text x="29" y="4">{item.name}</text></g>)}
-    {[0, 1, 2, 3, 4].map((tick) => { const value = min + span * tick / 4; return <g key={tick}><line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" /><text x={left - 8} y={y(value) + 4} textAnchor="end">{Math.round(value)}</text></g> })}
+    {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><text x="29" y="4">{item.name}</text></g>)}
+    {[0, 1, 2, 3, 4].map((tick) => { const value = min + span * tick / 4; return <g key={tick}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{Math.round(value)}</text></g> })}
+    {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
     {labels.map((label, index) => <text key={label} x={x(index)} y={height - 18} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
       <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />
       {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />}
       {item.values.map((value, index) => Number.isFinite(value) ? <circle key={index} cx={x(index)} cy={y(value)} r="5"><title>{item.name}, {labels[index]}: {value.toFixed(1)}</title></circle> : null)}
+    </g>)}
+    {endLabels.map(({ item, seriesIndex, kind, value, targetX, targetY, labelY }) => <g key={`${item.name}-${kind}`} data-end-label={kind}>
+      <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />
+      <text x={width - right + 12} y={labelY + 4} style={{ fill: COLORS[seriesIndex % COLORS.length] }}>{displayValue(value)}{kind === 'potential' ? ' P' : ''}</text>
     </g>)}
   </svg>
 }
@@ -204,7 +240,7 @@ export function CumulativePointsChart({ history }) {
   const [showPotential, setShowPotential] = useState(true)
   const series = cumulativeChartSeries(history, showPotential)
   const tableSeries = cumulativeChartSeries(history)
-  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: potential points gap." footer={<div className="chart-footer"><button type="button" aria-pressed={showPotential} onClick={() => setShowPotential((visible) => !visible)}>{showPotential ? 'Hide potential' : 'Show potential'}</button></div>} table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={tableSeries.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" /></ChartFrame>
+  return <ChartFrame id="cumulative-points" title="Points vs season leader" description="Solid: earned gap. Dashed: potential points gap. P: potential ending value." footer={<div className="chart-footer"><button type="button" aria-pressed={showPotential} onClick={() => setShowPotential((visible) => !visible)}>{showPotential ? 'Hide potential' : 'Show potential'}</button></div>} table={<AccessibleTable caption="Points versus season leader" columns={['Player', 'Line', ...history.weeks]} rows={tableSeries.flatMap((user) => [[user.name, 'Earned', ...user.values], [user.name, 'Potential', ...user.potentialValues]])} />}><LineSvg series={series} labels={history.weeks} ariaLabel="Cumulative points versus season leader" endValues zeroReference /></ChartFrame>
 }
 
 export function GotwChart({ history }) {

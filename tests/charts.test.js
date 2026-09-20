@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggressivenessChartData, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 
 const history = {
   weeks: ['W1', 'W2'],
@@ -27,6 +27,14 @@ describe('tracker-compatible chart transformations', () => {
 
   it('plots cumulative gaps to the leader with a separate potential line', () => {
     expect(cumulativeChartSeries(history)[0]).toMatchObject({ values: [-3, 0], potentialValues: [-1, 0] })
+  })
+
+  it('keeps player legend labels apart and uses a distinct fourth color', () => {
+    const layout = chartLegendLayout([{ name: 'Alexandra' }, { name: 'Christopher' }, { name: 'Casey' }, { name: 'Devon' }], 54, 722)
+    for (let index = 1; index < layout.length; index += 1) {
+      if (layout[index].row === layout[index - 1].row) expect(layout[index].x).toBeGreaterThanOrEqual(layout[index - 1].x + layout[index - 1].width)
+    }
+    expect(COLORS[3]).toBe('#b795ff')
   })
 
   it('uses all played GOTW stakes as the points-percentage denominator', () => {
