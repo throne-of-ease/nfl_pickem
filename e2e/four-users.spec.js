@@ -366,6 +366,7 @@ test('Week 3 player keeps a saved pick and reserves an unpicked locked rank whil
   expect(saves[0].p_picks).toContainEqual(savedPick)
   expect(saves[0].p_picks).toContainEqual({ gameId: 'missed-game', team: null, confidence: 2 })
   expect(saves[0].p_picks).toContainEqual({ gameId: 'future-game', team: 'DAL', confidence: 3 })
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible()
   await future.getByRole('combobox').selectOption('2')
   await expect(page.getByText('LOCKED VALUE CANNOT BE REUSED')).toBeVisible()
   await expect(future.getByRole('combobox')).toHaveValue('3')
