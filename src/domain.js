@@ -101,6 +101,9 @@ export function pickDeviation(game, picksByUser) {
 
 export const isLocked = (game, now = new Date(), acceptsLatePicks = false) => !acceptsLatePicks && (game.locked || new Date(game.kickoff) <= new Date(now))
 
+export const canEditWeek3Late = (poolKey, username, now = new Date()) =>
+  poolKey === 'week-03' && username?.toLowerCase() === 'nflstresstest2026' && now < new Date('2026-09-29T10:00:00Z')
+
 export function presetConfidencePicks(games, existing = [], now = new Date(), acceptsLatePicks = false) {
   const old = new Map(existing.map((pick) => [pick.gameId, pick]))
   const used = new Set()

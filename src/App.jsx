@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
+import { POOLS, buildSeasonHistory, canEditWeek3Late, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
@@ -315,6 +315,7 @@ export default function App() {
   const initialLoadKey = useRef("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [viewerName, setViewerName] = useState("");
+  const [viewerUsername, setViewerUsername] = useState("");
   const [profileDraft, setProfileDraft] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
@@ -343,6 +344,7 @@ export default function App() {
   const savedPicks = useRef({});
   const saveQueue = useRef(Promise.resolve());
   const pool = POOLS.find((item) => item.key === poolKey);
+  const acceptsLatePicks = pool.acceptsLatePicks || (!useFixtures && canEditWeek3Late(poolKey, viewerUsername));
   const baseGames = loadedGamesByPool[poolKey] ?? [];
   const currentWeek = isCurrentPool(baseGames);
   const hasLiveGames = currentWeek && baseGames.some((game) => game.status === "live" || game.status === "in");
@@ -545,6 +547,7 @@ export default function App() {
           savedPicks.current[poolKey] = result.ownPicks;
           setAppUsers(result.users);
           setViewerName(result.viewer?.name ?? "");
+          setViewerUsername(result.viewer?.username ?? "");
           setProfileDraft(result.viewer?.name ?? "");
           setIsAdmin(Boolean(result.viewer?.isAdmin));
           setUserId(session.user.id);
@@ -632,7 +635,7 @@ export default function App() {
       const next = { ...all };
       for (const player of useFixtures ? appUsers : appUsers.filter((player) => player.id === userId)) {
         const previous = all[player.id]?.[poolKey] ?? [];
-        const draft = presetConfidencePicks(games, previous);
+        const draft = presetConfidencePicks(games, previous, new Date(), acceptsLatePicks);
         if (JSON.stringify(previous) !== JSON.stringify(draft)) {
           next[player.id] = { ...all[player.id], [poolKey]: draft };
           changed = true;
@@ -640,7 +643,7 @@ export default function App() {
       }
       return changed ? next : all;
     });
-  }, [appUsers, poolKey, baseGames, useFixtures, userId]);
+  }, [appUsers, poolKey, baseGames, useFixtures, userId, acceptsLatePicks]);
 
   useEffect(() => {
     if (useFixtures) localStorage.setItem(STORAGE_KEY, JSON.stringify({ users: appUsers, picksByUser }));
@@ -683,7 +686,6 @@ export default function App() {
     const savingPool = poolKey;
     const savingUser = userId;
     const savingGames = games;
-    const acceptsLatePicks = pool.acceptsLatePicks;
     setMessage("Saving...");
     saveQueue.current = saveQueue.current
       .then(async () => {
@@ -708,7 +710,7 @@ export default function App() {
 
   const updatePick = (gameId, changes) => {
     setHighlightedGameId(null);
-    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), pool.acceptsLatePicks);
+    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), acceptsLatePicks);
     const changed = oldDraft.find((pick) => pick.gameId === gameId);
     const occupied = Number.isInteger(changes.confidence) ? oldDraft.find((pick) => pick.gameId !== gameId && pick.confidence === changes.confidence) : null;
     if (
@@ -716,7 +718,7 @@ export default function App() {
       isLocked(
         games.find((game) => game.id === occupied.gameId),
         new Date(),
-        pool.acceptsLatePicks,
+        acceptsLatePicks,
       )
     ) {
       setMessage("LOCKED VALUE CANNOT BE REUSED");
@@ -725,7 +727,7 @@ export default function App() {
     const nextDraft = oldDraft.map((pick) => (pick.gameId === gameId ? { ...pick, ...changes } : occupied?.gameId === pick.gameId ? { ...pick, confidence: changed.confidence } : pick));
     const result = validateDraft(games, nextDraft, {
       previous: oldDraft,
-      acceptsLatePicks: pool.acceptsLatePicks,
+      acceptsLatePicks,
     });
     if (!result.ok) {
       setMessage(result.code.replaceAll("_", " "));
@@ -741,13 +743,13 @@ export default function App() {
   };
 
   const applyModelPicks = (kind, label) => {
-    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), pool.acceptsLatePicks);
+    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), acceptsLatePicks);
     const nextDraft = modelAutopick(games, kind, oldDraft, {
-      acceptsLatePicks: pool.acceptsLatePicks,
+      acceptsLatePicks,
     });
     const result = validateDraft(games, nextDraft, {
       previous: oldDraft,
-      acceptsLatePicks: pool.acceptsLatePicks,
+      acceptsLatePicks,
     });
     if (!result.ok) {
       setMessage(result.code.replaceAll("_", " "));
@@ -769,7 +771,7 @@ export default function App() {
     const sourcePick = userPicks.find((pick) => pick.gameId === sourceGameId);
     const sourceGame = games.find((game) => game.id === sourceGameId);
     const targetGame = games.find((game) => game.id === targetGameId);
-    if (!Number.isInteger(sourcePick?.confidence) || isLocked(sourceGame, new Date(), pool.acceptsLatePicks) || isLocked(targetGame, new Date(), pool.acceptsLatePicks)) {
+    if (!Number.isInteger(sourcePick?.confidence) || isLocked(sourceGame, new Date(), acceptsLatePicks) || isLocked(targetGame, new Date(), acceptsLatePicks)) {
       setMessage("LOCKED VALUE CANNOT BE MOVED");
       return;
     }
@@ -833,7 +835,7 @@ export default function App() {
       document.removeEventListener("pointerup", finishPointerDrag);
       document.removeEventListener("pointercancel", finishPointerDrag);
     };
-  }, [games, pool.acceptsLatePicks, swapConfidence, userId, userPicks]);
+  }, [games, acceptsLatePicks, swapConfidence, userId, userPicks]);
 
   const submitPasswordChange = async (event) => {
     event.preventDefault();
@@ -1136,7 +1138,7 @@ export default function App() {
                 <div className="games">
                   {displayedGames.map((game) => {
                     const pick = userPicks.find((item) => item.gameId === game.id);
-                    const locked = isLocked(game, new Date(), pool.acceptsLatePicks);
+                    const locked = isLocked(game, new Date(), acceptsLatePicks);
                     const kickoff = new Date(game.kickoff);
                     const displayedModelPick = pickProbabilities.get(game.id);
                     const pregameHome = displayedModelPick ? (displayedModelPick.team === game.home ? displayedModelPick.probability : 1 - displayedModelPick.probability) : null;
