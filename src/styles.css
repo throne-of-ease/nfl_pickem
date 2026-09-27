@@ -36,7 +36,7 @@
   --chart-color-3: #7848bc;
 }
 
-.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; min-height: 32px; padding: .25rem .4rem; color: var(--ink); font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: .25rem .4rem; color: var(--ink); flex-shrink: 0; }
 .theme-toggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .signed-in > .theme-toggle { order: 1; }
 .auth-theme { position: absolute; top: .75rem; right: 1rem; }
@@ -182,7 +182,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teams label:hover { border-color: var(--ink); }
 .teams label.selected { color: var(--ink); background: var(--accent-soft); border-color: var(--accent); }
 .teams input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); flex: 0 0 auto; }
-.team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; background: #fff; border-radius: 3px; }
+.team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; background: transparent; border-radius: 3px; }
 .team-logo.large { width: 30px; height: 30px; }
 .teams span:not(.at) { overflow: hidden; text-overflow: ellipsis; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
 .teams b { margin-left: .2rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
