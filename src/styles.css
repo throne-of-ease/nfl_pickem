@@ -312,7 +312,7 @@ footer [data-testid="real-data-status"] { display: block; }
 .text-button { margin-top: 1rem; padding-left: 0; color: var(--accent); border: 0; background: transparent; }
 .optional { color: var(--muted); font-size: .7rem; font-weight: 400; }
 .signed-in { position: relative; margin-left: auto; display: flex; align-items: center; gap: .7rem; color: var(--muted); font-size: .75rem; }
-.viewer-name { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-name { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .account-toggle { display: none; min-width: 2rem; padding: .25rem .4rem; color: var(--ink); background: var(--surface); font-weight: 900; letter-spacing: .12em; }
 .account-actions { display: flex; align-items: center; gap: .7rem; }
 .admin-panel { display: grid; gap: .75rem; }
@@ -403,7 +403,6 @@ footer [data-testid="real-data-status"] { display: block; }
   .account-actions { display: none; position: absolute; top: calc(100% + .4rem); right: 0; z-index: 12; min-width: 10rem; padding: .5rem; align-items: stretch; flex-direction: column; gap: .35rem; border: 1px solid var(--line); background: var(--surface-raised); box-shadow: 4px 4px 0 color-mix(in srgb, var(--accent) 16%, transparent); }
   .account-actions.open { display: flex; }
   .account-actions button { width: 100%; text-align: left; }
-  .viewer-name { max-width: min(18vw, 12rem); }
   .setup-button { margin-left: auto; }
   .user-switch span { display: none; }
   main { padding: .75rem .55rem 3rem; }
