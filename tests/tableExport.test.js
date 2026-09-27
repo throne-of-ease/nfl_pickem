@@ -10,22 +10,35 @@ it('exports full names and displayed picks without exposing hidden picks', async
   for (const cell of document.querySelectorAll('th,td')) Object.defineProperty(cell, 'innerText', { value: cell.textContent })
   const image = document.querySelector('.team-logo')
   Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 100 } })
-  const context = { measureText: text => ({ width: text.length * 8 }), scale: vi.fn(), fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), drawImage: vi.fn() }
+  const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
+  const table = document.querySelector('table')
+  table.getBoundingClientRect = () => box(0, 0, 160, 80)
+  Object.defineProperty(table, 'scrollWidth', { value: 160 })
+  for (const [rowIndex, row] of [...table.rows].entries()) {
+    for (const [cellIndex, cell] of [...row.cells].entries()) cell.getBoundingClientRect = () => box(cellIndex * 80, rowIndex * 40, 80, 40)
+  }
+  image.getBoundingClientRect = () => box(90, 48, 15, 15)
+  const context = {
+    measureText: text => ({ width: text.length * 8 }), scale: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(), drawImage: vi.fn(),
+    beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), save: vi.fn(), restore: vi.fn(), setLineDash: vi.fn(), arc: vi.fn(), fill: vi.fn(), strokeRect: vi.fn(),
+  }
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
   const blob = new Blob(['png'], { type: 'image/png' })
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(blob))
-  expect(await tableToPngBlob(document.querySelector('table'), 'Week 1')).toBe(blob)
+  expect(await tableToPngBlob(table, 'Week 1')).toBe(blob)
   const lines = context.fillText.mock.calls.map(call => call[0])
-  expect(lines).toContain('Very long player name')
+  expect(lines.join(' ')).toContain('Very long player name')
   expect(lines).toContain('?')
   expect(lines).not.toContain('PHI')
   expect(lines).toContain('7')
-  expect(context.drawImage).toHaveBeenCalledWith(image, expect.any(Number), expect.any(Number), 26, 26)
+  expect(context.drawImage).toHaveBeenCalledWith(image, expect.any(Number), expect.any(Number), 15, 15)
 })
 
-it('reports an unavailable canvas', async () => {
+it('reports a missing table or unavailable canvas', async () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
-  await expect(tableToPngBlob(null, 'Week 1')).rejects.toThrow('Canvas is unavailable')
+  await expect(tableToPngBlob(null, 'Week 1')).rejects.toThrow('Table is unavailable')
+  document.body.innerHTML = '<table></table>'
+  await expect(tableToPngBlob(document.querySelector('table'), 'Week 1')).rejects.toThrow('Canvas is unavailable')
 })
 
 it('shares a PNG file when file sharing is supported', async () => {

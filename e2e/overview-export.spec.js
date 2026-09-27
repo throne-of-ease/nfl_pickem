@@ -39,7 +39,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/?scenario=scheduled&pool=week-01')
   await page.getByLabel('Include model picks', { exact: true }).check()
-  // Record the actual canvas text: complete names, all rows and no unrevealed picks.
+  // Record the visible canvas content to check names, rows and logos.
   await page.evaluate(() => {
     window.exportText = []
     window.exportImageCount = 0
@@ -60,17 +60,67 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
   expect(png.readUInt32BE(16)).toBeGreaterThan(600)
   const text = await page.evaluate(() => window.exportText)
-  for (const name of [...names, 'Moneyline', 'DAL@PHI', 'CIN@CLE']) expect(text).toContain(name)
-  expect(text.filter(value => value === '–')).toHaveLength(16)
-  expect(await page.evaluate(() => window.exportImageCount)).toBeGreaterThan(0)
+  expect(text[0]).toContain('NFL Pick’em 2026')
+  expect(text).toContain('GAME')
+  expect(text).toContain('SCORE ▲')
+  expect(text).toContain('GQ')
+  expect(text).toContain('DEV')
+  for (const name of names) expect(text).toContain(name.toUpperCase())
+  expect(text).toContain('MONEYLINE')
+  expect(text.some(value => value.startsWith('DAL@'))).toBe(true)
+  expect(text.some(value => value.startsWith('CIN@'))).toBe(true)
+  expect(text.filter(value => value === '–').length).toBeGreaterThanOrEqual(16)
+  expect(await page.evaluate(() => window.exportImageCount)).toBe(await page.locator('.overview-table img').count())
   await expect(page.getByRole('button', { name: 'Share table as PNG' })).toBeEnabled()
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true })
-    Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.shared = { name: files[0].name, type: files[0].type, size: files[0].size } } })
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.shared = { name: files[0].name, type: files[0].type, size: files[0].size, file: files[0] } } })
   })
   await page.getByRole('button', { name: 'Share table as PNG' }).click()
   await expect.poll(() => page.evaluate(() => window.shared?.type), { timeout: 15000 }).toBe('image/png')
   expect(await page.evaluate(() => window.shared.size)).toBeGreaterThan(1000)
+  const darkPixels = await page.evaluate(async () => {
+    const bitmap = await createImageBitmap(window.shared.file)
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')
+    const table = document.querySelector('.overview-table')
+    const tableRect = table.getBoundingClientRect()
+    const headerRect = table.tHead.rows[0].cells[0].getBoundingClientRect()
+    const sample = (x, y) => {
+      context.clearRect(0, 0, 1, 1)
+      context.drawImage(bitmap, x, y, 1, 1, 0, 0, 1, 1)
+      return [...context.getImageData(0, 0, 1, 1).data]
+    }
+    return {
+      page: sample(4, 4),
+      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((48 + headerRect.top - tableRect.top + 5) * 2)),
+    }
+  })
+  expect(darkPixels).toEqual({ page: [11, 17, 24, 255], tableHeader: [23, 34, 49, 255] })
+  await page.getByRole('button', { name: 'Switch to light mode' }).click()
+  await page.evaluate(() => { window.shared = null })
+  await page.getByRole('button', { name: 'Share table as PNG' }).click()
+  await expect.poll(() => page.evaluate(() => window.shared?.type), { timeout: 15000 }).toBe('image/png')
+  const lightPixels = await page.evaluate(async () => {
+    const bitmap = await createImageBitmap(window.shared.file)
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')
+    const table = document.querySelector('.overview-table')
+    const tableRect = table.getBoundingClientRect()
+    const headerRect = table.tHead.rows[0].cells[0].getBoundingClientRect()
+    const sample = (x, y) => {
+      context.clearRect(0, 0, 1, 1)
+      context.drawImage(bitmap, x, y, 1, 1, 0, 0, 1, 1)
+      return [...context.getImageData(0, 0, 1, 1).data]
+    }
+    return {
+      page: sample(4, 4),
+      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((48 + headerRect.top - tableRect.top + 5) * 2)),
+    }
+  })
+  expect(lightPixels).toEqual({ page: [255, 255, 255, 255], tableHeader: [233, 238, 244, 255] })
   await page.evaluate(() => Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }))
   const fallback = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Share table as PNG' }).click()
