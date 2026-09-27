@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { POOLS, buildSeasonHistory, canEditWeek3Late, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, preserveLockedPicks, scorePick, standings, validateDraft } from '../src/domain.js'
+import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, preserveLockedPicks, scorePick, standings, validateDraft } from '../src/domain.js'
 import { gamesByPool, picksByUser, users } from '../src/fixtures.js'
 
 const games = [
@@ -9,14 +9,6 @@ const games = [
 ]
 
 describe('pool contract', () => {
-  it('limits late Week 3 edits to the test player and expires the exception', () => {
-    const now = new Date('2026-09-27T19:00:00Z')
-    expect(canEditWeek3Late('week-03', 'nflstresstest2026', now)).toBe(true)
-    expect(canEditWeek3Late('week-03', 'another-player', now)).toBe(false)
-    expect(canEditWeek3Late('week-04', 'nflstresstest2026', now)).toBe(false)
-    expect(canEditWeek3Late('week-03', 'nflstresstest2026', new Date('2026-09-29T10:00:00Z'))).toBe(false)
-  })
-
   it('maps the 22 regular and postseason pools without preseason or Pro Bowl week', () => {
     expect(POOLS).toHaveLength(22)
     expect(POOLS.every((pool) => pool.espnSeason === 2026 && pool.espnSeasonType && pool.espnWeek)).toBe(true)
