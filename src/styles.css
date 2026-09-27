@@ -141,7 +141,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .teams label:hover { border-color: var(--ink); }
 .teams label.selected { color: var(--ink); background: var(--accent-soft); border-color: var(--accent); }
 .teams input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); flex: 0 0 auto; }
-.team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+.team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; background: #fff; border-radius: 3px; }
 .team-logo.large { width: 30px; height: 30px; }
 .teams span:not(.at) { overflow: hidden; text-overflow: ellipsis; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
 .teams b { margin-left: .2rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
