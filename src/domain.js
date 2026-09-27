@@ -101,7 +101,7 @@ export function pickDeviation(game, picksByUser) {
 
 export const isLocked = (game, now = new Date(), acceptsLatePicks = false) => !acceptsLatePicks && (game.locked || new Date(game.kickoff) <= new Date(now))
 
-export function presetConfidencePicks(games, existing = []) {
+export function presetConfidencePicks(games, existing = [], now = new Date(), acceptsLatePicks = false) {
   const old = new Map(existing.map((pick) => [pick.gameId, pick]))
   const used = new Set()
   const preserved = new Map()
@@ -120,11 +120,22 @@ export function presetConfidencePicks(games, existing = []) {
   })
   const available = Array.from({ length: games.length }, (_, index) => index + 1).filter((value) => !used.has(value))
   const assigned = new Map(preserved)
-  for (const game of defaultOrder) if (!assigned.has(game.id)) assigned.set(game.id, available.shift())
+  for (const game of defaultOrder) if (!assigned.has(game.id) && !isLocked(game, now, acceptsLatePicks)) assigned.set(game.id, available.shift())
   return games.map((game) => {
     const previous = old.get(game.id)
     const team = previous && (previous.team === game.home || previous.team === game.away) ? previous.team : null
-    return { gameId: game.id, team, confidence: assigned.get(game.id) }
+    return { gameId: game.id, team, confidence: assigned.get(game.id) ?? null }
+  })
+}
+
+export function preserveLockedPicks(games, picks, saved, now = new Date(), acceptsLatePicks = false) {
+  const savedByGame = new Map(saved.map((pick) => [pick.gameId, pick]))
+  const gamesById = new Map(games.map((game) => [game.id, game]))
+  return picks.map((pick) => {
+    const game = gamesById.get(pick.gameId)
+    if (!game || !isLocked(game, now, acceptsLatePicks)) return pick
+    const previous = savedByGame.get(pick.gameId)
+    return { gameId: pick.gameId, team: previous?.team ?? null, confidence: previous?.confidence ?? null }
   })
 }
 

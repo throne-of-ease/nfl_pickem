@@ -97,6 +97,22 @@ describe('four-user application flow', () => {
     expect(screen.getAllByLabelText('No pick saved yet').every((item) => item.textContent === '–')).toBe(true)
   })
 
+  it('lets a player who missed the first game pick later games and distinguishes saved from missing picks', async () => {
+    localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({ users: [{ id: 'u1', name: 'Alex' }], picksByUser: { u1: { 'week-02': [] } } }))
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    const missed = document.querySelector('.game.live')
+    expect(within(missed).getByRole('combobox')).toHaveValue('')
+    const future = screen.getAllByTestId(/game-row-/).find((row) => row !== missed)
+    await userEvent.click(within(future).getAllByRole('radio')[0])
+    expect(screen.getByText('1 / 4 picked')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Overview' }))
+    expect(screen.getAllByLabelText('Pick saved; hidden until kickoff')).toHaveLength(1)
+    expect(screen.getAllByLabelText('No pick saved yet')).toHaveLength(2)
+    expect(screen.getAllByLabelText('No pick')).toHaveLength(1)
+  })
+
   it('shows tracker metrics by default, includes live clock detail, and sorts by GQ and Dev', async () => {
     const user = userEvent.setup()
     history.replaceState({}, '', '/?scenario=live&pool=week-02')

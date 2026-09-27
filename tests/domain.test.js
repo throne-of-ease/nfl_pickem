@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, scorePick, standings, validateDraft } from '../src/domain.js'
+import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, preserveLockedPicks, scorePick, standings, validateDraft } from '../src/domain.js'
 import { gamesByPool, picksByUser, users } from '../src/fixtures.js'
 
 const games = [
@@ -19,7 +19,7 @@ describe('pool contract', () => {
   })
 
   it('presets every confidence while preserving valid saved values', () => {
-    expect(presetConfidencePicks(games, [{ gameId: 'b', team: 'B', confidence: 3 }])).toEqual([
+    expect(presetConfidencePicks(games, [{ gameId: 'b', team: 'B', confidence: 3 }], new Date('2026-08-01'))).toEqual([
       { gameId: 'b', team: 'B', confidence: 3 },
       { gameId: 'a', team: null, confidence: 1 },
       { gameId: 'c', team: null, confidence: 2 },
@@ -27,7 +27,28 @@ describe('pool contract', () => {
   })
 
   it('assigns fresh confidence in AVG model order', () => {
-    expect(presetConfidencePicks(games).map((pick) => [pick.gameId, pick.confidence])).toEqual([['b', 1], ['a', 2], ['c', 3]])
+    expect(presetConfidencePicks(games, [], new Date('2026-08-01')).map((pick) => [pick.gameId, pick.confidence])).toEqual([['b', 1], ['a', 2], ['c', 3]])
+  })
+
+  it('leaves missed locked games unranked and preserves saved locked ranks', () => {
+    const now = new Date('2026-09-01T13:00:00Z')
+    const draft = presetConfidencePicks(games, [], now)
+    expect(draft).toEqual([
+      { gameId: 'b', team: null, confidence: null },
+      { gameId: 'a', team: null, confidence: null },
+      { gameId: 'c', team: null, confidence: 1 },
+    ])
+    expect(presetConfidencePicks(games, [{ gameId: 'b', team: null, confidence: 3 }], now)[0]).toEqual({ gameId: 'b', team: null, confidence: 3 })
+    expect(preserveLockedPicks(games, [{ gameId: 'b', team: null, confidence: 2 }, { gameId: 'c', team: 'C', confidence: 1 }], [], now)).toEqual([
+      { gameId: 'b', team: null, confidence: null },
+      { gameId: 'c', team: 'C', confidence: 1 },
+    ])
+  })
+
+  it('removes an unsaved pre-kickoff pick if the save runs after kickoff', () => {
+    const draft = [{ gameId: 'b', team: 'B', confidence: 2 }, { gameId: 'c', team: 'C', confidence: 1 }]
+    expect(preserveLockedPicks(games, draft, [], new Date('2026-09-01T13:00:00Z'))[0]).toEqual({ gameId: 'b', team: null, confidence: null })
+    expect(preserveLockedPicks(games, draft, [{ gameId: 'b', team: 'B', confidence: 2 }], new Date('2026-09-01T13:00:00Z'))[0]).toEqual(draft[0])
   })
 
 })

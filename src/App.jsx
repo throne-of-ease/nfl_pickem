@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, validateDraft } from "./domain.js";
+import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
@@ -340,6 +340,7 @@ export default function App() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const refreshActive = useRef(false);
   const draftRevisions = useRef({});
+  const savedPicks = useRef({});
   const saveQueue = useRef(Promise.resolve());
   const pool = POOLS.find((item) => item.key === poolKey);
   const baseGames = loadedGamesByPool[poolKey] ?? [];
@@ -541,6 +542,7 @@ export default function App() {
           if (controller.signal.aborted) return;
           initialLoadKey.current = loadKey;
           draftRevisions.current[poolKey] = result.draftRevision;
+          savedPicks.current[poolKey] = result.ownPicks;
           setAppUsers(result.users);
           setViewerName(result.viewer?.name ?? "");
           setProfileDraft(result.viewer?.name ?? "");
@@ -656,7 +658,7 @@ export default function App() {
       name,
     }));
     setAppUsers(players);
-    setPicks(Object.fromEntries(players.map((player) => [player.id, Object.fromEntries(Object.entries(loadedGamesByPool).map(([key, poolGames]) => [key, presetConfidencePicks(poolGames)]))])));
+    setPicks(Object.fromEntries(players.map((player) => [player.id, Object.fromEntries(Object.entries(loadedGamesByPool).map(([key, poolGames]) => [key, presetConfidencePicks(key === poolKey ? games : poolGames)]))])));
     setUserId(players[0].id);
     setShowSetup(false);
     setMessage("3 players registered · picks saved on this device");
@@ -679,11 +681,26 @@ export default function App() {
     if (isAdmin) recordPickBackup(backupAccountKey, poolKey, draft);
     if (useFixtures || !session?.access_token) return;
     const savingPool = poolKey;
+    const savingUser = userId;
+    const savingGames = games;
+    const acceptsLatePicks = pool.acceptsLatePicks;
     setMessage("Saving...");
     saveQueue.current = saveQueue.current
       .then(async () => {
-        const result = await savePicks(savingPool, session.access_token, draftRevisions.current[savingPool] ?? 0, draft);
+        const safeDraft = preserveLockedPicks(savingGames, draft, savedPicks.current[savingPool] ?? [], new Date(), acceptsLatePicks);
+        const result = await savePicks(savingPool, session.access_token, draftRevisions.current[savingPool] ?? 0, safeDraft);
         draftRevisions.current[savingPool] = result.draftRevision;
+        savedPicks.current[savingPool] = safeDraft;
+        const safeByGame = new Map(safeDraft.map((pick) => [pick.gameId, pick]));
+        const gameById = new Map(savingGames.map((game) => [game.id, game]));
+        setPicks((all) => {
+          const current = all[savingUser]?.[savingPool] ?? [];
+          const next = current.map((pick) => {
+            const game = gameById.get(pick.gameId);
+            return game && isLocked(game, new Date(), acceptsLatePicks) ? safeByGame.get(pick.gameId) ?? pick : pick;
+          });
+          return JSON.stringify(current) === JSON.stringify(next) ? all : { ...all, [savingUser]: { ...all[savingUser], [savingPool]: next } };
+        });
         setMessage("All changes saved");
       })
       .catch((error) => setMessage((error.code ?? "SAVE_FAILED").replaceAll("_", " ")));
@@ -691,7 +708,7 @@ export default function App() {
 
   const updatePick = (gameId, changes) => {
     setHighlightedGameId(null);
-    const oldDraft = userPicks;
+    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), pool.acceptsLatePicks);
     const changed = oldDraft.find((pick) => pick.gameId === gameId);
     const occupied = Number.isInteger(changes.confidence) ? oldDraft.find((pick) => pick.gameId !== gameId && pick.confidence === changes.confidence) : null;
     if (
@@ -724,11 +741,12 @@ export default function App() {
   };
 
   const applyModelPicks = (kind, label) => {
-    const nextDraft = modelAutopick(games, kind, userPicks, {
+    const oldDraft = useFixtures ? userPicks : preserveLockedPicks(games, userPicks, savedPicks.current[poolKey] ?? [], new Date(), pool.acceptsLatePicks);
+    const nextDraft = modelAutopick(games, kind, oldDraft, {
       acceptsLatePicks: pool.acceptsLatePicks,
     });
     const result = validateDraft(games, nextDraft, {
-      previous: userPicks,
+      previous: oldDraft,
       acceptsLatePicks: pool.acceptsLatePicks,
     });
     if (!result.ok) {
@@ -1209,6 +1227,7 @@ export default function App() {
                               }
                               disabled={locked}
                             >
+                              {pick?.confidence == null && <option value="">—</option>}
                               {games.map((_, i) => (
                                 <option key={i + 1} value={i + 1}>
                                   {i + 1}
