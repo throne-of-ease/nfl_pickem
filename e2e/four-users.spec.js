@@ -322,7 +322,7 @@ test('production registration starts a session without email confirmation', asyn
   expect(directEspnRequests.length).toBeGreaterThan(0)
 })
 
-test('Week 3 test player keeps saved locked picks and can still pick a future game', async ({ page }) => {
+test('Week 3 player keeps a saved pick and reserves an unpicked locked rank while saving later games', async ({ page }) => {
   const session = { access_token: 'test-access', refresh_token: 'test-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'test-user' } }
   const savedPick = { gameId: 'locked-game', team: 'PIT', confidence: 1 }
   const saves = []
@@ -332,16 +332,17 @@ test('Week 3 test player keeps saved locked picks and can still pick a future ga
   await page.route('**/rest/v1/rpc/get_season_data', (route) => route.fulfill({ json: {
     games: [
       { id: 'locked-game', pool_key: 'week-03', kickoff: '2026-09-26T17:00:00Z', away_team: 'PIT', home_team: 'BUF', status: 'final', away_score: 10, home_score: 14, gotw: false, locked_at: '2026-09-26T17:00:00Z' },
+      { id: 'missed-game', pool_key: 'week-03', kickoff: '2026-09-25T00:20:00Z', away_team: 'CHI', home_team: 'GB', status: 'final', away_score: 3, home_score: 7, gotw: false, locked_at: '2026-09-25T00:20:00Z' },
       { id: 'future-game', pool_key: 'week-03', kickoff: '2099-09-29T17:00:00Z', away_team: 'DAL', home_team: 'NYG', status: 'scheduled', away_score: 0, home_score: 0, gotw: false, locked_at: null },
     ],
     profiles: [{ id: 'test-user', name: 'Test player' }], revealedPicks: [{ userId: 'test-user', ...savedPick }],
     viewer: { id: 'test-user', name: 'Test player', username: 'nflstresstest2026', isAdmin: false }, asOf: '2026-09-27T00:00:00Z',
   } }))
-  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [savedPick] } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [savedPick, { gameId: 'missed-game', team: null, confidence: null }, { gameId: 'future-game', team: null, confidence: null }] } }))
   await page.route('**/rest/v1/rpc/replace_picks', (route) => {
     const body = JSON.parse(route.request().postData())
     saves.push(body)
-    return route.fulfill({ json: { draftRevision: 2, picks: body.p_picks } })
+    return route.fulfill({ json: { draftRevision: 1 + saves.length, picks: body.p_picks } })
   })
 
   await page.goto('/?pool=week-03')
@@ -351,11 +352,25 @@ test('Week 3 test player keeps saved locked picks and can still pick a future ga
   await expect(locked.getByRole('radio').first()).toBeDisabled()
   await expect(locked.getByRole('combobox')).toBeDisabled()
   await expect(locked.getByRole('radio').first()).toBeChecked()
+  const missed = page.getByTestId('game-row-missed-game')
+  await expect(missed).toHaveAttribute('aria-disabled', 'true')
+  await expect(missed.getByRole('radio').first()).not.toBeChecked()
+  await expect(missed.getByRole('combobox')).toBeDisabled()
+  await expect(missed.getByRole('combobox')).toHaveValue('2')
   const future = page.getByTestId('game-row-future-game')
+  await expect(future.getByRole('combobox')).toHaveValue('3')
   await future.getByRole('radio').first().check()
   await expect.poll(() => saves.length).toBe(1)
   expect(saves[0].p_picks).toContainEqual(savedPick)
-  expect(saves[0].p_picks).toContainEqual({ gameId: 'future-game', team: 'DAL', confidence: 2 })
+  expect(saves[0].p_picks).toContainEqual({ gameId: 'missed-game', team: null, confidence: 2 })
+  expect(saves[0].p_picks).toContainEqual({ gameId: 'future-game', team: 'DAL', confidence: 3 })
+  await future.getByRole('combobox').selectOption('2')
+  await expect(page.getByText('LOCKED VALUE CANNOT BE REUSED')).toBeVisible()
+  await expect(future.getByRole('combobox')).toHaveValue('3')
+  await future.getByRole('radio').last().check()
+  await expect.poll(() => saves.length).toBe(2)
+  expect(saves[1].p_picks).toContainEqual({ gameId: 'missed-game', team: null, confidence: 2 })
+  expect(saves[1].p_picks).toContainEqual({ gameId: 'future-game', team: 'NYG', confidence: 3 })
 })
 
 test('live refresh reads ESPN directly without repeating the Supabase season request', async ({ page }) => {

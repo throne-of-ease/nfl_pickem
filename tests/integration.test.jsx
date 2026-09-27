@@ -97,14 +97,17 @@ describe('four-user application flow', () => {
     expect(screen.getAllByLabelText('No pick saved yet').every((item) => item.textContent === '–')).toBe(true)
   })
 
-  it('lets a player who missed the first game pick later games and distinguishes saved from missing picks', async () => {
+  it('reserves the missed locked game rank while allowing later picks', async () => {
     localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({ users: [{ id: 'u1', name: 'Alex' }], picksByUser: { u1: { 'week-02': [] } } }))
     history.replaceState({}, '', '/?scenario=live&pool=week-02')
     render(<App />)
     await userEvent.click(screen.getByRole('button', { name: 'My picks' }))
     const missed = document.querySelector('.game.live')
-    expect(within(missed).getByRole('combobox')).toHaveValue('')
+    const missedRank = within(missed).getByRole('combobox').value
+    expect(missedRank).not.toBe('')
+    expect(within(missed).getByRole('combobox')).toBeDisabled()
     const future = screen.getAllByTestId(/game-row-/).find((row) => row !== missed)
+    expect(within(future).getByRole('combobox').value).not.toBe(missedRank)
     await userEvent.click(within(future).getAllByRole('radio')[0])
     expect(screen.getByText('1 / 4 picked')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Overview' }))

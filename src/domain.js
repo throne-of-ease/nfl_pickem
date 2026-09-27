@@ -101,7 +101,7 @@ export function pickDeviation(game, picksByUser) {
 
 export const isLocked = (game, now = new Date(), acceptsLatePicks = false) => !acceptsLatePicks && (game.locked || new Date(game.kickoff) <= new Date(now))
 
-export function presetConfidencePicks(games, existing = [], now = new Date(), acceptsLatePicks = false) {
+export function presetConfidencePicks(games, existing = []) {
   const old = new Map(existing.map((pick) => [pick.gameId, pick]))
   const used = new Set()
   const preserved = new Map()
@@ -120,7 +120,7 @@ export function presetConfidencePicks(games, existing = [], now = new Date(), ac
   })
   const available = Array.from({ length: games.length }, (_, index) => index + 1).filter((value) => !used.has(value))
   const assigned = new Map(preserved)
-  for (const game of defaultOrder) if (!assigned.has(game.id) && !isLocked(game, now, acceptsLatePicks)) assigned.set(game.id, available.shift())
+  for (const game of defaultOrder) if (!assigned.has(game.id)) assigned.set(game.id, available.shift())
   return games.map((game) => {
     const previous = old.get(game.id)
     const team = previous && (previous.team === game.home || previous.team === game.away) ? previous.team : null
@@ -135,7 +135,7 @@ export function preserveLockedPicks(games, picks, saved, now = new Date(), accep
     const game = gamesById.get(pick.gameId)
     if (!game || !isLocked(game, now, acceptsLatePicks)) return pick
     const previous = savedByGame.get(pick.gameId)
-    return { gameId: pick.gameId, team: previous?.team ?? null, confidence: previous?.confidence ?? null }
+    return { gameId: pick.gameId, team: previous?.team ?? null, confidence: previous?.confidence ?? (previous?.team ? null : pick.confidence) }
   })
 }
 
@@ -150,7 +150,15 @@ export function validateDraft(games, picks, { complete = false, previous = [], n
   const values = picks.flatMap((pick) => Number.isInteger(pick.confidence) ? [pick.confidence] : [])
   if (new Set(values).size !== values.length || values.some((value) => value < 1 || value > games.length) || (complete && values.length !== games.length)) return { code: 'INVALID_CONFIDENCE_SET' }
   const old = new Map(previous.map((pick) => [pick.gameId, pick]))
-  if (games.some((game) => isLocked(game, now, acceptsLatePicks) && JSON.stringify(old.get(game.id) ?? null) !== JSON.stringify(picks.find((pick) => pick.gameId === game.id) ?? null))) return { code: 'LOCKED_GAME_CHANGED' }
+  if (games.some((game) => {
+    if (!isLocked(game, now, acceptsLatePicks)) return false
+    const before = old.get(game.id)
+    const after = picks.find((pick) => pick.gameId === game.id)
+    const sameTeam = (before?.team ?? null) === (after?.team ?? null)
+    const sameRank = (before?.confidence ?? null) === (after?.confidence ?? null)
+    const firstUnpickedRank = before?.team == null && before?.confidence == null && after?.team == null && Number.isInteger(after?.confidence)
+    return !((sameTeam && sameRank) || firstUnpickedRank)
+  })) return { code: 'LOCKED_GAME_CHANGED' }
   return { ok: true }
 }
 
