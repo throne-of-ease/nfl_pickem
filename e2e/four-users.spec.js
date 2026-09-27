@@ -164,7 +164,9 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(rankBox.y).toBeLessThan(probabilityBox.y)
 
   await page.getByRole('button', { name: 'Charts' }).click()
-  for (const heading of ['Total points', 'GOTW points', 'Without GOTW', 'Correct', 'Incorrect']) await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
+  for (const heading of ['Total points', 'Vs leader', 'Correct', 'Incorrect']) await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'GOTW points', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('columnheader', { name: 'Without GOTW', exact: true })).toHaveCount(0)
   await expect(page.getByRole('columnheader', { name: 'Points', exact: true })).toHaveCount(0)
   await expect(page.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
 

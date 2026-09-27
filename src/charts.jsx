@@ -12,9 +12,9 @@ export function toDisplay(value, mode, maximum = 1, leader = 0) {
 export const weeklyChartSeries = (history, mode) => history.users.map((user) => ({
   name: user.name,
   values: user.weekly.map((value, index) => mode === 'points_percentage'
-    ? (user.possible[index] ? value / user.possible[index] * 100 : 0)
+    ? (user.lockedPossible[index] ? value / user.lockedPossible[index] * 100 : 0)
     : mode === 'correct_percentage'
-      ? (user.gameCounts[index] ? user.correct[index] / user.gameCounts[index] * 100 : 0)
+      ? (user.lockedGameCounts[index] ? user.correct[index] / user.lockedGameCounts[index] * 100 : 0)
       : value),
 }))
 
@@ -30,7 +30,7 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
   value: mode === 'points_percentage'
     ? (user.gotwPossible ? user.gotw / user.gotwPossible * 100 : 0)
     : mode === 'correct_percentage'
-      ? (user.gotwPlayed ? user.gotwCorrect / user.gotwPlayed * 100 : 0)
+      ? (user.gotwLockedCount ? user.gotwCorrect / user.gotwLockedCount * 100 : 0)
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
@@ -70,8 +70,8 @@ export function currentWeekChartData(current, mode) {
   const seasonLeader = current.reduce((best, item) => !best || item.seasonTotal > best.seasonTotal ? item : best, null)
   const baseline = mode === 'vs_leader' ? weeklyLeader : mode === 'vs_total_leader' ? seasonLeader : null
   return current.map((item, colorIndex) => {
-    if (mode === 'points_percentage') return { name: item.name, colorIndex, value: item.maximum ? item.points / item.maximum * 100 : 0 }
-    if (mode === 'correct_percentage') return { name: item.name, colorIndex, value: item.gameCount ? item.correct / item.gameCount * 100 : 0 }
+    if (mode === 'points_percentage') return { name: item.name, colorIndex, value: item.lockedMaximum ? item.points / item.lockedMaximum * 100 : 0 }
+    if (mode === 'correct_percentage') return { name: item.name, colorIndex, value: item.lockedGameCount ? item.correct / item.lockedGameCount * 100 : 0 }
     if (baseline) return { name: item.name, colorIndex, value: item.points - baseline.points, potential: item.points + item.potential - baseline.points - baseline.potential }
     return { name: item.name, colorIndex, value: item.points, potential: item.points + item.potential }
   }).sort((a, b) => mode === 'vs_total_leader' && a.name === seasonLeader?.name ? -1 : mode === 'vs_total_leader' && b.name === seasonLeader?.name ? 1 : b.value - a.value || a.name.localeCompare(b.name))

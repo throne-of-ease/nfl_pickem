@@ -192,7 +192,10 @@ export function remainingPotential(games, picks, scores) {
 export function poolMetrics(users, games, picksByUser, provisional = false) {
   return users.map((user) => {
     const picks = picksByUser[user.id] ?? []
+    const rankedPicks = new Map(presetConfidencePicks(games, picks).map((pick) => [pick.gameId, pick]))
+    const lockedGames = games.filter((game) => game.status !== 'scheduled' || isLocked(game))
     const scores = games.map((game) => scorePick(picks.find((pick) => pick.gameId === game.id), game, provisional))
+    const lockedMaximum = lockedGames.reduce((sum, game) => sum + (rankedPicks.get(game.id)?.confidence ?? 0) + (game.gotw ? 5 : 0), 0)
     return {
       ...user,
       points: scores.reduce((sum, score) => sum + score.points, 0),
@@ -202,6 +205,8 @@ export function poolMetrics(users, games, picksByUser, provisional = false) {
       played: scores.filter((score) => score.scored).length,
       picksMade: picks.filter((pick) => pick.team).length,
       maximum: games.length * (games.length + 1) / 2 + games.filter((game) => game.gotw).length * 5,
+      lockedGameCount: lockedGames.length,
+      lockedMaximum,
       scores,
     }
   })
@@ -221,17 +226,25 @@ export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional 
   const rows = Object.fromEntries(users.map((user) => [user.id, includedPools.map((pool) => {
     const games = gamesByPool[pool.key]
     const picks = picksByUser[user.id]?.[pool.key] ?? []
+    const rankedPicks = new Map(presetConfidencePicks(games, picks).map((pick) => [pick.gameId, pick]))
+    const lockedGames = games.filter((game) => game.status !== 'scheduled' || isLocked(game))
     const scores = games.map((game) => scorePick(picks.find((pick) => pick.gameId === game.id), game, provisional))
+    const lockedPossible = lockedGames.reduce((sum, game) => sum + (rankedPicks.get(game.id)?.confidence ?? 0) + (game.gotw ? 5 : 0), 0)
+    const gotwGames = lockedGames.filter((game) => game.gotw)
     return {
       points: scores.reduce((sum, score) => sum + score.points, 0),
       correct: scores.filter((score) => score.correct).length,
       played: scores.filter((score) => score.scored).length,
       picksMade: picks.filter((pick) => pick.team).length,
       possible: games.length * (games.length + 1) / 2 + games.filter((game) => game.gotw).length * 5,
+      lockedGameCount: lockedGames.length,
+      lockedPossible,
       remaining: remainingPotential(games, picks, scores),
       lost: scores.reduce((sum, score) => sum + (score.scored && !score.correct ? score.stake : 0), 0),
       games: games.length,
       gotw: games.flatMap((game, index) => game.gotw ? [scores[index]] : []),
+      gotwPossible: gotwGames.reduce((sum, game) => sum + (rankedPicks.get(game.id)?.confidence ?? 0) + 5, 0),
+      gotwLockedCount: gotwGames.length,
     }
   })]))
 
@@ -253,6 +266,8 @@ export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional 
         played: userRows.map((row) => row.played),
         picksMade: userRows.map((row) => row.picksMade),
         possible: userRows.map((row) => row.possible),
+        lockedPossible: userRows.map((row) => row.lockedPossible),
+        lockedGameCounts: userRows.map((row) => row.lockedGameCount),
         remaining: userRows.map((row) => row.remaining),
         lost: userRows.map((row) => row.lost),
         gameCounts: userRows.map((row) => row.games),
@@ -260,9 +275,10 @@ export function buildSeasonHistory(users, gamesByPool, picksByUser, provisional 
         relative: cumulative[user.id].map((value, index) => value - leaders[index]),
         relativePotential: cumulative[user.id].map((value, index) => value + userRows[index].remaining - potentialLeaders[index]),
         gotw: gotwScores.reduce((sum, score) => sum + score.points, 0),
-        gotwPossible: gotwScores.reduce((sum, score) => sum + (score.scored ? score.stake : 0), 0),
+        gotwPossible: userRows.reduce((sum, row) => sum + row.gotwPossible, 0),
         gotwCorrect: gotwScores.filter((score) => score.correct).length,
         gotwPlayed: gotwScores.filter((score) => score.scored).length,
+        gotwLockedCount: userRows.reduce((sum, row) => sum + row.gotwLockedCount, 0),
       }
     }),
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { buildSeasonHistory } from '../src/domain.js'
 
 const history = {
   weeks: ['W1', 'W2'],
@@ -9,20 +10,49 @@ const history = {
     correct: [1, 2],
     possible: [20, 25],
     gameCounts: [4, 4],
+    lockedPossible: [10, 20],
+    lockedGameCounts: [2, 4],
     relative: [-3, 0],
     relativePotential: [-1, 0],
     gotw: 6,
     gotwPossible: 10,
     gotwCorrect: 1,
     gotwPlayed: 2,
+    gotwLockedCount: 1,
     gotwPotential: 11,
   }],
 }
 
 describe('tracker-compatible chart transformations', () => {
-  it('uses full weekly game count for correct-pick percentage', () => {
-    expect(weeklyChartSeries(history, 'correct_percentage')[0].values).toEqual([25, 50])
-    expect(weeklyChartSeries(history, 'points_percentage')[0].values).toEqual([25, 40])
+  it('uses only finished or locked games in weekly percentage denominators', () => {
+    expect(weeklyChartSeries(history, 'correct_percentage')[0].values).toEqual([50, 50])
+    expect(weeklyChartSeries(history, 'points_percentage')[0].values).toEqual([50, 50])
+  })
+
+  it('excludes a picked future GOTW from weekly and GOTW percentage denominators', () => {
+    const games = [
+      { id: 'finished', away: 'A1', home: 'H1', kickoff: '2026-01-01T00:00:00Z', status: 'final', awayScore: 14, homeScore: 21, gotw: true },
+      { id: 'locked', away: 'A2', home: 'H2', kickoff: '2099-01-01T00:00:00Z', status: 'scheduled', locked: true },
+      { id: 'future', away: 'A3', home: 'H3', kickoff: '2099-01-02T00:00:00Z', status: 'scheduled', gotw: true },
+    ]
+    const built = buildSeasonHistory(
+      [{ id: 'alex', name: 'Alex' }],
+      { 'week-01': games },
+      { alex: { 'week-01': [
+        { gameId: 'finished', team: 'H1', confidence: 1 },
+        { gameId: 'locked', team: 'A2', confidence: 2 },
+        { gameId: 'future', team: 'H3', confidence: 3 },
+      ] } },
+      false,
+      'week-01',
+    )
+
+    expect(built.users[0].lockedGameCounts).toEqual([2])
+    expect(built.users[0].lockedPossible).toEqual([8])
+    expect(weeklyChartSeries(built, 'correct_percentage')[0].values).toEqual([50])
+    expect(weeklyChartSeries(built, 'points_percentage')[0].values).toEqual([75])
+    expect(gotwChartData(built, 'points_percentage')[0].value).toBe(100)
+    expect(gotwChartData(built, 'correct_percentage')[0].value).toBe(100)
   })
 
   it('plots cumulative gaps to the leader with a separate potential line', () => {
@@ -37,19 +67,20 @@ describe('tracker-compatible chart transformations', () => {
     expect(COLORS[3]).toBe('#b795ff')
   })
 
-  it('uses all played GOTW stakes as the points-percentage denominator', () => {
+  it('uses only finished or locked GOTW games in percentage denominators', () => {
     expect(gotwChartData(history, 'points_percentage')[0].value).toBe(60)
-    expect(gotwChartData(history, 'correct_percentage')[0].value).toBe(50)
+    expect(gotwChartData(history, 'correct_percentage')[0].value).toBe(100)
   })
 
   it('compares current-week results with weekly and season leaders correctly', () => {
     const current = [
-      { name: 'Alex', points: 5, potential: 2, correct: 1, gameCount: 4, maximum: 15, seasonTotal: 100 },
-      { name: 'Blair', points: 10, potential: 1, correct: 2, gameCount: 4, maximum: 15, seasonTotal: 90 },
+      { name: 'Alex', points: 5, potential: 2, correct: 1, gameCount: 4, lockedGameCount: 2, maximum: 15, lockedMaximum: 10, seasonTotal: 100 },
+      { name: 'Blair', points: 10, potential: 1, correct: 2, gameCount: 4, lockedGameCount: 4, maximum: 15, lockedMaximum: 20, seasonTotal: 90 },
     ]
     const correctPercentage = currentWeekChartData(current, 'correct_percentage').find((item) => item.name === 'Alex')
-    expect(correctPercentage).toMatchObject({ value: 25 })
+    expect(correctPercentage).toMatchObject({ value: 50 })
     expect(correctPercentage).not.toHaveProperty('potential')
+    expect(currentWeekChartData(current, 'points_percentage').find((item) => item.name === 'Alex')).toMatchObject({ value: 50 })
     expect(currentWeekChartData(current, 'vs_leader').find((item) => item.name === 'Alex')).toMatchObject({ value: -5, potential: -4 })
     expect(currentWeekChartData(current, 'vs_total_leader')).toEqual([
       { name: 'Alex', colorIndex: 0, value: 0, potential: 0 },

@@ -65,30 +65,32 @@ function StandingsTable({ players, history, provisional, onProvisional, includeM
   const rows = players.map((player) => {
     const season = seasonByPlayer.get(player.id);
     const totalPoints = season?.cumulative?.at(-1) ?? 0;
-    const gotwPoints = season?.gotw ?? 0;
     const correct = season?.correct?.reduce((sum, value) => sum + value, 0) ?? 0;
     const played = season?.played?.reduce((sum, value) => sum + value, 0) ?? 0;
-    const maximum = season?.possible?.reduce((sum, value) => sum + value, 0) ?? 0;
+    const lockedGames = season?.lockedGameCounts?.reduce((sum, value) => sum + value, 0) ?? 0;
+    const lockedMaximum = season?.lockedPossible?.reduce((sum, value) => sum + value, 0) ?? 0;
     return {
       player,
       totalPoints,
-      gotwPoints,
-      withoutGotw: totalPoints - gotwPoints,
+      leaderDifference: 0,
       correct,
       incorrect: played - correct,
-      pickPercentage: played ? (correct / played) * 100 : null,
-      pointPercentage: maximum ? (totalPoints / maximum) * 100 : null,
+      pickPercentage: lockedGames ? (correct / lockedGames) * 100 : null,
+      pointPercentage: lockedMaximum ? (totalPoints / lockedMaximum) * 100 : null,
       gamesPicked: season?.picksMade?.reduce((sum, value) => sum + value, 0) ?? 0,
       potentialTotal: totalPoints + (season?.remaining?.at(-1) ?? 0),
     };
-  }).sort((a, b) => b.totalPoints - a.totalPoints || b.potentialTotal - a.potentialTotal || a.player.name.localeCompare(b.player.name))
+  });
+  const leaderPoints = Math.max(0, ...rows.map((row) => row.totalPoints));
+  rows.forEach((row) => { row.leaderDifference = row.totalPoints - leaderPoints; });
+  rows.sort((a, b) => b.totalPoints - a.totalPoints || b.potentialTotal - a.potentialTotal || a.player.name.localeCompare(b.player.name));
+  const rankedRows = rows
     .map((row, index) => ({ ...row, rank: index + 1 }));
   const columns = [
     ["rank", "Rank"],
     ["name", "Player"],
     ["totalPoints", "Total points"],
-    ["gotwPoints", "GOTW points"],
-    ["withoutGotw", "Without GOTW"],
+    ["leaderDifference", "Vs leader"],
     ["pickPercentage", "Pick %"],
     ["pointPercentage", "Point %"],
     ["gamesPicked", "Games picked"],
@@ -102,7 +104,7 @@ function StandingsTable({ players, history, provisional, onProvisional, includeM
     }));
   const sortIndicator = (key) => (sort.key === key ? (sort.direction === "ascending" ? " ▲" : " ▼") : "");
   const sortOrder = (key) => (sort.key === key ? sort.direction : "none");
-  const sortedRows = [...rows].sort((a, b) => {
+  const sortedRows = [...rankedRows].sort((a, b) => {
     const aValue = sort.key === "name" ? a.player.name.toLocaleLowerCase() : a[sort.key];
     const bValue = sort.key === "name" ? b.player.name.toLocaleLowerCase() : b[sort.key];
     if (aValue == null && bValue != null) return 1;
@@ -143,15 +145,14 @@ function StandingsTable({ players, history, provisional, onProvisional, includeM
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map(({ player, rank, totalPoints, gotwPoints, withoutGotw, pickPercentage, pointPercentage, gamesPicked, correct, incorrect }) => (
+            {sortedRows.map(({ player, rank, totalPoints, leaderDifference, pickPercentage, pointPercentage, gamesPicked, correct, incorrect }) => (
               <tr key={player.id}>
                 <th scope="row">{rank}</th>
                 <td>
                   <strong>{player.name}</strong>
                 </td>
                 <td data-testid={`total-points-${player.id}`}>{totalPoints}</td>
-                <td data-testid={`gotw-points-${player.id}`}>{gotwPoints}</td>
-                <td data-testid={`without-gotw-${player.id}`}>{withoutGotw}</td>
+                <td data-testid={`leader-difference-${player.id}`}>{leaderDifference}</td>
                 <td>{pickPercentage == null ? "—" : `${pickPercentage.toFixed(1)}%`}</td>
                 <td>{pointPercentage == null ? "—" : `${pointPercentage.toFixed(1)}%`}</td>
                 <td data-testid={`games-picked-${player.id}`}>{gamesPicked}</td>
@@ -399,7 +400,7 @@ export default function App() {
   const chartHistory = buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, provisional);
   const overviewModelHistory = buildSeasonHistory(MODEL_DEFINITIONS, chartGamesByPool, modelPicksByUser, provisional);
   const seasonTotals = new Map(chartHistory.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]));
-  const current = poolMetrics(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional).map(({ id, name, points, potential, correct, played, maximum }) => ({
+  const current = poolMetrics(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional).map(({ id, name, points, potential, correct, played, maximum, lockedMaximum, lockedGameCount }) => ({
     id,
     name,
     points,
@@ -407,6 +408,8 @@ export default function App() {
     correct,
     played,
     maximum,
+    lockedMaximum,
+    lockedGameCount,
     gameCount: games.length,
     seasonTotal: seasonTotals.get(id) ?? 0,
   }));
