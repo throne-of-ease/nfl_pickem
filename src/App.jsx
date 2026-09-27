@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ThemeToggle from "./ThemeToggle.jsx";
 import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, WeeklyPointsChart } from "./charts.jsx";
@@ -894,7 +895,7 @@ export default function App() {
         <p>Restoring your session...</p>
       </main>
     );
-  if (!useFixtures && !session) return <AuthPanel onSession={setSession} />;
+  if (!useFixtures && !session) return <><div className="auth-theme"><ThemeToggle /></div><AuthPanel onSession={setSession} /></>;
   if (!currentPoolReady)
     return (
       <main className="auth-shell">
@@ -936,10 +937,12 @@ export default function App() {
                 ))}
               </select>
             </label>
+            <ThemeToggle />
           </>
         ) : (
           <div className="signed-in">
             <span className="viewer-name">{viewerName || session.user.user_metadata?.display_name || session.user.user_metadata?.username || "Player"}</span>
+            <ThemeToggle />
             <button className="account-toggle" type="button" aria-label="Player options" aria-expanded={showAccountMenu} onClick={() => setShowAccountMenu((open) => !open)}>
               •••
             </button>

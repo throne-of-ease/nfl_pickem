@@ -79,7 +79,13 @@ export function currentWeekChartData(current, mode) {
 
 export function svgToPngBlob(svg) {
   return new Promise((resolve, reject) => {
-    const source = new XMLSerializer().serializeToString(svg)
+    const copy = svg.cloneNode(true)
+    const originals = [svg, ...svg.querySelectorAll('*')]
+    ;[copy, ...copy.querySelectorAll('*')].forEach((element, index) => {
+      const style = getComputedStyle(originals[index])
+      for (const property of ['fill', 'stroke', 'font-family', 'font-size', 'font-weight']) element.style.setProperty(property, style.getPropertyValue(property))
+    })
+    const source = new XMLSerializer().serializeToString(copy)
     const canvas = document.createElement('canvas')
     canvas.width = 1200
     canvas.height = 600
@@ -205,7 +211,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
     </g>)}
     {endLabels.map(({ item, seriesIndex, kind, value, targetX, targetY, labelY }) => <g key={`${item.name}-${kind}`} data-end-label={kind}>
       <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />
-      <text x={width - right + 12} y={labelY + 4} style={{ fill: COLORS[seriesIndex % COLORS.length] }}>{displayValue(value)}{kind === 'potential' ? ' P' : ''}</text>
+      <text x={width - right + 12} y={labelY + 4} style={{ fill: `var(--chart-color-${seriesIndex % COLORS.length}, ${COLORS[seriesIndex % COLORS.length]})` }}>{displayValue(value)}{kind === 'potential' ? ' P' : ''}</text>
     </g>)}
   </svg>
 }
