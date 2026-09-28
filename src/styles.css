@@ -271,6 +271,9 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .charts { display: grid; gap: .8rem; margin-top: .8rem; min-width: 0; }
 .chart-card, .rules { min-width: 0; max-width: 100%; padding: 1rem; background: var(--surface); border: 1px solid var(--line); }
 .relative-game-points { grid-column: 1 / -1; }
+.relative-game-points .table-scroll { overflow-x: hidden; }
+.relative-game-points table { table-layout: fixed; }
+.relative-game-points .chart-actions { flex-wrap: wrap; }
 .chart-heading p { margin: .25rem 0 .8rem; }
 .chart-actions { display: flex; align-items: end; gap: .45rem; }
 .chart-actions label { display: grid; gap: .2rem; color: var(--muted); font-size: .68rem; }
@@ -511,6 +514,21 @@ footer [data-testid="real-data-status"] { display: block; }
   .standings-table th:nth-child(4) { width: 10%; }
   .standings-table th:nth-child(5) { width: 12%; }
   .standings-table th:nth-child(n+6) { width: 9%; }
+  .relative-game-points { padding: .6rem .45rem; }
+  .relative-game-points .chart-heading p { font-size: .62rem; line-height: 1.25; }
+  .relative-game-points .chart-actions { gap: .25rem .35rem; }
+  .relative-game-points .chart-actions label { min-width: 0; font-size: .58rem; }
+  .relative-game-points .chart-actions select { max-width: 100%; padding-inline: .2rem; font-size: .62rem; }
+  .relative-game-points th, .relative-game-points td { padding: .18rem .08rem; white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.05; }
+  .relative-game-points th { font-size: .45rem; letter-spacing: 0; }
+  .relative-game-points td { font-size: .55rem; }
+  .relative-game-points th:nth-child(1) { width: 7%; }
+  .relative-game-points th:nth-child(2) { width: 11%; }
+  .relative-game-points th:nth-child(3) { width: 24%; }
+  .relative-game-points th:nth-child(4) { width: 17%; }
+  .relative-game-points th:nth-child(5) { width: 14%; }
+  .relative-game-points th:nth-child(6) { width: 11%; }
+  .relative-game-points th:nth-child(7) { width: 16%; }
   .pick-actions { gap: .25rem; }
   .pick-actions button { padding: .3rem .35rem; font-size: .6rem; }
   .pick-tools { align-items: flex-end; }

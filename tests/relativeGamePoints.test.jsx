@@ -43,3 +43,7 @@ it('defaults to the viewer and supports player, ranking, period, and week contro
   fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'bottom' } })
   expect(within(screen.getByRole('table')).getAllByRole('row')[1]).toHaveTextContent('-6.5')
 })
+it('renders difference before points and the other-player mean', () => {
+  render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  expect([...screen.getByRole('table').querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Rank', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
+})

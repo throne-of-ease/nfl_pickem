@@ -38,9 +38,9 @@ export function RelativeGamePointsTable({ players, gamesByPool, picksByUser, vie
     </div>
     {rows.length ? <div className="table-scroll"><table>
       <caption>{direction === 'top' ? 'Top' : 'Bottom'} 10 games by points difference</caption>
-      <thead><tr>{['Rank', 'Week', 'Game', 'Pick', 'Points', 'Others’ mean', 'Difference'].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+      <thead><tr>{['Rank', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
       <tbody>{rows.map((row, index) => <tr key={`${row.poolKey}-${row.game.id}`}>
-        <td>{index + 1}</td><td>{weekLabels[poolKeys.indexOf(row.poolKey)]}</td><td>{row.game.away} @ {row.game.home}{row.game.gotw ? ' (GOTW)' : ''}</td><td>{row.team || 'Not picked'}</td><td>{row.points}</td><td>{row.mean.toFixed(1)}</td><td>{row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}</td>
+        <td>{index + 1}</td><td>{weekLabels[poolKeys.indexOf(row.poolKey)]}</td><td>{row.game.away} @ {row.game.home}{row.game.gotw ? ' (GOTW)' : ''}</td><td>{row.team || 'Not picked'}</td><td>{row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}</td><td>{row.points}</td><td>{row.mean.toFixed(1)}</td>
       </tr>)}</tbody>
     </table></div> : <p>No completed games to compare. At least two players are required.</p>}
   </section>

@@ -170,6 +170,14 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   await expect(standings.getByRole('columnheader', { name: 'Without GOTW', exact: true })).toHaveCount(0)
   await expect(standings.getByRole('columnheader', { name: 'Points', exact: true })).toHaveCount(0)
   await expect(standings.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
+  const comparison = page.getByRole('table', { name: 'Top 10 games by points difference' })
+  await expect(comparison).toBeVisible()
+  await expect(comparison.locator('thead th')).toHaveText(['Rank', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
+  if (testInfo.project.name !== 'desktop') {
+    const layout = await comparison.evaluate((table) => ({ tableWidth: table.getBoundingClientRect().width, parentWidth: table.parentElement.clientWidth, contentWidth: table.parentElement.scrollWidth }))
+    expect(layout.contentWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
+    expect(layout.tableWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
+  }
 
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()
