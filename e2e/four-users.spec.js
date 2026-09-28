@@ -164,11 +164,12 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   expect(rankBox.y).toBeLessThan(probabilityBox.y)
 
   await page.getByRole('button', { name: 'Charts' }).click()
-  for (const heading of ['Total points', 'Vs leader', 'Correct', 'Incorrect']) await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
-  await expect(page.getByRole('columnheader', { name: 'GOTW points', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('columnheader', { name: 'Without GOTW', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('columnheader', { name: 'Points', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
+  const standings = page.getByRole('table', { name: 'Current standings' })
+  for (const heading of ['Total points', 'Vs leader', 'Correct', 'Incorrect']) await expect(standings.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
+  await expect(standings.getByRole('columnheader', { name: 'GOTW points', exact: true })).toHaveCount(0)
+  await expect(standings.getByRole('columnheader', { name: 'Without GOTW', exact: true })).toHaveCount(0)
+  await expect(standings.getByRole('columnheader', { name: 'Points', exact: true })).toHaveCount(0)
+  await expect(standings.getByRole('columnheader', { name: 'GOTW % of total' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()
