@@ -310,16 +310,22 @@ describe('four-user application flow', () => {
     expect(within(week).queryByRole('option', { name: /Preseason|Hall of Fame/i })).not.toBeInTheDocument()
   })
 
-  it('swaps occupied confidence values on unlocked games', async () => {
+  it('moves confidence ranks and shifts the intervening games', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
     fireEvent.change(screen.getByLabelText('Week'), { target: { value: 'week-02' } })
-    const selects = screen.getAllByLabelText(/confidence$/)
-    expect(selects[2]).toHaveValue('3')
-    expect(selects[3]).toHaveValue('4')
-    fireEvent.change(selects[2], { target: { value: '4' } })
-    expect(selects[2]).toHaveValue('4')
-    expect(selects[3]).toHaveValue('3')
+    const initialRows = screen.getAllByTestId(/game-row-/)
+    const rowsByRank = Object.fromEntries(initialRows.map((row) => [row.querySelector('select').value, row.dataset.testid]))
+    fireEvent.change(screen.getByTestId(rowsByRank['2']).querySelector('select'), { target: { value: '4' } })
+    expect(screen.getByTestId(rowsByRank['2']).querySelector('select')).toHaveValue('4')
+    expect(screen.getByTestId(rowsByRank['3']).querySelector('select')).toHaveValue('2')
+    expect(screen.getByTestId(rowsByRank['4']).querySelector('select')).toHaveValue('3')
+
+    fireEvent.change(screen.getByTestId(rowsByRank['2']).querySelector('select'), { target: { value: '2' } })
+    expect(screen.getByTestId(rowsByRank['2']).querySelector('select')).toHaveValue('2')
+    expect(screen.getByTestId(rowsByRank['1']).querySelector('select')).toHaveValue('1')
+    expect(screen.getByTestId(rowsByRank['3']).querySelector('select')).toHaveValue('3')
+    expect(screen.getByTestId(rowsByRank['4']).querySelector('select')).toHaveValue('4')
   })
 
   it('keeps the confidence control compact with a left drag handle and no rank label', () => {
@@ -352,9 +358,8 @@ describe('four-user application flow', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
     fireEvent.change(screen.getByLabelText('Week'), { target: { value: 'week-02' } })
-    const selects = screen.getAllByLabelText(/confidence$/)
     const rows = screen.getAllByTestId(/game-row-/)
-    const sourceId = rows[2].dataset.testid
+    const sourceId = rows[1].dataset.testid
     const targetId = rows[3].dataset.testid
     const target = rows[3]
     let draggedGameId = ''
@@ -365,16 +370,17 @@ describe('four-user application flow', () => {
       getData: () => draggedGameId,
     }
 
-    fireEvent.dragStart(rows[2], { dataTransfer })
+    fireEvent.dragStart(rows[1], { dataTransfer })
     fireEvent.dragOver(target, { dataTransfer })
     fireEvent.drop(target, { dataTransfer })
 
-    expect(selects[2]).toHaveValue('4')
-    expect(selects[3]).toHaveValue('3')
-    expect(screen.getAllByTestId(/game-row-/).map((row) => row.dataset.testid).slice(2, 4)).toEqual([targetId, sourceId])
+    expect(screen.getByTestId(sourceId).querySelector('select')).toHaveValue('4')
+    expect(screen.getByTestId(targetId).querySelector('select')).toHaveValue('3')
+    expect(screen.getAllByTestId(/game-row-/).map((row) => row.dataset.testid)).toEqual([rows[0].dataset.testid, rows[2].dataset.testid, targetId, sourceId])
     expect(screen.getByTestId(sourceId)).toHaveClass('moved')
     expect(screen.getByTestId(targetId)).not.toHaveClass('moved')
-    fireEvent.change(selects[0], { target: { value: selects[0].value === '1' ? '2' : '1' } })
+    const firstRank = screen.getByTestId(rows[0].dataset.testid).querySelector('select')
+    fireEvent.change(firstRank, { target: { value: firstRank.value === '1' ? '2' : '1' } })
     expect(screen.getByTestId(sourceId)).not.toHaveClass('moved')
   })
 

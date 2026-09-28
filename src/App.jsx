@@ -726,7 +726,16 @@ export default function App() {
       setMessage("LOCKED VALUE CANNOT BE REUSED");
       return false;
     }
-    const nextDraft = oldDraft.map((pick) => (pick.gameId === gameId ? { ...pick, ...changes } : occupied?.gameId === pick.gameId ? { ...pick, confidence: changed.confidence } : pick));
+    const movesRank = Number.isInteger(changed?.confidence) && Number.isInteger(changes.confidence);
+    const nextDraft = oldDraft.map((pick) => {
+      if (pick.gameId === gameId) return { ...pick, ...changes };
+      if (occupied?.gameId === pick.gameId && !movesRank) return { ...pick, confidence: changed?.confidence ?? null };
+      if (!movesRank || !Number.isInteger(pick.confidence)) return pick;
+      const shiftsEarlier = changed.confidence < changes.confidence && pick.confidence > changed.confidence && pick.confidence <= changes.confidence;
+      const shiftsLater = changed.confidence > changes.confidence && pick.confidence >= changes.confidence && pick.confidence < changed.confidence;
+      if (!shiftsEarlier && !shiftsLater) return pick;
+      return { ...pick, confidence: pick.confidence + (shiftsEarlier ? -1 : 1) };
+    });
     const result = validateDraft(games, nextDraft, {
       previous: oldDraft,
       acceptsLatePicks: pool.acceptsLatePicks,
@@ -768,16 +777,20 @@ export default function App() {
     persistDraft(nextDraft);
   };
 
-  const swapConfidence = (sourceGameId, targetGameId) => {
+  const moveConfidence = (sourceGameId, targetGameId) => {
     if (!sourceGameId || sourceGameId === targetGameId) return;
     const sourcePick = userPicks.find((pick) => pick.gameId === sourceGameId);
+    const targetPick = userPicks.find((pick) => pick.gameId === targetGameId);
     const sourceGame = games.find((game) => game.id === sourceGameId);
     const targetGame = games.find((game) => game.id === targetGameId);
     if (!Number.isInteger(sourcePick?.confidence) || isLocked(sourceGame, new Date(), pool.acceptsLatePicks) || isLocked(targetGame, new Date(), pool.acceptsLatePicks)) {
       setMessage("LOCKED VALUE CANNOT BE MOVED");
       return;
     }
-    if (updatePick(targetGameId, { confidence: sourcePick.confidence })) setHighlightedGameId(sourceGameId);
+    const moved = Number.isInteger(targetPick?.confidence)
+      ? updatePick(sourceGameId, { confidence: targetPick.confidence })
+      : updatePick(targetGameId, { confidence: sourcePick.confidence });
+    if (moved) setHighlightedGameId(sourceGameId);
   };
 
   useEffect(() => {
@@ -797,7 +810,7 @@ export default function App() {
       const active = pointerDrag.current;
       if (!active || active.pointerId !== event.pointerId) return;
       const target = rowAt(event.clientX, event.clientY, event.target);
-      if (active.sourceGameId && target?.dataset.testid) swapConfidence(active.sourceGameId, target.dataset.testid.replace("game-row-", ""));
+      if (active.sourceGameId && target?.dataset.testid) moveConfidence(active.sourceGameId, target.dataset.testid.replace("game-row-", ""));
       pointerDrag.current = null;
       setDraggedGameId(null);
       setDragOverGameId(null);
@@ -837,7 +850,7 @@ export default function App() {
       document.removeEventListener("pointerup", finishPointerDrag);
       document.removeEventListener("pointercancel", finishPointerDrag);
     };
-  }, [games, pool.acceptsLatePicks, swapConfidence, userId, userPicks]);
+  }, [games, pool.acceptsLatePicks, moveConfidence, userId, userPicks]);
 
   const submitPasswordChange = async (event) => {
     event.preventDefault();
@@ -1179,7 +1192,7 @@ export default function App() {
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
-                          swapConfidence(event.dataTransfer.getData("text/plain") || draggedGameId, game.id);
+                          moveConfidence(event.dataTransfer.getData("text/plain") || draggedGameId, game.id);
                           setDraggedGameId(null);
                           setDragOverGameId(null);
                         }}
