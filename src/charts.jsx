@@ -1,7 +1,50 @@
 import React, { useRef, useState } from 'react'
-import { isLocked, modelPicks } from './domain.js'
+import { isLocked, modelPicks, scorePick } from './domain.js'
 
 export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#b795ff']
+
+export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, poolKeys, direction = 'top') {
+  const others = players.filter((player) => player.id !== playerId)
+  if (!others.length || !players.some((player) => player.id === playerId)) return []
+  return poolKeys.flatMap((poolKey) => (gamesByPool[poolKey] ?? []).flatMap((game) => {
+    if (!['final', 'post'].includes(game.status) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)) return []
+    const pickFor = (id) => picksByUser[id]?.[poolKey]?.find((pick) => pick.gameId === game.id)
+    const pick = pickFor(playerId)
+    const points = scorePick(pick, game).points
+    const mean = others.reduce((sum, player) => sum + scorePick(pickFor(player.id), game).points, 0) / others.length
+    return [{ poolKey, game, team: pick?.team, points, mean, difference: points - mean }]
+  })).sort((a, b) => (direction === 'bottom' ? a.difference - b.difference : b.difference - a.difference)
+    || a.poolKey.localeCompare(b.poolKey) || String(a.game.id).localeCompare(String(b.game.id))).slice(0, 10)
+}
+
+export function RelativeGamePointsTable({ players, gamesByPool, picksByUser, viewerId, poolKeys, weekLabels, selectedPoolKey }) {
+  const [selectedPlayer, setSelectedPlayer] = useState(null)
+  const [direction, setDirection] = useState('top')
+  const [scope, setScope] = useState('week')
+  const [selectedWeek, setSelectedWeek] = useState(null)
+  const playerId = players.some((player) => player.id === selectedPlayer) ? selectedPlayer
+    : players.some((player) => player.id === viewerId) ? viewerId : players[0]?.id
+  const week = poolKeys.includes(selectedWeek) ? selectedWeek : poolKeys.includes(selectedPoolKey) ? selectedPoolKey : poolKeys.at(-1)
+  const rows = relativeGamePoints(players, gamesByPool, picksByUser, playerId, scope === 'season' ? poolKeys : [week], direction)
+  return <section className="chart-card relative-game-points" aria-labelledby="relative-game-points-title">
+    <div className="chart-heading">
+      <div><h3 id="relative-game-points-title">Game points vs other players</h3><p>Completed games only. Difference = player’s earned points − all other players’ mean for that game. Includes GOTW bonuses; losing and missed picks earn zero.</p></div>
+      <div className="chart-actions">
+        <label>Player <select aria-label="Game points player" value={playerId ?? ''} onChange={(event) => setSelectedPlayer(event.target.value)}>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
+        <label>Ranking <select aria-label="Game points ranking" value={direction} onChange={(event) => setDirection(event.target.value)}><option value="top">Top 10</option><option value="bottom">Bottom 10</option></select></label>
+        <label>Period <select aria-label="Game points period" value={scope} onChange={(event) => setScope(event.target.value)}><option value="week">By week</option><option value="season">Whole season</option></select></label>
+        {scope === 'week' && <label>Week <select aria-label="Game points week" value={week ?? ''} onChange={(event) => setSelectedWeek(event.target.value)}>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>}
+      </div>
+    </div>
+    {rows.length ? <div className="table-scroll"><table>
+      <caption>{direction === 'top' ? 'Top' : 'Bottom'} 10 games by points difference</caption>
+      <thead><tr>{['Rank', 'Week', 'Game', 'Pick', 'Points', 'Others’ mean', 'Difference'].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={`${row.poolKey}-${row.game.id}`}>
+        <td>{index + 1}</td><td>{weekLabels[poolKeys.indexOf(row.poolKey)]}</td><td>{row.game.away} @ {row.game.home}{row.game.gotw ? ' (GOTW)' : ''}</td><td>{row.team || 'Not picked'}</td><td>{row.points}</td><td>{row.mean.toFixed(1)}</td><td>{row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}</td>
+      </tr>)}</tbody>
+    </table></div> : <p>No completed games to compare. At least two players are required.</p>}
+  </section>
+}
 
 export function toDisplay(value, mode, maximum = 1, leader = 0) {
   if (mode === 'percent') return maximum ? (value / maximum) * 100 : 0

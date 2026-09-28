@@ -270,6 +270,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .missing { color: var(--muted); }
 .charts { display: grid; gap: .8rem; margin-top: .8rem; min-width: 0; }
 .chart-card, .rules { min-width: 0; max-width: 100%; padding: 1rem; background: var(--surface); border: 1px solid var(--line); }
+.relative-game-points { grid-column: 1 / -1; }
 .chart-heading p { margin: .25rem 0 .8rem; }
 .chart-actions { display: flex; align-items: end; gap: .45rem; }
 .chart-actions label { display: grid; gap: .2rem; color: var(--muted); font-size: .68rem; }
