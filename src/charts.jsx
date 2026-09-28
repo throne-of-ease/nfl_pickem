@@ -267,8 +267,13 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" /><line x1={left} x2={width - right} y1={zero} y2={zero} stroke="#8ba0b9" />
     {data.map((item, index) => { const x = left + index * group + (group - bar) / 2; const topY = y(Math.max(0, item.value)); const barHeight = Math.abs(y(item.value) - zero); return <g key={item.name}>
-      {potential && item.potential > item.value && <rect x={x} y={item.potential >= 0 ? y(item.potential) : zero} width={bar} height={Math.abs(y(item.potential) - zero)} fill="#29415e" rx="5"><title>{item.name} potential: {item.potential.toFixed(1)}</title></rect>}
       <rect x={x} y={item.value >= 0 ? topY : zero} width={bar} height={barHeight} fill={COLORS[(item.colorIndex ?? index) % COLORS.length]} rx="5"><title>{item.name}: {item.value.toFixed(1)}</title></rect>
+      {potential && Number.isFinite(item.potential) && <g data-potential={item.name}>
+        <title>{item.name} potential: {item.potential.toFixed(1)}</title>
+        <line x1={x + bar + 8} x2={x + bar + 8} y1={y(item.value)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" strokeDasharray="4,3" />
+        <line x1={x + bar + 3} x2={x + bar + 13} y1={y(item.potential)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" />
+        <text x={x + bar + 16} y={y(item.potential) + 4}>{displayValue(item.potential)} P</text>
+      </g>}
       <text x={x + bar / 2} y={item.value >= 0 ? topY - 7 : zero + barHeight + 15} textAnchor="middle">{item.value.toFixed(1)}</text>
       <text x={x + bar / 2} y={height - 20} textAnchor="middle">{item.name}</text>
     </g>})}
@@ -301,7 +306,7 @@ export function GotwChart({ history }) {
 export function CurrentWeekChart({ current }) {
   const [mode, setMode] = useState('vs_total_leader')
   const data = currentWeekChartData(current, mode)
-  return <ChartFrame id="current-week" title="Current week" description="Earned points and remaining potential." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
+  return <ChartFrame id="current-week" title="Current week" description="Bars: earned points. Dashed markers (P): potential totals. Leader comparisons subtract the same leader’s earned or potential total, respectively." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
 }
 
 export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys, weekLabels, selectedPoolKey }) {
