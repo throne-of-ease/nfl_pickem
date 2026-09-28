@@ -201,13 +201,13 @@ describe('four-user application flow', () => {
     expect(screen.queryByText('MODEL')).not.toBeInTheDocument()
   })
 
-  it('renders all five accessible charts and every display mode', async () => {
+  it('renders all accessible charts and the game comparison table with every display mode', async () => {
     const user = userEvent.setup()
     render(<App />)
     await user.selectOptions(screen.getByLabelText('Week'), 'week-02')
     await user.click(screen.getByRole('button', { name: 'Charts' }))
     expect(screen.getAllByRole('img')).toHaveLength(5)
-    expect([...document.querySelectorAll('.chart-card h3')].map((heading) => heading.textContent)).toEqual(['Points vs season leader', 'Current week', 'Points per week', 'Game of the Week', 'Aggressiveness index'])
+    expect([...document.querySelectorAll('.chart-card h3')].map((heading) => heading.textContent)).toEqual(['Points vs season leader', 'Current week', 'Points per week', 'Game of the Week', 'Aggressiveness index', 'Game points vs other players'])
     const cumulative = document.querySelector('svg[aria-label="Cumulative points versus season leader"]')
     expect(cumulative).not.toBeNull()
     expect(cumulative.querySelectorAll('polyline')).toHaveLength(8)
