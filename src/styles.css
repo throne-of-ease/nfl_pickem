@@ -529,6 +529,14 @@ footer [data-testid="real-data-status"] { display: block; }
   .relative-game-points th:nth-child(5) { width: 14%; }
   .relative-game-points th:nth-child(6) { width: 11%; }
   .relative-game-points th:nth-child(7) { width: 16%; }
+  .relative-game-points .all-players th:nth-child(1) { width: 6%; }
+  .relative-game-points .all-players th:nth-child(2) { width: 13%; }
+  .relative-game-points .all-players th:nth-child(3) { width: 8%; }
+  .relative-game-points .all-players th:nth-child(4) { width: 22%; }
+  .relative-game-points .all-players th:nth-child(5) { width: 12%; }
+  .relative-game-points .all-players th:nth-child(6) { width: 14%; }
+  .relative-game-points .all-players th:nth-child(7) { width: 9%; }
+  .relative-game-points .all-players th:nth-child(8) { width: 16%; }
   .pick-actions { gap: .25rem; }
   .pick-actions button { padding: .3rem .35rem; font-size: .6rem; }
   .pick-tools { align-items: flex-end; }

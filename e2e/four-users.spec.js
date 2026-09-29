@@ -178,6 +178,17 @@ test('compact overview, model, chart, and pick controls match the new layout', a
     expect(layout.contentWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
     expect(layout.tableWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
   }
+  await page.getByLabel('Game points player').selectOption('all')
+  const allPlayersComparison = page.getByRole('table', { name: 'Top 10 player-game results across all players by points difference' })
+  await expect(allPlayersComparison.locator('thead th')).toHaveText(['Rank', 'Player', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
+  const allPlayersTable = page.locator('.relative-game-points table.all-players')
+  await page.getByLabel('Game points ranking').selectOption('bottom25')
+  await expect(page.getByRole('table', { name: 'Bottom 25 player-game results across all players by points difference' })).toBeVisible()
+  if (testInfo.project.name !== 'desktop') {
+    const layout = await allPlayersTable.evaluate((table) => ({ tableWidth: table.getBoundingClientRect().width, parentWidth: table.parentElement.clientWidth, contentWidth: table.parentElement.scrollWidth }))
+    expect(layout.contentWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
+    expect(layout.tableWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
+  }
 
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()

@@ -20,6 +20,14 @@ it('scores opposite teams independently, excludes self, and counts missed picks 
   expect(relativeGamePoints(players, games, picks, 'a', Object.keys(games), 'bottom')[0].poolKey).toBe('week-02')
   expect(relativeGamePoints(players, games, picks, 'a', ['week-02'])).toHaveLength(1)
 })
+it('ranks each player against the mean of the other players in the all-player view', () => {
+  const rows = relativeGamePoints(players, games, picks, null, ['week-01'])
+  expect(rows.map(({ playerName, points, mean, difference }) => [playerName, points, mean, difference])).toEqual([
+    ['Alex', 10, 2, 8],
+    ['Casey', 4, 5, -1],
+    ['Blair', 0, 7, -7],
+  ])
+})
 it('handles ties, unfinished games, missing scores, and no opponents', () => {
   const mixed = { 'week-01': [{ ...game, homeScore: 10, gotw: true }, { ...game, id: 'live', status: 'live' }, { ...game, id: 'missing', homeScore: null }] }
   expect(relativeGamePoints(players, mixed, picks, 'a', ['week-01'])[0]).toMatchObject({ points: 15, mean: 15, difference: 0 })
@@ -29,6 +37,16 @@ it('limits to ten games and sorts by unrounded differences', () => {
   const many = { 'week-01': Array.from({ length: 12 }, (_, i) => ({ ...game, id: `g${i}` })) }
   const manyPicks = { a: { 'week-01': many['week-01'].map((g, i) => ({ gameId: g.id, team: 'H', confidence: i + 1 })) } }
   expect(relativeGamePoints(players, many, manyPicks, 'a', ['week-01']).map((r) => r.points)).toEqual([12, 11, 10, 9, 8, 7, 6, 5, 4, 3])
+})
+it('supports top and bottom 25 rankings', () => {
+  const many = { 'week-01': Array.from({ length: 30 }, (_, i) => ({ ...game, id: `g${i}` })) }
+  const manyPicks = Object.fromEntries(players.map((player, playerIndex) => [player.id, { 'week-01': many['week-01'].map((g, i) => ({ gameId: g.id, team: playerIndex === 1 ? 'A' : 'H', confidence: i + 1 })) }]))
+  const top = relativeGamePoints(players, many, manyPicks, null, ['week-01'], 'top', 25)
+  const bottom = relativeGamePoints(players, many, manyPicks, null, ['week-01'], 'bottom', 25)
+  expect(top).toHaveLength(25)
+  expect(bottom).toHaveLength(25)
+  expect(top[0].difference).toBeGreaterThanOrEqual(top.at(-1).difference)
+  expect(bottom[0].difference).toBeLessThanOrEqual(bottom.at(-1).difference)
 })
 it('defaults to the viewer and supports player, ranking, period, and week controls', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="b" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
@@ -40,10 +58,24 @@ it('defaults to the viewer and supports player, ranking, period, and week contro
   fireEvent.change(screen.getByLabelText('Game points period'), { target: { value: 'season' } })
   expect(screen.queryByLabelText('Game points week')).not.toBeInTheDocument()
   expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(3)
-  fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'bottom' } })
+  fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'bottom10' } })
   expect(within(screen.getByRole('table')).getAllByRole('row')[1]).toHaveTextContent('-6.5')
 })
 it('renders difference before points and the other-player mean', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
   expect([...screen.getByRole('table').querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Rank', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
+})
+it('shows every player in the shared ranking and offers 25-row rankings', () => {
+  render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  fireEvent.change(screen.getByLabelText('Game points player'), { target: { value: 'all' } })
+  fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'top25' } })
+  expect(screen.getByRole('table', { name: 'Top 25 player-game results across all players by points difference' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'bottom25' } })
+  fireEvent.change(screen.getByLabelText('Game points period'), { target: { value: 'season' } })
+  const table = screen.getByRole('table', { name: 'Bottom 25 player-game results across all players by points difference' })
+  expect([...table.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Rank', 'Player', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
+  expect(within(table).getAllByRole('row')).toHaveLength(7)
+  expect(table).toHaveTextContent('Alex')
+  expect(table).toHaveTextContent('Blair')
+  expect(table).toHaveTextContent('Casey')
 })
