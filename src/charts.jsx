@@ -236,7 +236,8 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const endLabels = endValues ? spreadEndLabels(series.flatMap((item, seriesIndex) => [
     { item, seriesIndex, kind: 'earned', values: item.values },
-    ...(item.potentialValues ? [{ item, seriesIndex, kind: 'potential', values: item.potentialValues }] : []),
+    ...(item.potentialValues && (item.values.findLastIndex(Number.isFinite) !== item.potentialValues.findLastIndex(Number.isFinite)
+      || item.values.findLast(Number.isFinite) !== item.potentialValues.findLast(Number.isFinite)) ? [{ item, seriesIndex, kind: 'potential', values: item.potentialValues }] : []),
   ]).flatMap((entry) => {
     const index = entry.values.findLastIndex(Number.isFinite)
     return index < 0 ? [] : [{ ...entry, value: entry.values[index], targetX: x(index), targetY: y(entry.values[index]) }]
@@ -268,7 +269,7 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
     <rect width={width} height={height} fill="#0c192b" rx="10" /><line x1={left} x2={width - right} y1={zero} y2={zero} stroke="#8ba0b9" />
     {data.map((item, index) => { const x = left + index * group + (group - bar) / 2; const topY = y(Math.max(0, item.value)); const barHeight = Math.abs(y(item.value) - zero); return <g key={item.name}>
       <rect x={x} y={item.value >= 0 ? topY : zero} width={bar} height={barHeight} fill={COLORS[(item.colorIndex ?? index) % COLORS.length]} rx="5"><title>{item.name}: {item.value.toFixed(1)}</title></rect>
-      {potential && Number.isFinite(item.potential) && <g data-potential={item.name}>
+      {potential && Number.isFinite(item.potential) && item.potential !== item.value && <g data-potential={item.name}>
         <title>{item.name} potential: {item.potential.toFixed(1)}</title>
         <line x1={x + bar + 8} x2={x + bar + 8} y1={y(item.value)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" strokeDasharray="4,3" />
         <line x1={x + bar + 3} x2={x + bar + 13} y1={y(item.potential)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" />

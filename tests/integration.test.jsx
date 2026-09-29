@@ -214,7 +214,7 @@ describe('four-user application flow', () => {
     expect(cumulative.querySelector('[data-zero-reference]')).toHaveAttribute('stroke', '#fff')
     expect(cumulative.querySelector('[data-zero-reference]')).toHaveAttribute('stroke-dasharray', '4,4')
     expect(cumulative.querySelectorAll('[data-end-label="earned"]')).toHaveLength(4)
-    expect(cumulative.querySelectorAll('[data-end-label="potential"]')).toHaveLength(4)
+    expect(cumulative.querySelectorAll('[data-end-label="potential"]')).toHaveLength(2)
     await user.click(screen.getByRole('button', { name: 'Hide potential' }))
     expect(cumulative.querySelectorAll('polyline')).toHaveLength(4)
     expect(cumulative.querySelectorAll('[data-end-label="potential"]')).toHaveLength(0)
