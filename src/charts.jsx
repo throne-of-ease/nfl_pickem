@@ -3,7 +3,7 @@ import { isLocked, modelPicks, scorePick } from './domain.js'
 
 export const COLORS = ['#43d6b5', '#ffca5c', '#ff6b81', '#b795ff']
 
-export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, poolKeys, direction = 'top', limit = 10) {
+export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, poolKeys, direction = 'top', limit = 10, includeLostPoints = false) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
   if (players.length < 2 || !selectedPlayers.length) return []
   return poolKeys.flatMap((poolKey) => (gamesByPool[poolKey] ?? []).flatMap((game) => {
@@ -11,7 +11,8 @@ export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, 
     const pickFor = (id) => picksByUser[id]?.[poolKey]?.find((pick) => pick.gameId === game.id)
     const scores = players.map((player) => {
       const pick = pickFor(player.id)
-      return { player, pick, points: scorePick(pick, game).points }
+      const score = scorePick(pick, game)
+      return { player, pick, points: includeLostPoints && score.stake && !score.correct ? -score.stake : score.points }
     })
     return selectedPlayers.map((player) => {
       const own = scores.find((score) => score.player.id === player.id)
@@ -28,27 +29,31 @@ export function RelativeGamePointsTable({ players, gamesByPool, picksByUser, vie
   const [ranking, setRanking] = useState('top10')
   const [scope, setScope] = useState('week')
   const [selectedWeek, setSelectedWeek] = useState(null)
+  const [includeLostPoints, setIncludeLostPoints] = useState(false)
   const allPlayers = selectedPlayer === 'all'
   const playerId = allPlayers ? null : players.some((player) => player.id === selectedPlayer) ? selectedPlayer
     : players.some((player) => player.id === viewerId) ? viewerId : players[0]?.id
   const direction = ranking.startsWith('bottom') ? 'bottom' : 'top'
   const limit = Number(ranking.slice(-2))
   const week = poolKeys.includes(selectedWeek) ? selectedWeek : poolKeys.includes(selectedPoolKey) ? selectedPoolKey : poolKeys.at(-1)
-  const rows = relativeGamePoints(players, gamesByPool, picksByUser, playerId, scope === 'season' ? poolKeys : [week], direction, limit)
-  const caption = `${direction === 'top' ? 'Top' : 'Bottom'} ${limit} ${allPlayers ? 'player-game results across all players' : 'games'} by points difference`
+  const rows = relativeGamePoints(players, gamesByPool, picksByUser, playerId, scope === 'season' ? poolKeys : [week], direction, limit, includeLostPoints)
+  const caption = `${direction === 'top' ? 'Top' : 'Bottom'} ${limit} ${allPlayers ? 'player-game results across all players' : 'games'} by ${includeLostPoints ? 'net' : 'points'} difference`
   return <section className="chart-card relative-game-points" aria-labelledby="relative-game-points-title">
     <div className="chart-heading">
-      <div><h3 id="relative-game-points-title">Game points vs other players</h3><p>Completed games only. Difference = player’s earned points − all other players’ mean for that game. Includes GOTW bonuses; losing and missed picks earn zero.</p></div>
+      <div><h3 id="relative-game-points-title">Game points vs other players</h3><p id="relative-game-points-description">{includeLostPoints
+        ? 'Completed games only. Net points = earned points on winning picks, minus committed points on losing picks. Difference = player’s net points − all other players’ mean. Includes GOTW bonuses; missed picks count as zero and ties follow official scoring. This comparison does not change official scores.'
+        : 'Completed games only. Difference = player’s earned points − all other players’ mean for that game. Includes GOTW bonuses; losing and missed picks earn zero.'}</p></div>
       <div className="chart-actions">
         <label>Player <select aria-label="Game points player" value={allPlayers ? 'all' : playerId ?? ''} onChange={(event) => setSelectedPlayer(event.target.value)}><option value="all">All players</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
         <label>Ranking <select aria-label="Game points ranking" value={ranking} onChange={(event) => setRanking(event.target.value)}><option value="top10">Top 10</option><option value="bottom10">Bottom 10</option><option value="top25">Top 25</option><option value="bottom25">Bottom 25</option></select></label>
         <label>Period <select aria-label="Game points period" value={scope} onChange={(event) => setScope(event.target.value)}><option value="week">By week</option><option value="season">Whole season</option></select></label>
         {scope === 'week' && <label>Week <select aria-label="Game points week" value={week ?? ''} onChange={(event) => setSelectedWeek(event.target.value)}>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>}
+        <label className="lost-points-toggle"><input type="checkbox" checked={includeLostPoints} onChange={(event) => setIncludeLostPoints(event.target.checked)} aria-describedby="relative-game-points-description" />Include lost points</label>
       </div>
     </div>
     {rows.length ? <div className="table-scroll"><table className={allPlayers ? 'all-players' : undefined}>
       <caption>{caption}</caption>
-      <thead><tr>{['Rank', ...(allPlayers ? ['Player'] : []), 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+      <thead><tr>{['Rank', ...(allPlayers ? ['Player'] : []), 'Week', 'Game', 'Pick', 'Difference', includeLostPoints ? 'Net points' : 'Points', 'Others’ mean'].map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
       <tbody>{rows.map((row, index) => <tr key={`${row.poolKey}-${row.game.id}-${row.playerId}`}>
         <td>{index + 1}</td>{allPlayers && <td>{row.playerName}</td>}<td>{weekLabels[poolKeys.indexOf(row.poolKey)]}</td><td>{row.game.away} @ {row.game.home}{row.game.gotw ? ' (GOTW)' : ''}</td><td>{row.team || 'Not picked'}</td><td>{row.difference > 0 ? '+' : ''}{row.difference.toFixed(1)}</td><td>{row.points}</td><td>{row.mean.toFixed(1)}</td>
       </tr>)}</tbody>

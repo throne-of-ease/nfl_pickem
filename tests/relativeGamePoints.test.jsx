@@ -11,6 +11,49 @@ const picks = {
   b: { 'week-01': [{ gameId: 'g', team: 'A', confidence: 16 }], 'week-02': [{ gameId: 'g', team: 'A', confidence: 8 }] },
   c: { 'week-01': [{ gameId: 'g', team: 'H', confidence: 4 }] },
 }
+it('reflects wasted confidence when everyone picks the losing team, only when enabled', () => {
+  const twoPlayers = players.slice(0, 2)
+  const losingPicks = {
+    a: { 'week-01': [{ gameId: 'g', team: 'A', confidence: 12 }] },
+    b: { 'week-01': [{ gameId: 'g', team: 'A', confidence: 2 }] },
+  }
+  expect(relativeGamePoints(twoPlayers, games, losingPicks, null, ['week-01']).map((row) => row.difference)).toEqual([0, 0])
+  const top = relativeGamePoints(twoPlayers, games, losingPicks, null, ['week-01'], 'top', 10, true)
+  expect(top.map(({ playerId, points, mean, difference }) => ({ playerId, points, mean, difference }))).toEqual([
+    { playerId: 'b', points: -2, mean: -12, difference: 10 },
+    { playerId: 'a', points: -12, mean: -2, difference: -10 },
+  ])
+  expect(relativeGamePoints(twoPlayers, games, losingPicks, null, ['week-01'], 'bottom', 10, true)[0].playerId).toBe('a')
+})
+it('uses each pick’s outcome and GOTW stake, preserves ties, and excludes unfinished games in net mode', () => {
+  const rows = relativeGamePoints(players, games, picks, 'a', Object.keys(games), 'top', 10, true)
+  expect(rows.map(({ points, mean, difference }) => ({ points, mean, difference }))).toEqual([
+    { points: 10, mean: -6, difference: 16 },
+    { points: -15, mean: 6.5, difference: -21.5 },
+  ])
+  const mixed = { 'week-01': [{ ...game, homeScore: 10, gotw: true }, { ...game, id: 'live', status: 'live' }, { ...game, id: 'missing', homeScore: null }] }
+  const tied = relativeGamePoints(players, mixed, picks, 'a', ['week-01'], 'top', 10, true)
+  expect(tied).toHaveLength(1)
+  expect(tied[0]).toMatchObject({ points: 15, mean: 15, difference: 0 })
+  expect(relativeGamePoints(players, games, picks, 'c', ['week-02'], 'top', 10, true)[0]).toMatchObject({ points: 0, mean: -1, difference: 1 })
+})
+it('switches to clearly labelled net points and restores the existing ranking when unchecked', () => {
+  render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  const toggle = screen.getByRole('checkbox', { name: 'Include lost points' })
+  expect(toggle).not.toBeChecked()
+  expect(screen.getByRole('table')).toHaveTextContent('+8.0')
+  fireEvent.click(toggle)
+  expect(screen.getByRole('columnheader', { name: 'Net points' })).toBeInTheDocument()
+  expect(screen.getByRole('table', { name: 'Top 10 games by net difference' })).toHaveTextContent('+16.0')
+  fireEvent.change(screen.getByLabelText('Game points period'), { target: { value: 'season' } })
+  fireEvent.change(screen.getByLabelText('Game points player'), { target: { value: 'all' } })
+  fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'bottom25' } })
+  const table = screen.getByRole('table', { name: 'Bottom 25 player-game results across all players by net difference' })
+  expect(within(table).getAllByRole('row')[1]).toHaveTextContent('-23.0')
+  fireEvent.click(toggle)
+  expect(screen.getByRole('columnheader', { name: 'Points', exact: true })).toBeInTheDocument()
+  expect(screen.getByRole('table')).toHaveTextContent('-7.0')
+})
 it('scores opposite teams independently, excludes self, and counts missed picks as zero', () => {
   const rows = relativeGamePoints(players, games, picks, 'a', Object.keys(games))
   expect(rows.map(({ points, mean, difference }) => ({ points, mean, difference }))).toEqual([

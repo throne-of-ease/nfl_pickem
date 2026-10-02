@@ -184,12 +184,19 @@ test('compact overview, model, chart, and pick controls match the new layout', a
   const allPlayersTable = page.locator('.relative-game-points table.all-players')
   await page.getByLabel('Game points ranking').selectOption('bottom25')
   await expect(page.getByRole('table', { name: 'Bottom 25 player-game results across all players by points difference' })).toBeVisible()
+  const lostPointsToggle = page.getByRole('checkbox', { name: 'Include lost points' })
+  await expect(lostPointsToggle).not.toBeChecked()
+  await lostPointsToggle.check()
+  await expect(page.getByRole('table', { name: 'Bottom 25 player-game results across all players by net difference' })).toBeVisible()
+  await expect(allPlayersTable.getByRole('columnheader', { name: 'Net points' })).toBeVisible()
   if (testInfo.project.name !== 'desktop') {
     const layout = await allPlayersTable.evaluate((table) => ({ tableWidth: table.getBoundingClientRect().width, parentWidth: table.parentElement.clientWidth, contentWidth: table.parentElement.scrollWidth }))
     expect(layout.contentWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
     expect(layout.tableWidth).toBeLessThanOrEqual(layout.parentWidth + 1)
   }
 
+  await lostPointsToggle.uncheck()
+  await expect(allPlayersTable.getByRole('columnheader', { name: 'Points', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'My picks' }).click()
   const row = page.locator('[data-testid^="game-row-"]').first()
   const handleBox = await row.locator('.drag-handle').boundingBox()
