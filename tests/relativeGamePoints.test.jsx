@@ -37,12 +37,10 @@ it('uses each pick’s outcome and GOTW stake, preserves ties, and excludes unfi
   expect(tied[0]).toMatchObject({ points: 15, mean: 15, difference: 0 })
   expect(relativeGamePoints(players, games, picks, 'c', ['week-02'], 'top', 10, true)[0]).toMatchObject({ points: 0, mean: -1, difference: 1 })
 })
-it('switches to clearly labelled net points and restores the existing ranking when unchecked', () => {
+it('defaults to net points and restores the existing ranking when unchecked', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
   const toggle = screen.getByRole('checkbox', { name: 'Include lost points' })
-  expect(toggle).not.toBeChecked()
-  expect(screen.getByRole('table')).toHaveTextContent('+8.0')
-  fireEvent.click(toggle)
+  expect(toggle).toBeChecked()
   expect(screen.getByRole('columnheader', { name: 'Net points' })).toBeInTheDocument()
   expect(screen.getByRole('table', { name: 'Top 10 games by net difference' })).toHaveTextContent('+16.0')
   fireEvent.change(screen.getByLabelText('Game points period'), { target: { value: 'season' } })
@@ -53,6 +51,8 @@ it('switches to clearly labelled net points and restores the existing ranking wh
   fireEvent.click(toggle)
   expect(screen.getByRole('columnheader', { name: 'Points', exact: true })).toBeInTheDocument()
   expect(screen.getByRole('table')).toHaveTextContent('-7.0')
+  fireEvent.click(toggle)
+  expect(screen.getByRole('columnheader', { name: 'Net points' })).toBeInTheDocument()
 })
 it('scores opposite teams independently, excludes self, and counts missed picks as zero', () => {
   const rows = relativeGamePoints(players, games, picks, 'a', Object.keys(games))
@@ -93,6 +93,7 @@ it('supports top and bottom 25 rankings', () => {
 })
 it('defaults to the viewer and supports player, ranking, period, and week controls', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="b" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Include lost points' }))
   expect(screen.getByLabelText('Game points player')).toHaveValue('b')
   fireEvent.change(screen.getByLabelText('Game points player'), { target: { value: 'a' } })
   expect(screen.getByRole('table')).toHaveTextContent('+8.0')
@@ -106,10 +107,12 @@ it('defaults to the viewer and supports player, ranking, period, and week contro
 })
 it('renders difference before points and the other-player mean', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Include lost points' }))
   expect([...screen.getByRole('table').querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Rank', 'Week', 'Game', 'Pick', 'Difference', 'Points', 'Others’ mean'])
 })
 it('shows every player in the shared ranking and offers 25-row rankings', () => {
   render(<RelativeGamePointsTable players={players} gamesByPool={games} picksByUser={picks} viewerId="a" poolKeys={Object.keys(games)} weekLabels={['W1', 'W2']} selectedPoolKey="week-01" />)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Include lost points' }))
   fireEvent.change(screen.getByLabelText('Game points player'), { target: { value: 'all' } })
   fireEvent.change(screen.getByLabelText('Game points ranking'), { target: { value: 'top25' } })
   expect(screen.getByRole('table', { name: 'Top 25 player-game results across all players by points difference' })).toBeInTheDocument()

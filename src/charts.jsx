@@ -29,7 +29,7 @@ export function RelativeGamePointsTable({ players, gamesByPool, picksByUser, vie
   const [ranking, setRanking] = useState('top10')
   const [scope, setScope] = useState('week')
   const [selectedWeek, setSelectedWeek] = useState(null)
-  const [includeLostPoints, setIncludeLostPoints] = useState(false)
+  const [includeLostPoints, setIncludeLostPoints] = useState(true)
   const allPlayers = selectedPlayer === 'all'
   const playerId = allPlayers ? null : players.some((player) => player.id === selectedPlayer) ? selectedPlayer
     : players.some((player) => player.id === viewerId) ? viewerId : players[0]?.id
