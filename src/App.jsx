@@ -403,11 +403,13 @@ export default function App() {
   const chartHistory = buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, provisional);
   const overviewModelHistory = buildSeasonHistory(MODEL_DEFINITIONS, chartGamesByPool, modelPicksByUser, provisional);
   const seasonTotals = new Map(chartHistory.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]));
-  const current = poolMetrics(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional).map(({ id, name, points, potential, correct, played, maximum, lockedMaximum, lockedGameCount }) => ({
+  const current = poolMetrics(chartUsers, games, Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []])), provisional).map(({ id, name, points, potential, pointsLost, potentialPointsLost, correct, played, maximum, lockedMaximum, lockedGameCount }) => ({
     id,
     name,
     points,
     potential,
+    pointsLost,
+    potentialPointsLost,
     correct,
     played,
     maximum,

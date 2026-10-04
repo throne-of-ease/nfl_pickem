@@ -213,6 +213,8 @@ export function poolMetrics(users, games, picksByUser, provisional = false) {
       points: scores.reduce((sum, score) => sum + score.points, 0),
       potential: remainingPotential(games, picks, scores),
       pointsLost: scores.reduce((sum, score) => sum + (score.scored && !score.correct ? score.stake : 0), 0),
+      potentialPointsLost: scores.reduce((sum, score, index) => sum + (['final', 'post'].includes(games[index].status) && !score.correct ? score.stake : 0), 0)
+        + remainingPotential(games, picks, scores.map((score, index) => ['live', 'in'].includes(games[index].status) ? { ...score, scored: false, potential: score.stake } : score)),
       correct: scores.filter((score) => score.correct).length,
       played: scores.filter((score) => score.scored).length,
       picksMade: picks.filter((pick) => pick.team).length,

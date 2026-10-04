@@ -160,7 +160,7 @@ describe('team-relative positions versus benchmark', () => {
       { gameId: 'g1', team: 'HOME', confidence: 1 },
       { gameId: 'g2', team: 'A2', confidence: 2 },
     ] } }
-    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])).toMatchObject([
       { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
       { name: 'A2', value: -3, relativeStake: 3, playerNet: -2, benchmarkNet: 1, comparisons: 1 },
     ])
@@ -177,7 +177,7 @@ describe('team-relative positions versus benchmark', () => {
         { gameId: 'g2', team: 'H2', confidence: 1 },
       ] },
     }
-    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-01'])).toMatchObject([
       { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
       { name: 'A2', value: -3, relativeStake: 3, playerNet: -2, benchmarkNet: 1, comparisons: 1 },
     ])
@@ -188,7 +188,7 @@ describe('team-relative positions versus benchmark', () => {
       alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }], 'week-02': [{ gameId: 'g3', team: 'A3', confidence: 1 }] },
       blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
     }
-    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-02'])).toEqual([])
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-02'])).toMatchObject([])
   })
 
   it('sums only non-zero positions for All players when comparing with another player', () => {
@@ -196,7 +196,7 @@ describe('team-relative positions versus benchmark', () => {
       alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }] },
       blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
     }
-    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, null, 'player:blair', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, null, 'player:blair', ['week-01'])).toMatchObject([
       { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
     ])
   })
@@ -205,8 +205,8 @@ describe('team-relative positions versus benchmark', () => {
     const game = { id: 'g', home: 'HOME', away: 'AWAY', status: 'final', homeScore: 28, awayScore: 20, predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
     const picks = { alex: { 'week-01': [{ gameId: 'g', team: 'HOME', confidence: 1 }] } }
     const games = { 'week-01': [game] }
-    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])).toEqual([])
-    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])).toMatchObject([])
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])).toMatchObject([
       { name: 'HOME', value: 2, relativeStake: 2, playerNet: 1, benchmarkNet: -1, comparisons: 1 },
     ])
   })
@@ -217,7 +217,7 @@ describe('team-relative positions versus benchmark', () => {
       blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
     }
     const rows = teamBenchmarkRelativeExposure(players, gamesByPool, picks, 'alex', 'player:blair', ['week-01'])
-    expect(rows).toEqual([
+    expect(rows).toMatchObject([
       { name: 'AWAY', value: 1, comparisons: 1 },
       { name: 'HOME', value: -1, comparisons: 1 },
     ])
@@ -231,10 +231,10 @@ describe('team-relative positions versus benchmark', () => {
       alex: { 'week-01': [{ gameId: 'gotw', team: 'AWAY', confidence: 1 }] },
       blair: { 'week-01': [{ gameId: 'gotw', team: 'HOME', confidence: 1 }] },
     }
-    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'player:blair', ['week-01'])).toMatchObject([
       { name: 'AWAY', value: 12, relativeStake: 12, playerNet: 6, benchmarkNet: -6, comparisons: 1 },
     ])
-    expect(teamBenchmarkRelativeExposure(players, games, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativeExposure(players, games, picks, 'alex', 'player:blair', ['week-01'])).toMatchObject([
       { name: 'AWAY', value: 12, comparisons: 1 },
       { name: 'HOME', value: -12, comparisons: 1 },
     ])

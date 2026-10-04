@@ -100,7 +100,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await page.getByLabel('Net points vs benchmark view').selectOption('exposure')
   await expect(page.getByRole('img', { name: /Overweight and underweight versus Alex by team, all players, W2/ })).toBeVisible()
   await page.getByLabel('Net points vs benchmark view').selectOption('impact')
-  for (const mode of ['points_percentage', 'correct_percentage', 'vs_leader', 'vs_total_leader']) {
+  for (const mode of ['points_lost', 'points_percentage', 'correct_percentage', 'vs_leader', 'vs_total_leader']) {
     await page.getByLabel('Current week display mode').selectOption(mode)
     await expect(page.getByRole('img', { name: `Current week points, ${mode}` })).toBeVisible()
   }

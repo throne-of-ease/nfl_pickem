@@ -242,7 +242,7 @@ describe('four-user application flow', () => {
     await user.selectOptions(weekly, 'correct_percentage')
     expect(screen.getByRole('img', { name: /Points per week, correct_percentage/ })).toBeInTheDocument()
     const currentWeekMode = screen.getByLabelText('Current week display mode')
-    expect(within(currentWeekMode).getAllByRole('option')).toHaveLength(5)
+    expect(within(currentWeekMode).getAllByRole('option')).toHaveLength(6)
     expect(currentWeekMode).toHaveValue('vs_total_leader')
     await user.selectOptions(currentWeekMode, 'vs_leader')
     const relativeChart = screen.getByRole('img', { name: /Current week points, vs_leader/ })

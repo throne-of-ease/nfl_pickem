@@ -105,7 +105,7 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
-function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys) {
+function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys, includeLive) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
   const benchmarkPlayerId = benchmark.startsWith('player:') ? benchmark.slice('player:'.length) : null
   const comparisons = []
@@ -119,17 +119,19 @@ function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, b
       for (const pick of picksByUser[player.id]?.[poolKey] ?? []) {
         const game = gamesById.get(pick.gameId)
         const benchmarkPick = benchmarkPicks.get(pick.gameId)
-        if (!game || !benchmarkPick || !['final', 'post'].includes(game.status) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)
+        const live = ['live', 'in'].includes(game?.status)
+        if (!game || !benchmarkPick || !(['final', 'post'].includes(game.status) || (includeLive && live)) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)
           || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)
           || !Number.isInteger(benchmarkPick.confidence) || ![game.away, game.home].includes(benchmarkPick.team)) continue
-        const playerScore = scorePick(pick, game)
-        const benchmarkScore = scorePick(benchmarkPick, game)
+        const playerScore = scorePick(pick, game, live)
+        const benchmarkScore = scorePick(benchmarkPick, game, live)
         const playerSignedStake = (pick.team === game.home ? 1 : -1) * playerScore.stake
         const benchmarkSignedStake = (benchmarkPick.team === game.home ? 1 : -1) * benchmarkScore.stake
         const relativeSignedStake = playerSignedStake - benchmarkSignedStake
         if (!relativeSignedStake) continue
-        const playerNet = playerScore.correct ? playerScore.points : -playerScore.stake
-        const benchmarkNet = benchmarkScore.correct ? benchmarkScore.points : -benchmarkScore.stake
+        const liveTie = live && game.homeScore === game.awayScore
+        const playerNet = liveTie ? 0 : playerScore.correct ? playerScore.points : -playerScore.stake
+        const benchmarkNet = liveTie ? 0 : benchmarkScore.correct ? benchmarkScore.points : -benchmarkScore.stake
         comparisons.push({
           overweightTeam: relativeSignedStake > 0 ? game.home : game.away,
           underweightTeam: relativeSignedStake > 0 ? game.away : game.home,
@@ -137,6 +139,8 @@ function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, b
           playerNet,
           benchmarkNet,
           impact: playerNet - benchmarkNet,
+          live,
+          outcome: game.homeScore === game.awayScore ? 'tied' : ((relativeSignedStake > 0) === (game.homeScore > game.awayScore) ? 'winning' : 'losing'),
         })
       }
     }
@@ -144,10 +148,25 @@ function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, b
   return comparisons
 }
 
-export function teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool)) {
+function recordTeamResult(row, comparison, value, opposite = false) {
+  row.finalValue = (row.finalValue ?? 0) + (comparison.live ? 0 : value)
+  row.liveValue = (row.liveValue ?? 0) + (comparison.live ? value : 0)
+  row.liveGames = (row.liveGames ?? 0) + Number(comparison.live)
+  row.outcomes ??= {}
+  const outcome = opposite && comparison.outcome !== 'tied' ? (comparison.outcome === 'winning' ? 'losing' : 'winning') : comparison.outcome
+  const label = comparison.live ? { winning: 'Leading', losing: 'Trailing', tied: 'Live tied' }[outcome] : { winning: 'Won', losing: 'Lost', tied: 'Tied' }[outcome]
+  row.outcomes[label] = (row.outcomes[label] ?? 0) + 1
+}
+
+export function teamResultLabel(row) {
+  return Object.entries(row.outcomes ?? {}).map(([label, count]) => `${label} ${count}`).join(' · ')
+}
+
+export function teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool), includeLive = true) {
   const totals = new Map()
-  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys)) {
+  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys, includeLive)) {
     const current = totals.get(comparison.overweightTeam) ?? { name: comparison.overweightTeam, value: 0, relativeStake: 0, playerNet: 0, benchmarkNet: 0, comparisons: 0 }
+    recordTeamResult(current, comparison, comparison.impact)
     current.value += comparison.impact
     current.relativeStake += comparison.relativeStake
     current.playerNet += comparison.playerNet
@@ -158,17 +177,18 @@ export function teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, p
   return [...totals.values()].sort((a, b) => b.value - a.value || b.relativeStake - a.relativeStake || a.name.localeCompare(b.name))
 }
 
-export function teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool)) {
+export function teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool), includeLive = true) {
   const totals = new Map()
-  const add = (team, value) => {
+  const add = (team, value, comparison, opposite = false) => {
     const current = totals.get(team) ?? { name: team, value: 0, comparisons: 0 }
+    recordTeamResult(current, comparison, value, opposite)
     current.value += value
     current.comparisons += 1
     totals.set(team, current)
   }
-  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys)) {
-    add(comparison.overweightTeam, comparison.relativeStake)
-    add(comparison.underweightTeam, -comparison.relativeStake)
+  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys, includeLive)) {
+    add(comparison.overweightTeam, comparison.relativeStake, comparison)
+    add(comparison.underweightTeam, -comparison.relativeStake, comparison, true)
   }
   return [...totals.values()].sort((a, b) => b.value - a.value || b.comparisons - a.comparisons || a.name.localeCompare(b.name))
 }
@@ -209,6 +229,7 @@ export function currentWeekChartData(current, mode) {
   const seasonLeader = current.reduce((best, item) => !best || item.seasonTotal > best.seasonTotal ? item : best, null)
   const baseline = mode === 'vs_leader' ? weeklyLeader : mode === 'vs_total_leader' ? seasonLeader : null
   return current.map((item, colorIndex) => {
+    if (mode === 'points_lost') return { name: item.name, colorIndex, value: item.pointsLost ?? 0, potential: item.potentialPointsLost ?? (item.pointsLost ?? 0) + item.potential }
     if (mode === 'points_percentage') return { name: item.name, colorIndex, value: item.lockedMaximum ? item.points / item.lockedMaximum * 100 : 0 }
     if (mode === 'correct_percentage') return { name: item.name, colorIndex, value: item.lockedGameCount ? item.correct / item.lockedGameCount * 100 : 0 }
     if (baseline) return { name: item.name, colorIndex, value: item.points - baseline.points, potential: item.points + item.potential - baseline.points - baseline.potential }
@@ -302,6 +323,14 @@ const safeRange = (values) => {
   return { min, max, span: max - min || 1 }
 }
 
+export function naturalRange(values) {
+  const finite = values.filter(Number.isFinite)
+  if (!finite.length) return { min: -1, max: 1, span: 2 }
+  const low = Math.min(...finite), high = Math.max(...finite)
+  const padding = Math.max(1, (high - low) * 0.1)
+  return { min: low - padding, max: high + padding, span: high - low + padding * 2 }
+}
+
 export function leaderAxisTicks(values) {
   const finite = values.filter(Number.isFinite)
   const low = Math.min(0, ...finite)
@@ -347,7 +376,7 @@ function spreadEndLabels(items, minY, maxY) {
 
 const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toFixed(1)
 
-function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false }) {
+function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false }) {
   const compact = useCompactChart()
   const width = compact ? 360 : 800
   const height = compact ? 310 : 330, left = compact ? 36 : 54, right = endValues ? (compact ? 52 : 74) : 24, bottom = 32
@@ -355,7 +384,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   const top = 44 + (legend.at(-1)?.row ?? 0) * 22
   const values = series.flatMap((item) => [...item.values, ...(item.potentialValues ?? [])])
   const ticks = zeroReference ? leaderAxisTicks(values) : null
-  const { min, max, span } = ticks ? { min: ticks[0], max: ticks.at(-1), span: ticks.at(-1) - ticks[0] } : safeRange(values)
+  const { min, max, span } = ticks ? { min: ticks[0], max: ticks.at(-1), span: ticks.at(-1) - ticks[0] } : natural ? naturalRange(values) : safeRange(values)
   const x = (index) => labels.length === 1 ? (width - right + left) / 2 : left + index * (width - left - right) / (labels.length - 1)
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const endLabels = endValues ? spreadEndLabels(series.flatMap((item, seriesIndex) => [
@@ -369,7 +398,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><SeriesMarker index={index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
-    {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks ? displayValue(value) : Math.round(value)}</text></g>)}
+    {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks || natural ? displayValue(value) : Math.round(value)}</text></g>)}
     {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
     {labels.map((label, index) => (compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={label} x={x(index)} y={height - 10} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
@@ -419,30 +448,47 @@ export function teamBarValueLabelLayout(value, valueX, barX, barWidth, left) {
 
 function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
   const compact = useCompactChart()
-  const width = compact ? 360 : 800, top = 24, bottom = 24, left = compact ? 110 : 78, right = 64, rowHeight = 18
-  const height = Math.max(100, top + bottom + data.length * rowHeight)
-  const values = data.map((item) => item.value)
+  const width = compact ? 360 : 800, top = 24, bottom = 24, left = compact ? 110 : 78, right = 64
+  let nextY = top
+  const rows = data.map((item) => {
+    const parts = [...Object.entries(item.outcomes ?? {}).map(([label, count]) => `${label} ${count}`), ...(item.liveGames > 0 ? ['LIVE'] : [])]
+    const lines = ['']
+    for (const part of parts) {
+      const last = lines.length - 1
+      if (lines[last] && lines[last].length + part.length + 3 > (compact ? 54 : 110)) lines.push(part)
+      else lines[last] += `${lines[last] ? ' · ' : ''}${part}`
+    }
+    const y = nextY
+    nextY += 24 + lines.length * 14
+    return { y, lines }
+  })
+  const height = Math.max(100, nextY + bottom)
+  const values = data.flatMap((item) => [item.value, item.finalValue ?? item.value])
   const min = Math.min(0, ...values), max = Math.max(0, ...values), span = max - min || 1
   const x = (value) => left + (value - min) * (width - left - right) / span
   const zero = x(0)
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     <line x1={zero} x2={zero} y1={top - 8} y2={height - bottom + 4} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />
-    {!data.length && <text x={width / 2} y={height / 2} textAnchor="middle">No completed comparable picks</text>}
+    {!data.length && <text x={width / 2} y={height / 2} textAnchor="middle">No comparable completed or live picks</text>}
     {data.map((item, index) => {
-      const y = top + index * rowHeight
+      const { y, lines } = rows[index]
       const valueX = x(item.value)
       const barX = Math.min(zero, valueX)
       const barWidth = Math.max(1, Math.abs(valueX - zero))
       const valueLabel = teamBarValueLabelLayout(item.value, valueX, barX, barWidth, left)
+      const resultLabel = teamResultLabel(item)
+      const finalX = x(item.finalValue ?? item.value)
       const tooltip = Number.isFinite(item.playerNet) && Number.isFinite(item.benchmarkNet)
         ? `${item.name}: ${displayValue(item.value)} net impact vs benchmark; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; benchmark net ${displayValue(item.benchmarkNet)}; ${item.comparisons} relative games`
         : `${item.name}: ${displayValue(item.value)} net relative stake; ${item.comparisons} relative games`
       return <g key={item.name}>
         <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
-        <rect x={barX} y={y + 2} width={barWidth} height={13} fill={item.value >= 0 ? COLORS[0] : COLORS[2]} rx="3">
+        <rect x={Math.min(zero, finalX)} y={y + 2} width={Math.abs(finalX - zero)} height={13} fill={(item.finalValue ?? item.value) >= 0 ? COLORS[0] : COLORS[2]} rx="3">
           <title>{tooltip}</title>
         </rect>
+        {item.liveGames > 0 && <rect data-live-bar={item.name} x={Math.min(finalX, valueX)} y={y + 2} width={Math.max(2, Math.abs(valueX - finalX))} height={13} fill="none" stroke="#66ccee" strokeWidth="2" strokeDasharray="4,2" rx="2"><title>{item.name}: live contribution {displayValue(item.liveValue)}; {resultLabel}</title></rect>}
+        <text x={compact ? 18 : left} y={y + 29} style={{ fontSize: 11 }}>{lines.map((line, lineIndex) => <tspan key={lineIndex} x={compact ? 18 : left} dy={lineIndex ? 14 : 0}>{line}</tspan>)}</text>
         <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
     })}
@@ -456,7 +502,7 @@ function AccessibleTable({ caption, columns, rows }) {
 export function WeeklyPointsChart({ history }) {
   const [mode, setMode] = useState('absolute')
   const series = weeklyChartSeries(history, mode)
-  return <ChartFrame id="weekly-points" title="Points per week" description="Compare each player's weekly result." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Points per week" columns={['Player', ...history.weeks]} rows={series.map((user) => [user.name, ...user.values])} />}><LineSvg series={series} labels={history.weeks} ariaLabel={`Points per week, ${mode}`} /></ChartFrame>
+  return <ChartFrame id="weekly-points" title="Points per week" description="Compare each player's weekly result." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Points per week" columns={['Player', ...history.weeks]} rows={series.map((user) => [user.name, ...user.values])} />}><LineSvg series={series} labels={history.weeks} natural ariaLabel={`Points per week, ${mode}`} /></ChartFrame>
 }
 
 export function CumulativePointsChart({ history }) {
@@ -475,7 +521,7 @@ export function GotwChart({ history }) {
 export function CurrentWeekChart({ current }) {
   const [mode, setMode] = useState('vs_total_leader')
   const data = currentWeekChartData(current, mode)
-  return <ChartFrame id="current-week" title="Current week" description="Bars: earned points. Dashed markers (P): potential totals. Leader comparisons subtract the same leader’s earned or potential total, respectively." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', 'Earned', 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
+  return <ChartFrame id="current-week" title="Current week" description={mode === 'points_lost' ? 'Bars: points lost, including GOTW stakes. P: maximum possible losses if every unfinished pick loses, including live games. Live losses follow the app’s provisional scoring setting.' : 'Bars: earned points. Dashed markers (P): potential totals. Leader comparisons subtract the same leader’s earned or potential total, respectively.'} modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_lost', label: 'Points lost' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', mode === 'points_lost' ? 'Lost' : 'Earned', mode === 'points_lost' ? 'Maximum possible losses' : 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
 }
 
 export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys, weekLabels, selectedPoolKey }) {
@@ -493,6 +539,7 @@ export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKey
 export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, viewerId, poolKeys, weekLabels }) {
   const [benchmark, setBenchmark] = useState('aggregate')
   const [view, setView] = useState('impact')
+  const [includeLive, setIncludeLive] = useState(true)
   const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [selectedPeriod, setSelectedPeriod] = useState('all')
   const allPlayers = selectedPlayer === 'all'
@@ -506,13 +553,14 @@ export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, view
   const benchmarkLabel = benchmarkPlayer?.name
     ?? (benchmark === 'predictor' ? 'FPI' : benchmark === 'moneyline' ? 'Moneyline' : 'FPI + moneyline average')
   const data = impactView
-    ? teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools)
-    : teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools)
+    ? teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools, includeLive)
+    : teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools, includeLive)
   const changePlayer = (nextPlayer) => {
     setSelectedPlayer(nextPlayer)
     if (nextPlayer !== 'all' && benchmark === `player:${nextPlayer}`) setBenchmark('aggregate')
   }
   const controls = <>
+    <label><input type="checkbox" checked={includeLive} onChange={(event) => setIncludeLive(event.target.checked)} />Include live games</label>
     <label>View <select aria-label="Net points vs benchmark view" value={view} onChange={(event) => setView(event.target.value)}><option value="impact">Net impact</option><option value="exposure">Over/underweight</option></select></label>
     <label>Player <select aria-label="Net points vs benchmark player" value={allPlayers ? 'all' : playerId ?? ''} onChange={(event) => changePlayer(event.target.value)}><option value="all">All players</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
     <label>Week <select aria-label="Net points vs benchmark week" value={period} onChange={(event) => setSelectedPeriod(event.target.value)}><option value="all">All weeks</option>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>
@@ -530,11 +578,11 @@ export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, view
   const benchmarkType = benchmarkPlayer ? 'comparison player' : 'model'
   const missingBenchmark = benchmarkPlayer ? 'Games where the comparison player has no usable pick are excluded.' : 'Games missing the selected model input are excluded.'
   const description = impactView
-    ? `Completed games only. Each player-benchmark difference is one relative position: lower confidence in a team is equivalent to being overweight its opponent, while opposite picks combine both scoring stakes. The realized net-point difference is attributed once to the team the player is overweight versus the selected ${benchmarkType}. Stakes include GOTW bonuses. Positive bars mean the tilt beat the benchmark; negative bars mean it hurt. ${missingBenchmark}`
-    : `Completed games only. Shows net relative scoring stake by team versus the selected ${benchmarkType}. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. ${missingBenchmark}`
+    ? `${includeLive ? 'Completed and live games. Live results use the current scoreboard; a tied live game has zero impact.' : 'Completed games only.'} Solid bars show completed contributions; dashed outlines extend from the completed value to the total including live games. Each player-benchmark difference is one relative position: lower confidence in a team is equivalent to being overweight its opponent, while opposite picks combine both scoring stakes. The realized net-point difference is attributed once to the team the player is overweight versus the selected ${benchmarkType}. Stakes include GOTW bonuses. Positive bars mean the tilt beat the benchmark; negative bars mean it hurt. ${missingBenchmark}`
+    : `${includeLive ? 'Completed and live games.' : 'Completed games only.'} Solid bars show completed stakes; dashed outlines show live stakes. Won/Lost and Leading/Trailing labels describe the team’s game results, not whether the tilt helped. Shows net relative scoring stake by team versus the selected ${benchmarkType}. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. ${missingBenchmark}`
   const table = impactView
-    ? <AccessibleTable caption="Net impact versus benchmark by overweight team" columns={['Team', 'Net impact', 'Relative stake', 'Player net', 'Benchmark net', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.relativeStake, item.playerNet, item.benchmarkNet, item.comparisons])} />
-    : <AccessibleTable caption="Overweight and underweight versus benchmark by team" columns={['Team', 'Net relative stake', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
+    ? <AccessibleTable caption="Net impact versus benchmark by overweight team" columns={['Team', 'Net impact', 'Relative stake', 'Player net', 'Benchmark net', 'Relative games', 'Live contribution', 'Results']} rows={data.map((item) => [item.name, item.value, item.relativeStake, item.playerNet, item.benchmarkNet, item.comparisons, item.liveValue, teamResultLabel(item)])} />
+    : <AccessibleTable caption="Overweight and underweight versus benchmark by team" columns={['Team', 'Net relative stake', 'Relative games', 'Live stake', 'Results']} rows={data.map((item) => [item.name, item.value, item.comparisons, item.liveValue, teamResultLabel(item)])} />
   const playerLabel = allPlayers ? 'all players' : players.find((player) => player.id === playerId)?.name ?? 'player'
   const periodLabel = period === 'all' ? 'all weeks' : weekLabels[poolKeys.indexOf(period)]
   return <ChartFrame
