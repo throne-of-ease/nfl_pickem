@@ -189,12 +189,13 @@ describe('team model chart label layout', () => {
       x: 84,
       anchor: 'start',
       inside: true,
+      fill: '#fff',
       label: '-17',
     })
   })
 
   it('keeps smaller negative and positive labels outside their bars', () => {
-    expect(teamBarValueLabelLayout(-2, 240, 240, 80, 78)).toMatchObject({ x: 234, anchor: 'end', inside: false, label: '-2' })
-    expect(teamBarValueLabelLayout(7, 500, 400, 100, 78)).toMatchObject({ x: 506, anchor: 'start', inside: false, label: '+7' })
+    expect(teamBarValueLabelLayout(-2, 240, 240, 80, 78)).toMatchObject({ x: 234, anchor: 'end', inside: false, fill: null, label: '-2' })
+    expect(teamBarValueLabelLayout(7, 500, 400, 100, 78)).toMatchObject({ x: 506, anchor: 'start', inside: false, fill: null, label: '+7' })
   })
 })

@@ -331,8 +331,8 @@ export function teamBarValueLabelLayout(value, valueX, barX, barWidth, left) {
   const outsideX = value >= 0 ? valueX + 6 : valueX - 6
   const overlapsTeamColumn = value < 0 && outsideX - estimatedWidth < left - 1
   const fitsInsideBar = barWidth >= estimatedWidth + 12
-  if (overlapsTeamColumn && fitsInsideBar) return { x: barX + 6, anchor: 'start', inside: true, label }
-  return { x: outsideX, anchor: value >= 0 ? 'start' : 'end', inside: false, label }
+  if (overlapsTeamColumn && fitsInsideBar) return { x: barX + 6, anchor: 'start', inside: true, fill: '#fff', label }
+  return { x: outsideX, anchor: value >= 0 ? 'start' : 'end', inside: false, fill: null, label }
 }
 
 function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
@@ -357,7 +357,7 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
         <rect x={barX} y={y + 2} width={barWidth} height={13} fill={item.value >= 0 ? COLORS[0] : COLORS[2]} rx="3">
           <title>{item.name}: {displayValue(item.value)} vs model; player net {displayValue(item.playerNet)}; model net {displayValue(item.modelNet)}; {item.comparisons} pick-games</title>
         </rect>
-        <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} fill={valueLabel.inside ? '#fff' : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
+        <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
     })}
   </svg>
