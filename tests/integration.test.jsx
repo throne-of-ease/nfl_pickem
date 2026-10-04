@@ -328,6 +328,33 @@ describe('four-user application flow', () => {
     expect(screen.getByTestId(rowsByRank['4']).querySelector('select')).toHaveValue('4')
   })
 
+  it('moves ranks across locked confidence 2 in both directions without changing the locked pick', () => {
+    history.replaceState({}, '', '/?scenario=live&pool=week-02')
+    localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({ users: [{ id: 'u1', name: 'Alex' }], picksByUser: { u1: { 'week-02': [
+      { gameId: 'week-02-g1', team: 'PHI', confidence: 2 },
+      { gameId: 'week-02-g2', team: 'KC', confidence: 1 },
+      { gameId: 'week-02-g3', team: 'ATL', confidence: 3 },
+      { gameId: 'week-02-g4', team: 'CIN', confidence: 4 },
+    ] } } }))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
+    const rank = (id) => screen.getByTestId(`game-row-week-02-g${id}`).querySelector('select')
+    expect(rank(1)).toBeDisabled()
+    for (const target of ['3', '4']) {
+      fireEvent.change(rank(2), { target: { value: target } })
+      expect(rank(2)).toHaveValue(target)
+      expect(rank(1)).toHaveValue('2')
+      expect(rank(3)).toHaveValue('1')
+      expect(rank(4)).toHaveValue(target === '4' ? '3' : '4')
+      fireEvent.change(rank(2), { target: { value: '1' } })
+      expect([1, 2, 3, 4].map((id) => rank(id).value)).toEqual(['2', '1', '3', '4'])
+    }
+    const dataTransfer = { effectAllowed: '', setData() {}, getData: () => 'week-02-g2' }
+    fireEvent.dragStart(screen.getByTestId('game-row-week-02-g2'), { dataTransfer })
+    fireEvent.drop(screen.getByTestId('game-row-week-02-g4'), { dataTransfer })
+    expect([1, 2, 3, 4].map((id) => rank(id).value)).toEqual(['2', '4', '1', '3'])
+  })
+
   it('keeps the confidence control compact with a left drag handle and no rank label', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))

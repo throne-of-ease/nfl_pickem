@@ -727,14 +727,16 @@ export default function App() {
       return false;
     }
     const movesRank = Number.isInteger(changed?.confidence) && Number.isInteger(changes.confidence);
+    const lockedRanks = new Set(oldDraft.filter((pick) => isLocked(games.find((game) => game.id === pick.gameId), new Date(), pool.acceptsLatePicks)).map((pick) => pick.confidence));
+    const availableRanks = Array.from({ length: games.length }, (_, index) => index + 1).filter((rank) => !lockedRanks.has(rank));
     const nextDraft = oldDraft.map((pick) => {
       if (pick.gameId === gameId) return { ...pick, ...changes };
       if (occupied?.gameId === pick.gameId && !movesRank) return { ...pick, confidence: changed?.confidence ?? null };
-      if (!movesRank || !Number.isInteger(pick.confidence)) return pick;
+      if (!movesRank || !Number.isInteger(pick.confidence) || lockedRanks.has(pick.confidence)) return pick;
       const shiftsEarlier = changed.confidence < changes.confidence && pick.confidence > changed.confidence && pick.confidence <= changes.confidence;
       const shiftsLater = changed.confidence > changes.confidence && pick.confidence >= changes.confidence && pick.confidence < changed.confidence;
       if (!shiftsEarlier && !shiftsLater) return pick;
-      return { ...pick, confidence: pick.confidence + (shiftsEarlier ? -1 : 1) };
+      return { ...pick, confidence: availableRanks[availableRanks.indexOf(pick.confidence) + (shiftsEarlier ? -1 : 1)] };
     });
     const result = validateDraft(games, nextDraft, {
       previous: oldDraft,
