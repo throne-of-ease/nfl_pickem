@@ -575,7 +575,7 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await page.getByRole('button', { name: 'Admin' }).click()
   await expect(page.getByRole('heading', { name: 'Registered players' })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Pat', exact: true })).toBeVisible()
-  await expect(page.getByTestId('pick-count-player-1')).toHaveText('1 / 1')
+  await expect(page.getByTestId('pick-count-player-1').locator('.admin-cell-value')).toHaveText('1 / 1')
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Reset password for Pat' }).click()
   await expect(page.getByText('Temporary password for Pat')).toBeVisible()
