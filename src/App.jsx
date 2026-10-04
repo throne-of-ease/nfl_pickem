@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
-import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
+import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, relativeModelWeight, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
 import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, RelativeGamePointsTable, TeamModelRelativeChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
@@ -380,6 +380,8 @@ export default function App() {
             : game,
   );
   const userPicks = picksByUser[userId]?.[poolKey] ?? [];
+  const showPickWeights = isAdmin && !useFixtures && session?.user.id === userId;
+  const pickModelLabel = pickProbabilityKind === "predictor" ? "FPI" : pickProbabilityKind === "moneyline" ? "ML" : "AVG";
   const divisionFixturePicks = Object.fromEntries(appUsers.map((player, playerIndex) => [player.id, Object.fromEntries(DIVISION_DEFINITIONS.map((division, divisionIndex) => [division.id, division.teams[(divisionIndex + playerIndex) % division.teams.length]]))]));
   const divisionFixtureData = activeScenario === "division-locked" ? {
     settings: { lockWeek: 5, lockAt: "2026-09-01T17:00:00.000Z", pointsPerCorrect: 7 },
@@ -1149,10 +1151,12 @@ export default function App() {
                     })()}
                   </div>
                 </div>
-                <div className="slate-head" aria-hidden="true">
+                {showPickWeights && <p className="pick-weight-help">OW = overweight; UW = underweight versus {pickModelLabel}. Signed scoring stakes include GOTW bonuses.</p>}
+                <div className={`slate-head ${showPickWeights ? "with-weights" : ""}`} aria-hidden="true">
                   <span>Kickoff</span>
                   <span>Matchup</span>
                   <span>Confidence</span>
+                  {showPickWeights && <span>Weight vs {pickModelLabel}</span>}
                 </div>
                 <div className="games">
                   {displayedGames.map((game) => {
@@ -1160,13 +1164,15 @@ export default function App() {
                     const locked = isLocked(game, new Date(), pool.acceptsLatePicks);
                     const kickoff = new Date(game.kickoff);
                     const displayedModelPick = pickProbabilities.get(game.id);
+                    const weight = showPickWeights ? relativeModelWeight(game, pick, displayedModelPick) : null;
+                    const weightDescription = !displayedModelPick ? `${pickModelLabel} model unavailable` : !weight ? "Select a team to compare with the model" : weight.amount === 0 ? `Matched to ${pickModelLabel}` : `Overweight ${weight.overweightTeam} by ${weight.amount}; underweight ${weight.underweightTeam} by ${weight.amount} versus ${pickModelLabel}`;
                     const pregameHome = displayedModelPick ? (displayedModelPick.team === game.home ? displayedModelPick.probability : 1 - displayedModelPick.probability) : null;
                     const liveHome = liveGame(game) && Number.isFinite(game.homeWinProbability) ? `${(game.homeWinProbability * 100).toFixed(0)}%` : null;
                     const liveAway = liveHome ? `${((1 - game.homeWinProbability) * 100).toFixed(0)}%` : null;
                     return (
                       <article
                         data-testid={`game-row-${game.id}`}
-                        className={`game ${game.status} ${locked ? "locked" : ""} ${pick?.team ? "picked" : ""} ${draggedGameId === game.id ? "dragging" : ""} ${highlightedGameId === game.id ? "moved" : ""} ${dragOverGameId === game.id ? "drop-target" : ""}`}
+                        className={`game ${showPickWeights ? "with-weights" : ""} ${game.status} ${locked ? "locked" : ""} ${pick?.team ? "picked" : ""} ${draggedGameId === game.id ? "dragging" : ""} ${highlightedGameId === game.id ? "moved" : ""} ${dragOverGameId === game.id ? "drop-target" : ""}`}
                         aria-disabled={locked}
                         key={game.id}
                         draggable={!locked && Number.isInteger(pick?.confidence)}
@@ -1257,6 +1263,13 @@ export default function App() {
                             </select>
                           </label>
                         </div>
+                        {showPickWeights && <div className="pick-weight" data-testid={`pick-weight-${game.id}`} aria-label={weightDescription} title={weightDescription}>
+                          <small>vs {pickModelLabel}</small>
+                          {!weight ? <span>—</span> : weight.amount === 0 ? <span>Matched 0</span> : <>
+                            <span>OW {weight.overweightTeam} <b>+{weight.amount}</b></span>
+                            <span>UW {weight.underweightTeam} <b>−{weight.amount}</b></span>
+                          </>}
+                        </div>}
                       </article>
                     );
                   })}

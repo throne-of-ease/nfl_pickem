@@ -135,7 +135,14 @@ p { color: var(--muted); }
 .slate-head { display: grid; grid-template-columns: 2rem 7.4rem minmax(0, 1fr) 6.2rem; gap: .45rem; padding: .3rem .4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .slate-head span:first-child { grid-column: 2; }
 .slate-head span:nth-child(2) { grid-column: 3; }
-.slate-head span:last-child { grid-column: 4; text-align: right; }
+.slate-head span:nth-child(3) { grid-column: 4; text-align: right; }
+.slate-head.with-weights, .game.with-weights { grid-template-columns: 2rem 7.4rem minmax(0, 1fr) 6.2rem 7.5rem; }
+.slate-head.with-weights span:last-child { grid-column: 5; text-align: center; }
+.game.with-weights { grid-template-areas: "drag meta matchup confidence weight"; }
+.pick-weight-help { margin: .3rem 0; color: var(--muted); font-size: .7rem; }
+.pick-weight { grid-area: weight; min-width: 0; display: grid; gap: .1rem; padding-left: .35rem; border-left: 1px solid var(--line); font-size: .7rem; font-variant-numeric: tabular-nums; }
+.pick-weight small { color: var(--muted); font-size: .6rem; }
+.pick-weight span { white-space: nowrap; }
 .games { padding-bottom: .35rem; }
 .game {
   display: grid;
@@ -427,6 +434,12 @@ footer [data-testid="real-data-status"] { display: block; }
   .slate-head { display: none; }
   .games { border-top: 1px solid var(--ink); }
   .game { grid-template-columns: 2.1rem 4.6rem minmax(0, 1fr) 3.4rem; grid-template-areas: "drag meta matchup confidence"; gap: .25rem .3rem; min-height: 46px; padding: .3rem .25rem; }
+  .game.with-weights { grid-template-columns: 1.7rem 3.5rem minmax(0, 1fr) 2.5rem 4.8rem; grid-template-areas: "drag meta matchup confidence weight"; gap: .25rem .2rem; }
+  .game.with-weights .teams { grid-template-columns: minmax(0, 1fr); gap: .15rem; }
+  .game.with-weights .at { display: none; }
+  .game.with-weights .drag-handle { width: 27px; }
+  .game.with-weights .pick-weight { padding-left: .2rem; font-size: .58rem; letter-spacing: 0; }
+  .game.with-weights .pick-weight small { font-size: .52rem; }
   .game-meta { grid-area: meta; }
   .game fieldset { grid-area: matchup; }
   .confidence-cell { grid-area: confidence; min-height: 32px; }

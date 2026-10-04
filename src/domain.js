@@ -46,6 +46,18 @@ export function modelPicks(games, kind) {
   }))
 }
 
+export function relativeModelWeight(game, pick, modelPick) {
+  const valid = (value) => [game.away, game.home].includes(value?.team) && Number.isInteger(value?.confidence) && value.confidence > 0
+  if (!valid(pick) || !valid(modelPick)) return null
+  const signedStake = (value) => (value.team === game.home ? 1 : -1) * (value.confidence + (game.gotw ? 5 : 0))
+  const difference = signedStake(pick) - signedStake(modelPick)
+  return {
+    amount: Math.abs(difference),
+    overweightTeam: difference > 0 ? game.home : difference < 0 ? game.away : null,
+    underweightTeam: difference > 0 ? game.away : difference < 0 ? game.home : null,
+  }
+}
+
 export function modelAutopick(games, kind, existing = [], { now = new Date(), acceptsLatePicks = false } = {}) {
   const old = new Map(existing.map((pick) => [pick.gameId, pick]))
   const model = modelPicks(games, kind)

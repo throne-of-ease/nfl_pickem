@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, preserveLockedPicks, scorePick, standings, validateDraft } from '../src/domain.js'
+import { POOLS, buildSeasonHistory, freezePregameSnapshot, gameQuality, modelAutopick, modelDisagreement, modelPicks, noVigProbabilities, pickDeviation, poolMetrics, presetConfidencePicks, preserveLockedPicks, relativeModelWeight, scorePick, standings, validateDraft } from '../src/domain.js'
 import { gamesByPool, picksByUser, users } from '../src/fixtures.js'
 
 const games = [
@@ -215,5 +215,29 @@ describe('pregame snapshots', () => {
     const first = freezePregameSnapshot({}, { predictorHome: .55, source: 'first-live', capturedAt: 't1' })
     const second = freezePregameSnapshot(first, { predictorHome: .8, source: 'later', capturedAt: 't2' })
     expect(second.pregameSnapshot).toEqual(first.pregameSnapshot)
+  })
+})
+
+
+describe('relative model weight', () => {
+  const game = { away: 'AWAY', home: 'HOME' }
+  const pick = (team, confidence) => ({ team, confidence })
+  it('compares signed stakes on either team and identifies both sides', () => {
+    expect(relativeModelWeight(game, pick('HOME', 6), pick('HOME', 2))).toEqual({ amount: 4, overweightTeam: 'HOME', underweightTeam: 'AWAY' })
+    expect(relativeModelWeight(game, pick('HOME', 2), pick('HOME', 6))).toEqual({ amount: 4, overweightTeam: 'AWAY', underweightTeam: 'HOME' })
+    expect(relativeModelWeight(game, pick('AWAY', 6), pick('AWAY', 2))).toEqual({ amount: 4, overweightTeam: 'AWAY', underweightTeam: 'HOME' })
+    expect(relativeModelWeight(game, pick('AWAY', 2), pick('HOME', 6))).toEqual({ amount: 8, overweightTeam: 'AWAY', underweightTeam: 'HOME' })
+    expect(relativeModelWeight(game, pick('HOME', 2), pick('AWAY', 6))).toEqual({ amount: 8, overweightTeam: 'HOME', underweightTeam: 'AWAY' })
+    expect(relativeModelWeight(game, pick('HOME', 6), pick('HOME', 6))).toEqual({ amount: 0, overweightTeam: null, underweightTeam: null })
+  })
+  it('cancels GOTW bonuses on the same side and adds both on opposite sides', () => {
+    expect(relativeModelWeight({ ...game, gotw: true }, pick('HOME', 6), pick('HOME', 2)).amount).toBe(4)
+    expect(relativeModelWeight({ ...game, gotw: true }, pick('AWAY', 2), pick('HOME', 6)).amount).toBe(18)
+  })
+  it('leaves unpicked games and unavailable models uncomputed', () => {
+    for (const invalid of [null, pick(null, 2), pick('OTHER', 2), pick('HOME', null), pick('HOME', 0)]) {
+      expect(relativeModelWeight(game, invalid, pick('HOME', 2))).toBeNull()
+      expect(relativeModelWeight(game, pick('HOME', 2), invalid)).toBeNull()
+    }
   })
 })
