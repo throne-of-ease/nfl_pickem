@@ -64,7 +64,7 @@ describe('tracker-compatible chart transformations', () => {
     for (let index = 1; index < layout.length; index += 1) {
       if (layout[index].row === layout[index - 1].row) expect(layout[index].x).toBeGreaterThanOrEqual(layout[index - 1].x + layout[index - 1].width)
     }
-    expect(COLORS).toEqual(['#008fd5', '#fc4f30', '#e5ae38', '#6d904f'])
+    expect(COLORS).toEqual(['#0072b2', '#d55e00', '#009e73', '#cc79a7', '#e69f00', '#56b4e9', '#f0e442'])
   })
 
   it('uses even, readable leader-gap ticks including zero', () => {

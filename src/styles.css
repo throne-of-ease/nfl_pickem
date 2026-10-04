@@ -15,10 +15,13 @@
   --success: #55c98a;
   --warning: #e9b44c;
   --live: #ff6574;
-  --chart-color-0: #008fd5;
-  --chart-color-1: #fc4f30;
-  --chart-color-2: #e5ae38;
-  --chart-color-3: #6d904f;
+  --chart-color-0: #359bd0;
+  --chart-color-1: #e87932;
+  --chart-color-2: #009e73;
+  --chart-color-3: #cc79a7;
+  --chart-color-4: #e69f00;
+  --chart-color-5: #88d5f5;
+  --chart-color-6: #f0e442;
 }
 
 :root[data-theme="light"] {
@@ -34,10 +37,13 @@
   --success: #187443;
   --warning: #8c5900;
   --live: #c52d43;
-  --chart-color-0: #0077b1;
-  --chart-color-1: #c63c20;
-  --chart-color-2: #8b6800;
-  --chart-color-3: #4c6e37;
+  --chart-color-0: #0072b2;
+  --chart-color-1: #b34f00;
+  --chart-color-2: #007d5b;
+  --chart-color-3: #a34d80;
+  --chart-color-4: #9c6b00;
+  --chart-color-5: #2584ad;
+  --chart-color-6: #827700;
 }
 
 .theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: .25rem .4rem; color: var(--ink); flex-shrink: 0; }
@@ -53,14 +59,20 @@
 :root[data-theme="light"] .chart line[stroke="#29415e"] { stroke: var(--line); }
 :root[data-theme="light"] .chart [data-zero-reference] { stroke: var(--muted); }
 :root[data-theme="light"] .chart rect[fill="#29415e"] { fill: var(--line); }
-:root[data-theme="light"] .chart [stroke="#008fd5"] { stroke: var(--chart-color-0); }
-:root[data-theme="light"] .chart [stroke="#fc4f30"] { stroke: var(--chart-color-1); }
-:root[data-theme="light"] .chart [stroke="#e5ae38"] { stroke: var(--chart-color-2); }
-:root[data-theme="light"] .chart [stroke="#6d904f"] { stroke: var(--chart-color-3); }
-:root[data-theme="light"] .chart [fill="#008fd5"] { fill: var(--chart-color-0); }
-:root[data-theme="light"] .chart [fill="#fc4f30"] { fill: var(--chart-color-1); }
-:root[data-theme="light"] .chart [fill="#e5ae38"] { fill: var(--chart-color-2); }
-:root[data-theme="light"] .chart [fill="#6d904f"] { fill: var(--chart-color-3); }
+.chart [stroke="#0072b2"] { stroke: var(--chart-color-0); }
+.chart [fill="#0072b2"] { fill: var(--chart-color-0); }
+.chart [stroke="#d55e00"] { stroke: var(--chart-color-1); }
+.chart [fill="#d55e00"] { fill: var(--chart-color-1); }
+.chart [stroke="#009e73"] { stroke: var(--chart-color-2); }
+.chart [fill="#009e73"] { fill: var(--chart-color-2); }
+.chart [stroke="#cc79a7"] { stroke: var(--chart-color-3); }
+.chart [fill="#cc79a7"] { fill: var(--chart-color-3); }
+.chart [stroke="#e69f00"] { stroke: var(--chart-color-4); }
+.chart [fill="#e69f00"] { fill: var(--chart-color-4); }
+.chart [stroke="#56b4e9"] { stroke: var(--chart-color-5); }
+.chart [fill="#56b4e9"] { fill: var(--chart-color-5); }
+.chart [stroke="#f0e442"] { stroke: var(--chart-color-6); }
+.chart [fill="#f0e442"] { fill: var(--chart-color-6); }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -295,6 +307,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .relative-game-points .lost-points-toggle { display: flex; align-items: center; gap: .3rem; cursor: pointer; }
 .chart-actions.chart-actions-bottom { justify-content: flex-end; margin-top: .3rem; }
 .chart-actions-bottom button { display: inline-grid; width: 2rem; height: 2rem; place-items: center; padding: .35rem; }
+.chart-actions-bottom .chart-data-toggle { width: auto; margin-right: auto; font-size: .72rem; white-space: nowrap; }
 .chart-actions-bottom svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
 .chart-scroll { max-width: 100%; overflow: auto; }
 .chart { display: block; min-width: 620px; width: 100%; height: auto; }
@@ -478,6 +491,11 @@ footer [data-testid="real-data-status"] { display: block; }
 
 @media (max-width: 430px) {
   .chart-card { padding: .65rem .55rem; }
+  nav { min-width: 0; }
+  nav button:first-child { flex-grow: 1.2; }
+  nav button.picks-tab { flex-grow: .85; line-height: 1.05; }
+  nav button.picks-tab .picks-word-second { display: block; }
+  nav button { flex: 1 1 0; min-width: 0; padding-inline: .25rem; white-space: normal; overflow-wrap: normal; letter-spacing: .025em; }
   .chart { min-width: 0; }
   .chart-card .chart-heading h3 { font-size: .98rem; }
   .chart-description { font-size: .72rem; }
@@ -654,4 +672,8 @@ footer [data-testid="real-data-status"] { display: block; }
 @media (max-width: 1040px) {
   header { flex-wrap: wrap; }
   header > nav { order: 3; flex: 0 0 100%; flex-wrap: wrap; }
+}
+
+@media (max-width: 430px) {
+  header > nav { flex-wrap: nowrap; }
 }

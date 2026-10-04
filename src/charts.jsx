@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { isLocked, modelPicks, scorePick } from './domain.js'
 
-// FiveThirtyEight's categorical chart colors.
-export const COLORS = ['#008fd5', '#fc4f30', '#e5ae38', '#6d904f']
+// Okabe–Ito categorical palette: distinct player hues first, then three model hues.
+// Theme variants keep thin lines visible against both chart backgrounds.
+export const COLORS = ['#0072b2', '#d55e00', '#009e73', '#cc79a7', '#e69f00', '#56b4e9', '#f0e442']
 
 export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, poolKeys, direction = 'top', limit = 10, includeLostPoints = false) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
@@ -257,8 +258,9 @@ export function ChartIcon({ type }) {
     : <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 12v2h10v-2" /></svg>
 }
 
-function ChartActions({ id, chartRef }) {
+function ChartActions({ id, chartRef, showData, onToggleData }) {
   return <div className="chart-actions chart-actions-bottom">
+    <button type="button" className="chart-data-toggle" aria-expanded={showData} aria-controls={`${id}-data`} onClick={onToggleData}>View chart data</button>
     <button type="button" title="Share chart as PNG" aria-label="Share chart as PNG" onClick={() => shareSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="share" /></button>
     <button type="button" title="Download chart as PNG" aria-label="Download chart as PNG" onClick={() => downloadSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="download" /></button>
   </div>
@@ -266,6 +268,7 @@ function ChartActions({ id, chartRef }) {
 
 function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', controls, children, table }) {
   const ref = useRef(null)
+  const [showData, setShowData] = useState(false)
   return <section className={`chart-card chart-card-${id}`} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}>
     <div className="chart-heading">
       <h3 id={`${id}-title`}>{title}</h3>
@@ -276,8 +279,8 @@ function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabe
     </div>
     <div className="chart-scroll">{React.cloneElement(children, { chartRef: ref })}</div>
     <p className="chart-description" id={`${id}-description`}>{description}</p>
-    <ChartActions id={id} chartRef={ref} />
-    {table}
+    <ChartActions id={id} chartRef={ref} showData={showData} onToggleData={() => setShowData((open) => !open)} />
+    <div id={`${id}-data`} hidden={!showData}>{table}</div>
   </section>
 }
 
@@ -335,7 +338,7 @@ const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toF
 
 function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false }) {
   const compact = useCompactChart()
-  const width = compact ? Math.max(360, labels.length > 8 ? labels.length * 38 + 92 : 360) : 800
+  const width = compact ? 360 : 800
   const height = compact ? 310 : 330, left = compact ? 36 : 54, right = endValues ? (compact ? 52 : 74) : 24, bottom = 32
   const legend = chartLegendLayout(series, left, width - left - 24)
   const top = 44 + (legend.at(-1)?.row ?? 0) * 22
@@ -352,7 +355,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
     const index = entry.values.findLastIndex(Number.isFinite)
     return index < 0 ? [] : [{ ...entry, value: entry.values[index], targetX: x(index), targetY: y(entry.values[index]) }]
   }), top + 7, height - bottom - 7) : []
-  return <svg ref={chartRef} className="chart" style={compact && width > 360 ? { minWidth: width } : undefined} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+  return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><text x="29" y="4">{item.name}</text></g>)}
     {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks ? displayValue(value) : Math.round(value)}</text></g>)}
@@ -372,12 +375,12 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
 
 function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
   const compact = useCompactChart()
-  const width = compact ? Math.max(360, data.length * 78 + 74) : 800
-  const height = compact ? 300 : 324, left = compact ? 40 : 50, right = 24, top = 28, bottom = 42
+  const width = compact ? 360 : 800
+  const height = compact ? 300 : 324, left = compact ? 40 : 50, right = 24, top = 28, bottom = compact ? 54 : 42
   const { min, max, span } = safeRange(data.flatMap((item) => [item.value, item.potential ?? item.value]))
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const zero = y(0), group = (width - left - right) / Math.max(1, data.length), bar = Math.min(84, group * .55)
-  return <svg ref={chartRef} className="chart" style={compact && width > 360 ? { minWidth: width } : undefined} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+  return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" /><line x1={left} x2={width - right} y1={zero} y2={zero} stroke="#8ba0b9" />
     {data.map((item, index) => { const x = left + index * group + (group - bar) / 2; const topY = y(Math.max(0, item.value)); const barHeight = Math.abs(y(item.value) - zero); return <g key={item.name}>
       <rect x={x} y={item.value >= 0 ? topY : zero} width={bar} height={barHeight} fill={COLORS[(item.colorIndex ?? index) % COLORS.length]} rx="5"><title>{item.name}: {item.value.toFixed(1)}</title></rect>
@@ -385,10 +388,10 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
         <title>{item.name} potential: {item.potential.toFixed(1)}</title>
         <line x1={x + bar + 8} x2={x + bar + 8} y1={y(item.value)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" strokeDasharray="4,3" />
         <line x1={x + bar + 3} x2={x + bar + 13} y1={y(item.potential)} y2={y(item.potential)} stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="2" />
-        <text x={x + bar + 16} y={y(item.potential) + 4}>{displayValue(item.potential)} P</text>
+        <text x={compact ? x + bar / 2 : x + bar + 16} y={y(item.potential) + (compact ? -8 : 4)} textAnchor={compact ? "middle" : undefined}>{displayValue(item.potential)} P</text>
       </g>}
       <text x={x + bar / 2} y={item.value >= 0 ? topY - 7 : zero + barHeight + 15} textAnchor="middle">{item.value.toFixed(1)}</text>
-      <text x={x + bar / 2} y={height - 13} textAnchor="middle"><title>{item.name}</title>{compact && item.name.length > 10 ? `${item.name.slice(0, 9)}…` : item.name}</text>
+      <text x={x + bar / 2} y={height - (compact ? 28 : 13)} textAnchor="middle" style={compact && data.length > 4 ? { fontSize: 11 } : undefined}><title>{item.name}</title>{compact ? item.name.split(/\s+/).map((word, wordIndex) => <tspan key={wordIndex} x={x + bar / 2} dy={wordIndex ? 14 : 0}>{word.length > (data.length > 4 ? 6 : 10) ? `${word.slice(0, data.length > 4 ? 5 : 9)}…` : word}</tspan>) : item.name}</text>
     </g>})}
   </svg>
 }
@@ -405,13 +408,13 @@ export function teamBarValueLabelLayout(value, valueX, barX, barWidth, left) {
 
 function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
   const compact = useCompactChart()
-  const width = compact ? 440 : 800, top = 24, bottom = 24, left = compact ? 110 : 78, right = 64, rowHeight = 18
+  const width = compact ? 360 : 800, top = 24, bottom = 24, left = compact ? 110 : 78, right = 64, rowHeight = 18
   const height = Math.max(100, top + bottom + data.length * rowHeight)
   const values = data.map((item) => item.value)
   const min = Math.min(0, ...values), max = Math.max(0, ...values), span = max - min || 1
   const x = (value) => left + (value - min) * (width - left - right) / span
   const zero = x(0)
-  return <svg ref={chartRef} className="chart" style={compact ? { minWidth: width } : undefined} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+  return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     <line x1={zero} x2={zero} y1={top - 8} y2={height - bottom + 4} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />
     {!data.length && <text x={width / 2} y={height / 2} textAnchor="middle">No completed comparable picks</text>}
@@ -436,7 +439,7 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
 }
 
 function AccessibleTable({ caption, columns, rows }) {
-  return <details><summary>View chart data</summary><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell == null ? '—' : typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></details>
+  return <div className="chart-data"><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell == null ? '—' : typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></div>
 }
 
 export function WeeklyPointsChart({ history }) {

@@ -928,11 +928,13 @@ export default function App() {
         </a>
         <nav aria-label="Main navigation">
           {[["overview", "Overview"], ["games", "My picks"], ["charts", "Charts"], ["models", "Win probs."], ...(isAdmin ? [["admin", "Admin"]] : [])].map(([item, label]) => (
-            <button key={item} className={`${tab === item ? "active" : ""} ${item === "models" ? "models-tab" : ""}`} onClick={() => { setTab(item); if (item !== "games") setDivisionWinnersOpen(false); }}>
+            <button key={item} className={`${tab === item ? "active" : ""} ${item === "models" ? "models-tab" : item === "games" ? "picks-tab" : ""}`} onClick={() => { setTab(item); if (item !== "games") setDivisionWinnersOpen(false); }}>
               {item === "models" ? (
                 <>
                   Win <span className="models-word-second">probs.</span>
                 </>
+              ) : item === "games" ? (
+                <>My <span className="picks-word-second">picks</span></>
               ) : (
                 label
               )}
