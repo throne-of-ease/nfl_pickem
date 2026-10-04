@@ -101,3 +101,12 @@ it('shows compact completed records for all weeks and counts a team game once ac
   expect(screen.getByRole('img').querySelector('[data-team-label]')).toHaveTextContent(/^HOME$/)
   expect(screen.getByRole('img').querySelector('[data-live-outcome]')).not.toBeNull()
 })
+
+it('uses theme text color for a negative value placed inside a hollow live bar', () => {
+  render(<TeamModelRelativeChart players={players} gamesByPool={{ w: [game('l', 'live', 10, 20)] }} picksByUser={picks} viewerId="p" poolKeys={['w']} weekLabels={['W1']} />)
+  fireEvent.change(screen.getByLabelText('Net points benchmark'), { target: { value: 'player:b' } })
+  fireEvent.change(screen.getByLabelText('Net points vs benchmark week'), { target: { value: 'w' } })
+  const label = screen.getByRole('img').querySelector('[data-value-label-placement="inside"]')
+  expect(label).toHaveTextContent('-14')
+  expect(label.style.fill).toBe('')
+})

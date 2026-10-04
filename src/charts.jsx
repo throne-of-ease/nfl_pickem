@@ -513,7 +513,7 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel, singleWeek = false }) {
           <title>{tooltip}</title>
         </rect>
         {item.liveGames > 0 && <rect data-live-bar={item.name} x={Math.min(finalX, valueX)} y={y + 2} width={Math.max(2, Math.abs(valueX - finalX))} height={13} fill="none" stroke="#66ccee" strokeWidth="2" strokeDasharray="4,2" rx="2"><title>{item.name}: live contribution {displayValue(item.liveValue)}; {resultLabel}</title></rect>}
-        <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
+        <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill && valueLabel.x >= Math.min(zero, finalX) && valueLabel.x <= Math.max(zero, finalX) ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
     })}
   </svg>
