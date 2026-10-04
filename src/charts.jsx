@@ -387,10 +387,13 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
       const barX = Math.min(zero, valueX)
       const barWidth = Math.max(1, Math.abs(valueX - zero))
       const valueLabel = teamBarValueLabelLayout(item.value, valueX, barX, barWidth, left)
+      const tooltip = Number.isFinite(item.playerNet) && Number.isFinite(item.modelNet)
+        ? `${item.name}: ${displayValue(item.value)} net impact vs model; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; model net ${displayValue(item.modelNet)}; ${item.comparisons} relative games`
+        : `${item.name}: ${displayValue(item.value)} net relative stake; ${item.comparisons} relative games`
       return <g key={item.name}>
         <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
         <rect x={barX} y={y + 2} width={barWidth} height={13} fill={item.value >= 0 ? COLORS[0] : COLORS[2]} rx="3">
-          <title>{item.name}: {displayValue(item.value)} vs model; player net {displayValue(item.playerNet)}; model net {displayValue(item.modelNet)}; {item.comparisons} pick-games</title>
+          <title>{tooltip}</title>
         </rect>
         <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
