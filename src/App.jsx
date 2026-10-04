@@ -1272,7 +1272,8 @@ export default function App() {
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />
                   <AggressivenessChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />
-                  <RelativeGamePointsTable players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />\n                  <TeamModelRelativeChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} />
+                  <RelativeGamePointsTable players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />
+                  <TeamModelRelativeChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} />
                 </div>
               </section>
             )}
