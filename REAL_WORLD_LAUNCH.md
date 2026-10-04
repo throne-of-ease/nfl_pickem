@@ -37,7 +37,18 @@ The production architecture is a static GitHub Pages frontend backed by the exis
    - `SUPABASE_PROJECT_REF`
 
 3. Add the personal Supabase access token as the repository secret `SUPABASE_ACCESS_TOKEN`.
-4. Push to the repository default branch (`feat/compact-pick-sheet`) or `main`. `.github/workflows/deploy.yml` runs the tests, builds with the `/nfl_pickem/` base path, deploys Edge Functions, then publishes `dist` to Pages.
+4. Push to the repository default branch (`feat/compact-pick-sheet`) or `main`. `.github/workflows/deploy.yml` runs the tests and builds with the `/nfl_pickem/` base path. Frontend-only changes publish directly to Pages. Changes under `supabase/` apply migrations and deploy Edge Functions before Pages; a backend failure blocks that release. Manual runs skip backend deployment unless `deploy_backend` is selected. The CLI is pinned to `2.119.0` to avoid anonymous latest-release lookups.
+
+Use the connected GitHub tools to publish and retry failed jobs without shell credentials. Check a published commit with Node 24.5 or newer:
+
+```sh
+npm run deploy:status -- --commit FULL_COMMIT_SHA --wait
+npm run deploy:status -- --run WORKFLOW_RUN_ID
+```
+
+Exit codes are `0` for success, `1` for failure/error/timeout, and `2` for a pending or not-yet-created run when `--wait` is omitted. `npm run test:deployment` checks push and manual deployment scope using temporary Git fixtures; CI runs it before publishing.
+
+Without a commit or run argument, the helper reads the latest remote deployment branch. It queries the deployment workflow across all event types, reports job failures, and returns a nonzero exit code for failure or timeout. Public repository reads require no token. `GH_TOKEN` or `GITHUB_TOKEN` can be supplied for authenticated reads when needed; the helper never prints their values. Retry transient failures through the connected GitHub failed-jobs or single-job retry tools and monitor that same run. Confirm the live page serves the changed build after Pages succeeds. Standing project instructions are in `AGENTS.md`.
 
 ## Verification
 

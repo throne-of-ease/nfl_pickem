@@ -11,7 +11,9 @@
     "build": "vite build",
     "test": "vitest run",
     "test:integration": "vitest run tests/integration.test.jsx",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:deployment": "bash scripts/test-deployment-scope.sh",
+    "deploy:status": "node --use-env-proxy scripts/deployment-status.js"
   },
   "dependencies": {
     "react": "^18.3.1",
