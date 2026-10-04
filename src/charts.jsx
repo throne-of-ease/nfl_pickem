@@ -92,34 +92,38 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
-function teamModelComparisons(players, gamesByPool, picksByUser, playerId, kind, poolKeys) {
+function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
+  const benchmarkPlayerId = benchmark.startsWith('player:') ? benchmark.slice('player:'.length) : null
   const comparisons = []
   for (const poolKey of poolKeys) {
     const games = gamesByPool[poolKey] ?? []
     const gamesById = new Map(games.map((game) => [game.id, game]))
-    const models = new Map(modelPicks(games, kind).map((pick) => [pick.gameId, pick]))
+    const benchmarkPicks = benchmarkPlayerId
+      ? new Map((picksByUser[benchmarkPlayerId]?.[poolKey] ?? []).map((pick) => [pick.gameId, pick]))
+      : new Map(modelPicks(games, benchmark).map((pick) => [pick.gameId, pick]))
     for (const player of selectedPlayers) {
       for (const pick of picksByUser[player.id]?.[poolKey] ?? []) {
         const game = gamesById.get(pick.gameId)
-        const model = models.get(pick.gameId)
-        if (!game || !model || !['final', 'post'].includes(game.status) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)
-          || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) continue
+        const benchmarkPick = benchmarkPicks.get(pick.gameId)
+        if (!game || !benchmarkPick || !['final', 'post'].includes(game.status) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)
+          || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)
+          || !Number.isInteger(benchmarkPick.confidence) || ![game.away, game.home].includes(benchmarkPick.team)) continue
         const playerScore = scorePick(pick, game)
-        const modelScore = scorePick(model, game)
+        const benchmarkScore = scorePick(benchmarkPick, game)
         const playerSignedStake = (pick.team === game.home ? 1 : -1) * playerScore.stake
-        const modelSignedStake = (model.team === game.home ? 1 : -1) * modelScore.stake
-        const relativeSignedStake = playerSignedStake - modelSignedStake
+        const benchmarkSignedStake = (benchmarkPick.team === game.home ? 1 : -1) * benchmarkScore.stake
+        const relativeSignedStake = playerSignedStake - benchmarkSignedStake
         if (!relativeSignedStake) continue
         const playerNet = playerScore.correct ? playerScore.points : -playerScore.stake
-        const modelNet = modelScore.correct ? modelScore.points : -modelScore.stake
+        const benchmarkNet = benchmarkScore.correct ? benchmarkScore.points : -benchmarkScore.stake
         comparisons.push({
           overweightTeam: relativeSignedStake > 0 ? game.home : game.away,
           underweightTeam: relativeSignedStake > 0 ? game.away : game.home,
           relativeStake: Math.abs(relativeSignedStake),
           playerNet,
-          modelNet,
-          impact: playerNet - modelNet,
+          benchmarkNet,
+          impact: playerNet - benchmarkNet,
         })
       }
     }
@@ -127,21 +131,21 @@ function teamModelComparisons(players, gamesByPool, picksByUser, playerId, kind,
   return comparisons
 }
 
-export function teamModelRelativePoints(players, gamesByPool, picksByUser, playerId, kind, poolKeys = Object.keys(gamesByPool)) {
+export function teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool)) {
   const totals = new Map()
-  for (const comparison of teamModelComparisons(players, gamesByPool, picksByUser, playerId, kind, poolKeys)) {
-    const current = totals.get(comparison.overweightTeam) ?? { name: comparison.overweightTeam, value: 0, relativeStake: 0, playerNet: 0, modelNet: 0, comparisons: 0 }
+  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys)) {
+    const current = totals.get(comparison.overweightTeam) ?? { name: comparison.overweightTeam, value: 0, relativeStake: 0, playerNet: 0, benchmarkNet: 0, comparisons: 0 }
     current.value += comparison.impact
     current.relativeStake += comparison.relativeStake
     current.playerNet += comparison.playerNet
-    current.modelNet += comparison.modelNet
+    current.benchmarkNet += comparison.benchmarkNet
     current.comparisons += 1
     totals.set(comparison.overweightTeam, current)
   }
   return [...totals.values()].sort((a, b) => b.value - a.value || b.relativeStake - a.relativeStake || a.name.localeCompare(b.name))
 }
 
-export function teamModelRelativeExposure(players, gamesByPool, picksByUser, playerId, kind, poolKeys = Object.keys(gamesByPool)) {
+export function teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys = Object.keys(gamesByPool)) {
   const totals = new Map()
   const add = (team, value) => {
     const current = totals.get(team) ?? { name: team, value: 0, comparisons: 0 }
@@ -149,7 +153,7 @@ export function teamModelRelativeExposure(players, gamesByPool, picksByUser, pla
     current.comparisons += 1
     totals.set(team, current)
   }
-  for (const comparison of teamModelComparisons(players, gamesByPool, picksByUser, playerId, kind, poolKeys)) {
+  for (const comparison of teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys)) {
     add(comparison.overweightTeam, comparison.relativeStake)
     add(comparison.underweightTeam, -comparison.relativeStake)
   }
@@ -387,8 +391,8 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
       const barX = Math.min(zero, valueX)
       const barWidth = Math.max(1, Math.abs(valueX - zero))
       const valueLabel = teamBarValueLabelLayout(item.value, valueX, barX, barWidth, left)
-      const tooltip = Number.isFinite(item.playerNet) && Number.isFinite(item.modelNet)
-        ? `${item.name}: ${displayValue(item.value)} net impact vs model; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; model net ${displayValue(item.modelNet)}; ${item.comparisons} relative games`
+      const tooltip = Number.isFinite(item.playerNet) && Number.isFinite(item.benchmarkNet)
+        ? `${item.name}: ${displayValue(item.value)} net impact vs benchmark; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; benchmark net ${displayValue(item.benchmarkNet)}; ${item.comparisons} relative games`
         : `${item.name}: ${displayValue(item.value)} net relative stake; ${item.comparisons} relative games`
       return <g key={item.name}>
         <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
@@ -443,7 +447,7 @@ export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKey
 }
 
 export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, viewerId, poolKeys, weekLabels }) {
-  const [kind, setKind] = useState('aggregate')
+  const [benchmark, setBenchmark] = useState('aggregate')
   const [view, setView] = useState('impact')
   const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [selectedPeriod, setSelectedPeriod] = useState('all')
@@ -453,32 +457,51 @@ export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, view
   const period = selectedPeriod === 'all' || poolKeys.includes(selectedPeriod) ? selectedPeriod : 'all'
   const selectedPools = period === 'all' ? poolKeys : [period]
   const impactView = view === 'impact'
+  const benchmarkPlayerId = benchmark.startsWith('player:') ? benchmark.slice('player:'.length) : null
+  const benchmarkPlayer = players.find((player) => player.id === benchmarkPlayerId)
+  const benchmarkLabel = benchmarkPlayer?.name
+    ?? (benchmark === 'predictor' ? 'FPI' : benchmark === 'moneyline' ? 'Moneyline' : 'FPI + moneyline average')
   const data = impactView
-    ? teamModelRelativePoints(players, gamesByPool, picksByUser, playerId, kind, selectedPools)
-    : teamModelRelativeExposure(players, gamesByPool, picksByUser, playerId, kind, selectedPools)
+    ? teamBenchmarkRelativePoints(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools)
+    : teamBenchmarkRelativeExposure(players, gamesByPool, picksByUser, playerId, benchmark, selectedPools)
+  const changePlayer = (nextPlayer) => {
+    setSelectedPlayer(nextPlayer)
+    if (nextPlayer !== 'all' && benchmark === `player:${nextPlayer}`) setBenchmark('aggregate')
+  }
   const controls = <>
-    <label>View <select aria-label="Net points vs model view" value={view} onChange={(event) => setView(event.target.value)}><option value="impact">Net impact</option><option value="exposure">Over/underweight</option></select></label>
-    <label>Player <select aria-label="Net points vs model player" value={allPlayers ? 'all' : playerId ?? ''} onChange={(event) => setSelectedPlayer(event.target.value)}><option value="all">All players</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
-    <label>Week <select aria-label="Net points vs model week" value={period} onChange={(event) => setSelectedPeriod(event.target.value)}><option value="all">All weeks</option>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>
-    <label>Model <select aria-label="Net points vs model baseline" value={kind} onChange={(event) => setKind(event.target.value)}><option value="predictor">FPI</option><option value="moneyline">Moneyline</option><option value="aggregate">FPI + moneyline average</option></select></label>
+    <label>View <select aria-label="Net points vs benchmark view" value={view} onChange={(event) => setView(event.target.value)}><option value="impact">Net impact</option><option value="exposure">Over/underweight</option></select></label>
+    <label>Player <select aria-label="Net points vs benchmark player" value={allPlayers ? 'all' : playerId ?? ''} onChange={(event) => changePlayer(event.target.value)}><option value="all">All players</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
+    <label>Week <select aria-label="Net points vs benchmark week" value={period} onChange={(event) => setSelectedPeriod(event.target.value)}><option value="all">All weeks</option>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>
+    <label>Compare against <select aria-label="Net points benchmark" value={benchmark} onChange={(event) => setBenchmark(event.target.value)}>
+      <optgroup label="Models">
+        <option value="predictor">FPI</option>
+        <option value="moneyline">Moneyline</option>
+        <option value="aggregate">FPI + moneyline average</option>
+      </optgroup>
+      <optgroup label="Players">
+        {players.map((player) => <option key={player.id} value={`player:${player.id}`} disabled={!allPlayers && player.id === playerId}>{player.name}</option>)}
+      </optgroup>
+    </select></label>
   </>
+  const benchmarkType = benchmarkPlayer ? 'comparison player' : 'model'
+  const missingBenchmark = benchmarkPlayer ? 'Games where the comparison player has no usable pick are excluded.' : 'Games missing the selected model input are excluded.'
   const description = impactView
-    ? 'Completed games only. Each player-model difference is one relative position: lower confidence in a team is equivalent to being overweight its opponent, while opposite picks combine both scoring stakes. The realized net-point difference is attributed once to the team the player is overweight versus the selected model. Stakes include GOTW bonuses. Positive bars mean the tilt beat the model; negative bars mean it hurt. Games missing the selected model input are excluded.'
-    : 'Completed games only. Shows net relative scoring stake by team versus the selected model. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. Games missing the selected model input are excluded.'
+    ? `Completed games only. Each player-benchmark difference is one relative position: lower confidence in a team is equivalent to being overweight its opponent, while opposite picks combine both scoring stakes. The realized net-point difference is attributed once to the team the player is overweight versus the selected ${benchmarkType}. Stakes include GOTW bonuses. Positive bars mean the tilt beat the benchmark; negative bars mean it hurt. ${missingBenchmark}`
+    : `Completed games only. Shows net relative scoring stake by team versus the selected ${benchmarkType}. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. ${missingBenchmark}`
   const table = impactView
-    ? <AccessibleTable caption="Net impact versus model by overweight team" columns={['Team', 'Net impact', 'Relative stake', 'Player net', 'Model net', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.relativeStake, item.playerNet, item.modelNet, item.comparisons])} />
-    : <AccessibleTable caption="Overweight and underweight versus model by team" columns={['Team', 'Net relative stake', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
+    ? <AccessibleTable caption="Net impact versus benchmark by overweight team" columns={['Team', 'Net impact', 'Relative stake', 'Player net', 'Benchmark net', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.relativeStake, item.playerNet, item.benchmarkNet, item.comparisons])} />
+    : <AccessibleTable caption="Overweight and underweight versus benchmark by team" columns={['Team', 'Net relative stake', 'Relative games']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
   const playerLabel = allPlayers ? 'all players' : players.find((player) => player.id === playerId)?.name ?? 'player'
   const periodLabel = period === 'all' ? 'all weeks' : weekLabels[poolKeys.indexOf(period)]
   return <ChartFrame
     id="team-net-vs-model"
-    title={impactView ? 'Net points vs model by team' : 'Over/underweight vs model by team'}
+    title={impactView ? 'Net points vs benchmark by team' : 'Over/underweight vs benchmark by team'}
     description={description}
     controls={controls}
     table={table}
   ><RankedTeamBarSvg data={data} ariaLabel={impactView
-    ? `Net impact versus ${kind} model by overweight team, ${playerLabel}, ${periodLabel}`
-    : `Overweight and underweight versus ${kind} model by team, ${playerLabel}, ${periodLabel}`} /></ChartFrame>
+    ? `Net impact versus ${benchmarkLabel} by overweight team, ${playerLabel}, ${periodLabel}`
+    : `Overweight and underweight versus ${benchmarkLabel} by team, ${playerLabel}, ${periodLabel}`} /></ChartFrame>
 }
 
 export function DivisionWinnersChart({ rows, pointsPerCorrect }) {

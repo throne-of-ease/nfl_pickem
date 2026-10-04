@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamBarValueLabelLayout, teamModelRelativeExposure, teamModelRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamBarValueLabelLayout, teamBenchmarkRelativeExposure, teamBenchmarkRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 import { buildSeasonHistory } from '../src/domain.js'
 
 const history = {
@@ -137,7 +137,7 @@ describe('tracker-compatible chart transformations', () => {
 })
 
 
-describe('team-relative positions versus model', () => {
+describe('team-relative positions versus benchmark', () => {
   const players = [{ id: 'alex', name: 'Alex' }, { id: 'blair', name: 'Blair' }]
   const gamesByPool = {
     'week-01': [
@@ -149,63 +149,86 @@ describe('team-relative positions versus model', () => {
     ],
   }
 
-  it('treats lower confidence in a team as an overweight in its opponent', () => {
+  it('treats lower confidence in a team as an overweight in its opponent against a model', () => {
     const picks = { alex: { 'week-01': [
       { gameId: 'g1', team: 'HOME', confidence: 1 },
       { gameId: 'g2', team: 'A2', confidence: 2 },
     ] } }
-    expect(teamModelRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])).toEqual([
-      { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, modelNet: 2, comparisons: 1 },
-      { name: 'A2', value: -3, relativeStake: 3, playerNet: -2, modelNet: 1, comparisons: 1 },
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])).toEqual([
+      { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
+      { name: 'A2', value: -3, relativeStake: 3, playerNet: -2, benchmarkNet: 1, comparisons: 1 },
     ])
   })
 
-  it('sums only non-zero relative positions across players and obeys the selected-week scope', () => {
+  it('compares directly with another player pick and confidence', () => {
+    const picks = {
+      alex: { 'week-01': [
+        { gameId: 'g1', team: 'HOME', confidence: 1 },
+        { gameId: 'g2', team: 'A2', confidence: 2 },
+      ] },
+      blair: { 'week-01': [
+        { gameId: 'g1', team: 'HOME', confidence: 2 },
+        { gameId: 'g2', team: 'H2', confidence: 1 },
+      ] },
+    }
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
+      { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
+      { name: 'A2', value: -3, relativeStake: 3, playerNet: -2, benchmarkNet: 1, comparisons: 1 },
+    ])
+  })
+
+  it('excludes games where the comparison player has no usable pick', () => {
     const picks = {
       alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }], 'week-02': [{ gameId: 'g3', team: 'A3', confidence: 1 }] },
       blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
     }
-    expect(teamModelRelativePoints(players, gamesByPool, picks, null, 'predictor', ['week-01'])).toEqual([
-      { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, modelNet: 2, comparisons: 1 },
-    ])
-    expect(teamModelRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-02'])).toEqual([
-      { name: 'A3', value: 2, relativeStake: 2, playerNet: 1, modelNet: -1, comparisons: 1 },
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, 'alex', 'player:blair', ['week-02'])).toEqual([])
+  })
+
+  it('sums only non-zero positions for All players when comparing with another player', () => {
+    const picks = {
+      alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }] },
+      blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
+    }
+    expect(teamBenchmarkRelativePoints(players, gamesByPool, picks, null, 'player:blair', ['week-01'])).toEqual([
+      { name: 'AWAY', value: -1, relativeStake: 1, playerNet: 1, benchmarkNet: 2, comparisons: 1 },
     ])
   })
 
-  it('uses the requested model baseline and omits games where player and model positions are identical', () => {
+  it('uses the requested model baseline and omits identical positions', () => {
     const game = { id: 'g', home: 'HOME', away: 'AWAY', status: 'final', homeScore: 28, awayScore: 20, predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
     const picks = { alex: { 'week-01': [{ gameId: 'g', team: 'HOME', confidence: 1 }] } }
     const games = { 'week-01': [game] }
-    expect(teamModelRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])).toEqual([])
-    expect(teamModelRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])).toEqual([
-      { name: 'HOME', value: 2, relativeStake: 2, playerNet: 1, modelNet: -1, comparisons: 1 },
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])).toEqual([])
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])).toEqual([
+      { name: 'HOME', value: 2, relativeStake: 2, playerNet: 1, benchmarkNet: -1, comparisons: 1 },
     ])
   })
 
   it('shows both sides in the over/underweight view and sums to zero', () => {
-    const picks = { alex: { 'week-01': [
-      { gameId: 'g1', team: 'HOME', confidence: 1 },
-      { gameId: 'g2', team: 'A2', confidence: 2 },
-    ] } }
-    const rows = teamModelRelativeExposure(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])
+    const picks = {
+      alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }] },
+      blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
+    }
+    const rows = teamBenchmarkRelativeExposure(players, gamesByPool, picks, 'alex', 'player:blair', ['week-01'])
     expect(rows).toEqual([
-      { name: 'A2', value: 3, comparisons: 1 },
       { name: 'AWAY', value: 1, comparisons: 1 },
       { name: 'HOME', value: -1, comparisons: 1 },
-      { name: 'H2', value: -3, comparisons: 1 },
     ])
     expect(rows.reduce((sum, row) => sum + row.value, 0)).toBe(0)
   })
 
-  it('includes GOTW bonus stake when opposite picks create the relative position', () => {
+  it('includes GOTW bonus stake against another player when picks oppose', () => {
     const game = { id: 'gotw', home: 'HOME', away: 'AWAY', status: 'final', homeScore: 10, awayScore: 20, predictorHome: .8, gotw: true }
     const games = { 'week-01': [game] }
-    const picks = { alex: { 'week-01': [{ gameId: 'gotw', team: 'AWAY', confidence: 1 }] } }
-    expect(teamModelRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])).toEqual([
-      { name: 'AWAY', value: 12, relativeStake: 12, playerNet: 6, modelNet: -6, comparisons: 1 },
+    const picks = {
+      alex: { 'week-01': [{ gameId: 'gotw', team: 'AWAY', confidence: 1 }] },
+      blair: { 'week-01': [{ gameId: 'gotw', team: 'HOME', confidence: 1 }] },
+    }
+    expect(teamBenchmarkRelativePoints(players, games, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
+      { name: 'AWAY', value: 12, relativeStake: 12, playerNet: 6, benchmarkNet: -6, comparisons: 1 },
     ])
-    expect(teamModelRelativeExposure(players, games, picks, 'alex', 'predictor', ['week-01'])).toEqual([
+    expect(teamBenchmarkRelativeExposure(players, games, picks, 'alex', 'player:blair', ['week-01'])).toEqual([
       { name: 'AWAY', value: 12, comparisons: 1 },
       { name: 'HOME', value: -12, comparisons: 1 },
     ])
