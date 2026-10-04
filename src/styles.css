@@ -15,13 +15,16 @@
   --success: #55c98a;
   --warning: #e9b44c;
   --live: #ff6574;
-  --chart-color-0: #359bd0;
-  --chart-color-1: #e87932;
-  --chart-color-2: #009e73;
-  --chart-color-3: #cc79a7;
-  --chart-color-4: #e69f00;
-  --chart-color-5: #88d5f5;
-  --chart-color-6: #f0e442;
+  --chart-color-0: #6699cc;
+  --chart-color-1: #ccbb44;
+  --chart-color-2: #44aa77;
+  --chart-color-3: #ee6677;
+  --chart-color-4: #66ccee;
+  --chart-color-5: #cc99cc;
+  --chart-color-6: #bbbbbb;
+  --chart-marker-outline: #0c192b;
+  --weight-over: #78c8f5;
+  --weight-under: #f0d264;
 }
 
 :root[data-theme="light"] {
@@ -37,13 +40,16 @@
   --success: #187443;
   --warning: #8c5900;
   --live: #c52d43;
-  --chart-color-0: #0072b2;
-  --chart-color-1: #b34f00;
-  --chart-color-2: #007d5b;
-  --chart-color-3: #a34d80;
-  --chart-color-4: #9c6b00;
-  --chart-color-5: #2584ad;
-  --chart-color-6: #827700;
+  --chart-color-0: #4477aa;
+  --chart-color-1: #827500;
+  --chart-color-2: #228833;
+  --chart-color-3: #b94455;
+  --chart-color-4: #007c99;
+  --chart-color-5: #aa3377;
+  --chart-color-6: #666666;
+  --chart-marker-outline: #f0f0f0;
+  --weight-over: #0964b9;
+  --weight-under: #845700;
 }
 
 .theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: .25rem .4rem; color: var(--ink); flex-shrink: 0; }
@@ -59,20 +65,20 @@
 :root[data-theme="light"] .chart line[stroke="#29415e"] { stroke: var(--line); }
 :root[data-theme="light"] .chart [data-zero-reference] { stroke: var(--muted); }
 :root[data-theme="light"] .chart rect[fill="#29415e"] { fill: var(--line); }
-.chart [stroke="#0072b2"] { stroke: var(--chart-color-0); }
-.chart [fill="#0072b2"] { fill: var(--chart-color-0); }
-.chart [stroke="#d55e00"] { stroke: var(--chart-color-1); }
-.chart [fill="#d55e00"] { fill: var(--chart-color-1); }
-.chart [stroke="#009e73"] { stroke: var(--chart-color-2); }
-.chart [fill="#009e73"] { fill: var(--chart-color-2); }
-.chart [stroke="#cc79a7"] { stroke: var(--chart-color-3); }
-.chart [fill="#cc79a7"] { fill: var(--chart-color-3); }
-.chart [stroke="#e69f00"] { stroke: var(--chart-color-4); }
-.chart [fill="#e69f00"] { fill: var(--chart-color-4); }
-.chart [stroke="#56b4e9"] { stroke: var(--chart-color-5); }
-.chart [fill="#56b4e9"] { fill: var(--chart-color-5); }
-.chart [stroke="#f0e442"] { stroke: var(--chart-color-6); }
-.chart [fill="#f0e442"] { fill: var(--chart-color-6); }
+.chart [stroke="#4477aa"] { stroke: var(--chart-color-0); }
+.chart [fill="#4477aa"] { fill: var(--chart-color-0); }
+.chart [stroke="#ccbb44"] { stroke: var(--chart-color-1); }
+.chart [fill="#ccbb44"] { fill: var(--chart-color-1); }
+.chart [stroke="#228833"] { stroke: var(--chart-color-2); }
+.chart [fill="#228833"] { fill: var(--chart-color-2); }
+.chart [stroke="#ee6677"] { stroke: var(--chart-color-3); }
+.chart [fill="#ee6677"] { fill: var(--chart-color-3); }
+.chart [stroke="#66ccee"] { stroke: var(--chart-color-4); }
+.chart [fill="#66ccee"] { fill: var(--chart-color-4); }
+.chart [stroke="#aa3377"] { stroke: var(--chart-color-5); }
+.chart [fill="#aa3377"] { fill: var(--chart-color-5); }
+.chart [stroke="#bbbbbb"] { stroke: var(--chart-color-6); }
+.chart [fill="#bbbbbb"] { fill: var(--chart-color-6); }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -155,6 +161,9 @@ p { color: var(--muted); }
 .pick-weight { grid-area: weight; min-width: 0; display: grid; gap: .1rem; padding-left: .35rem; border-left: 1px solid var(--line); font-size: .7rem; font-variant-numeric: tabular-nums; }
 .pick-weight small { color: var(--muted); font-size: .6rem; }
 .pick-weight span { white-space: nowrap; }
+.pick-weight .weight-over { color: var(--weight-over); }
+.pick-weight .weight-under { color: var(--weight-under); }
+.pick-weight .weight-neutral { color: var(--muted); }
 .games { padding-bottom: .35rem; }
 .game {
   display: grid;

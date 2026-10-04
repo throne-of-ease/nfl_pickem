@@ -1267,9 +1267,9 @@ export default function App() {
                         </div>
                         {showPickWeights && <div className="pick-weight" data-testid={`pick-weight-${game.id}`} aria-label={weightDescription} title={weightDescription}>
                           <small>vs {pickModelLabel}</small>
-                          {!weight ? <span>—</span> : weight.amount === 0 ? <span>Matched 0</span> : <>
-                            <span>OW {weight.overweightTeam} <b>+{weight.amount}</b></span>
-                            <span>UW {weight.underweightTeam} <b>−{weight.amount}</b></span>
+                          {!weight ? <span className="weight-neutral">—</span> : weight.amount === 0 ? <span className="weight-neutral">Matched 0</span> : <>
+                            <span className="weight-over">OW {weight.overweightTeam} <b>+{weight.amount}</b></span>
+                            <span className="weight-under">UW {weight.underweightTeam} <b>−{weight.amount}</b></span>
                           </>}
                         </div>}
                       </article>

@@ -1,9 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { isLocked, modelPicks, scorePick } from './domain.js'
 
-// Okabe–Ito categorical palette: distinct player hues first, then three model hues.
-// Theme variants keep thin lines visible against both chart backgrounds.
-export const COLORS = ['#0072b2', '#d55e00', '#009e73', '#cc79a7', '#e69f00', '#56b4e9', '#f0e442']
+// Paul Tol's colorblind-friendly bright palette, reordered for four player hues.
+// Theme variants improve contrast; marker shapes identify series without color.
+export const COLORS = ['#4477aa', '#ccbb44', '#228833', '#ee6677', '#66ccee', '#aa3377', '#bbbbbb']
+
+const MARKER_PATHS = [null, 'M-4-4H4V4H-4Z', 'M0-5 5 4H-5Z', 'M0-5 5 0 0 5-5 0Z', 'M-5-2H-2V-5H2V-2H5V2H2V5H-2V2H-5Z', 'M-5-3-3-5 0-2 3-5 5-3 2 0 5 3 3 5 0 2-3 5-5 3-2 0Z', 'M0-5 4-2.5 4 2.5 0 5-4 2.5-4-2.5Z']
+
+function SeriesMarker({ index, x, y, title }) {
+  const markerIndex = index % COLORS.length
+  const style = { fill: `var(--chart-color-${markerIndex}, ${COLORS[markerIndex]})`, stroke: 'var(--chart-marker-outline, #0c192b)', strokeWidth: 1 }
+  return <g data-series-marker={markerIndex} transform={`translate(${x} ${y})`}>
+    {title && <title>{title}</title>}
+    {markerIndex === 0 ? <circle r="4.5" style={style} /> : <path d={MARKER_PATHS[markerIndex]} style={style} />}
+  </g>
+}
 
 export function relativeGamePoints(players, gamesByPool, picksByUser, playerId, poolKeys, direction = 'top', limit = 10, includeLostPoints = false) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
@@ -357,14 +368,14 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   }), top + 7, height - bottom - 7) : []
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
-    {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><text x="29" y="4">{item.name}</text></g>)}
+    {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><SeriesMarker index={index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
     {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks ? displayValue(value) : Math.round(value)}</text></g>)}
     {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
     {labels.map((label, index) => (compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={label} x={x(index)} y={height - 10} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
       <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />
       {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />}
-      {item.values.map((value, index) => Number.isFinite(value) ? <circle key={index} cx={x(index)} cy={y(value)} r="5"><title>{item.name}, {labels[index]}: {value.toFixed(1)}</title></circle> : null)}
+      {item.values.map((value, index) => Number.isFinite(value) ? <SeriesMarker key={index} index={seriesIndex} x={x(index)} y={y(value)} title={`${item.name}, ${labels[index]}: ${value.toFixed(1)}`} /> : null)}
     </g>)}
     {endLabels.map(({ item, seriesIndex, kind, value, targetX, targetY, labelY }) => <g key={`${item.name}-${kind}`} data-end-label={kind}>
       <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />

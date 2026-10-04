@@ -46,7 +46,14 @@ test('admin comparisons follow model, team and confidence changes and fit iPhone
   await expect(first).toHaveAttribute('aria-label', 'Overweight PIT by 2; underweight BUF by 2 versus AVG')
   await expect(page.getByTestId('pick-weight-g3')).toHaveAttribute('aria-label', 'Select a team to compare with the model')
   await expect(page.getByTestId('pick-weight-g4')).toHaveAttribute('aria-label', 'AVG model unavailable')
-  await checkLayout(page)
+  for (const theme of ['dark', 'light']) {
+    if (theme === 'light') await page.getByRole('button', { name: 'Switch to light mode' }).click()
+    await expect(first.locator('.weight-over')).toContainText('OW PIT +2')
+    await expect(first.locator('.weight-under')).toContainText('UW BUF −2')
+    await expect(first.locator('.weight-over')).toHaveCSS('color', theme === 'dark' ? 'rgb(120, 200, 245)' : 'rgb(9, 100, 185)')
+    await expect(first.locator('.weight-under')).toHaveCSS('color', theme === 'dark' ? 'rgb(240, 210, 100)' : 'rgb(132, 87, 0)')
+    await checkLayout(page)
+  }
   await page.getByLabel('Pick probability model').selectOption('moneyline')
   await expect(first).toHaveAttribute('aria-label', 'Overweight BUF by 13; underweight PIT by 13 versus ML')
   await page.getByLabel('Pick probability model').selectOption('predictor')
