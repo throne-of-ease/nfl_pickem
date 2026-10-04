@@ -133,6 +133,7 @@ function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, b
         const playerNet = liveTie ? 0 : playerScore.correct ? playerScore.points : -playerScore.stake
         const benchmarkNet = liveTie ? 0 : benchmarkScore.correct ? benchmarkScore.points : -benchmarkScore.stake
         comparisons.push({
+          resultKey: `${poolKey}:${game.id}`,
           overweightTeam: relativeSignedStake > 0 ? game.home : game.away,
           underweightTeam: relativeSignedStake > 0 ? game.away : game.home,
           relativeStake: Math.abs(relativeSignedStake),
@@ -155,7 +156,11 @@ function recordTeamResult(row, comparison, value, opposite = false) {
   row.outcomes ??= {}
   const outcome = opposite && comparison.outcome !== 'tied' ? (comparison.outcome === 'winning' ? 'losing' : 'winning') : comparison.outcome
   const label = comparison.live ? { winning: 'Leading', losing: 'Trailing', tied: 'Live tied' }[outcome] : { winning: 'Won', losing: 'Lost', tied: 'Tied' }[outcome]
-  row.outcomes[label] = (row.outcomes[label] ?? 0) + 1
+  row.resultKeys ??= []
+  if (!row.resultKeys.includes(comparison.resultKey)) {
+    row.resultKeys.push(comparison.resultKey)
+    row.outcomes[label] = (row.outcomes[label] ?? 0) + 1
+  }
 }
 
 export function teamResultLabel(row) {
@@ -229,7 +234,7 @@ export function currentWeekChartData(current, mode) {
   const seasonLeader = current.reduce((best, item) => !best || item.seasonTotal > best.seasonTotal ? item : best, null)
   const baseline = mode === 'vs_leader' ? weeklyLeader : mode === 'vs_total_leader' ? seasonLeader : null
   return current.map((item, colorIndex) => {
-    if (mode === 'points_lost') return { name: item.name, colorIndex, value: item.pointsLost ?? 0, potential: item.potentialPointsLost ?? (item.pointsLost ?? 0) + item.potential }
+    if (mode === 'points_lost') return { name: item.name, colorIndex, value: -(item.pointsLost ?? 0) || 0, potential: -(item.potentialPointsLost ?? (item.pointsLost ?? 0) + item.potential) || 0 }
     if (mode === 'points_percentage') return { name: item.name, colorIndex, value: item.lockedMaximum ? item.points / item.lockedMaximum * 100 : 0 }
     if (mode === 'correct_percentage') return { name: item.name, colorIndex, value: item.lockedGameCount ? item.correct / item.lockedGameCount * 100 : 0 }
     if (baseline) return { name: item.name, colorIndex, value: item.points - baseline.points, potential: item.points + item.potential - baseline.points - baseline.potential }
@@ -331,6 +336,16 @@ export function naturalRange(values) {
   return { min: low - padding, max: high + padding, span: high - low + padding * 2 }
 }
 
+export function weeklyAxisTicks(values) {
+  const { min, max, span } = naturalRange(values)
+  const roughStep = Math.max(1, span / 5)
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep))
+  const step = [1, 2, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= roughStep)
+  const first = Math.floor(min / step) * step
+  const last = Math.ceil(max / step) * step
+  return Array.from({ length: Math.round((last - first) / step) + 1 }, (_, index) => first + index * step)
+}
+
 export function leaderAxisTicks(values) {
   const finite = values.filter(Number.isFinite)
   const low = Math.min(0, ...finite)
@@ -383,7 +398,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   const legend = chartLegendLayout(series, left, width - left - 24)
   const top = 44 + (legend.at(-1)?.row ?? 0) * 22
   const values = series.flatMap((item) => [...item.values, ...(item.potentialValues ?? [])])
-  const ticks = zeroReference ? leaderAxisTicks(values) : null
+  const ticks = zeroReference ? leaderAxisTicks(values) : natural ? weeklyAxisTicks(values) : null
   const { min, max, span } = ticks ? { min: ticks[0], max: ticks.at(-1), span: ticks.at(-1) - ticks[0] } : natural ? naturalRange(values) : safeRange(values)
   const x = (index) => labels.length === 1 ? (width - right + left) / 2 : left + index * (width - left - right) / (labels.length - 1)
   const y = (value) => top + (max - value) * (height - top - bottom) / span
@@ -398,7 +413,7 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><SeriesMarker index={index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
-    {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks || natural ? displayValue(value) : Math.round(value)}</text></g>)}
+    {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value} data-axis-tick={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks || natural ? displayValue(value) : Math.round(value)}</text></g>)}
     {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
     {labels.map((label, index) => (compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={label} x={x(index)} y={height - 10} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
@@ -446,23 +461,31 @@ export function teamBarValueLabelLayout(value, valueX, barX, barWidth, left) {
   return { x: outsideX, anchor: value >= 0 ? 'start' : 'end', inside: false, fill: null, label }
 }
 
-function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
+export function compactTeamRecord(item) {
+  const outcomes = item.outcomes ?? {}
+  return `(W:${outcomes.Won ?? 0}/L:${outcomes.Lost ?? 0}${outcomes.Tied ? `/T:${outcomes.Tied}` : ''})`
+}
+
+function TeamOutcomeBadge({ label, count, x, y }) {
+  const live = ['Leading', 'Trailing', 'Live tied'].includes(label)
+  const winning = ['Won', 'Leading'].includes(label)
+  const losing = ['Lost', 'Trailing'].includes(label)
+  const color = winning ? 'var(--chart-color-2, #228833)' : losing ? 'var(--chart-color-3, #ee6677)' : 'var(--muted, #b7c7da)'
+  return <g data-team-outcome={label} data-live-outcome={live || undefined} transform={`translate(${x} ${y})`}>
+    <title>{label}: {count} compared {count === 1 ? 'game' : 'games'}</title>
+    <ellipse rx="7" ry="7" fill="none" style={{ stroke: color }} strokeWidth="1.5" strokeDasharray={live ? '2,2' : undefined} />
+    <path d={winning ? 'M-3 0-1 2 3-2' : losing ? 'M-2.5-2.5 2.5 2.5M-2.5 2.5 2.5-2.5' : 'M-3 0H3'} fill="none" style={{ stroke: color }} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </g>
+}
+
+function RankedTeamBarSvg({ data, chartRef, ariaLabel, singleWeek = false }) {
   const compact = useCompactChart()
-  const width = compact ? 360 : 800, top = 24, bottom = 24, left = compact ? 110 : 78, right = 64
-  let nextY = top
-  const rows = data.map((item) => {
-    const parts = [...Object.entries(item.outcomes ?? {}).map(([label, count]) => `${label} ${count}`), ...(item.liveGames > 0 ? ['LIVE'] : [])]
-    const lines = ['']
-    for (const part of parts) {
-      const last = lines.length - 1
-      if (lines[last] && lines[last].length + part.length + 3 > (compact ? 54 : 110)) lines.push(part)
-      else lines[last] += `${lines[last] ? ' · ' : ''}${part}`
-    }
-    const y = nextY
-    nextY += 24 + lines.length * 14
-    return { y, lines }
-  })
-  const height = Math.max(100, nextY + bottom)
+  const width = compact ? 360 : 800, top = 24, bottom = 20, right = 64, rowHeight = 24
+  const labels = data.map((item) => singleWeek ? item.name : `${item.name} ${compactTeamRecord(item)}`)
+  const left = Math.max(singleWeek ? 90 : 110, ...data.map((item, index) => singleWeek
+    ? item.name.length * 8 + Object.keys(item.outcomes ?? {}).length * 18 + 15
+    : labels[index].length * 7 + 15))
+  const height = Math.max(100, top + bottom + data.length * rowHeight)
   const values = data.flatMap((item) => [item.value, item.finalValue ?? item.value])
   const min = Math.min(0, ...values), max = Math.max(0, ...values), span = max - min || 1
   const x = (value) => left + (value - min) * (width - left - right) / span
@@ -472,23 +495,24 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
     <line x1={zero} x2={zero} y1={top - 8} y2={height - bottom + 4} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />
     {!data.length && <text x={width / 2} y={height / 2} textAnchor="middle">No comparable completed or live picks</text>}
     {data.map((item, index) => {
-      const { y, lines } = rows[index]
+      const y = top + index * rowHeight
       const valueX = x(item.value)
       const barX = Math.min(zero, valueX)
       const barWidth = Math.max(1, Math.abs(valueX - zero))
       const valueLabel = teamBarValueLabelLayout(item.value, valueX, barX, barWidth, left)
       const resultLabel = teamResultLabel(item)
       const finalX = x(item.finalValue ?? item.value)
+      const outcomes = Object.entries(item.outcomes ?? {})
       const tooltip = Number.isFinite(item.playerNet) && Number.isFinite(item.benchmarkNet)
-        ? `${item.name}: ${displayValue(item.value)} net impact vs benchmark; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; benchmark net ${displayValue(item.benchmarkNet)}; ${item.comparisons} relative games`
-        : `${item.name}: ${displayValue(item.value)} net relative stake; ${item.comparisons} relative games`
-      return <g key={item.name}>
-        <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
+        ? `${item.name}: ${displayValue(item.value)} net impact vs benchmark; relative stake ${displayValue(item.relativeStake)}; player net ${displayValue(item.playerNet)}; benchmark net ${displayValue(item.benchmarkNet)}; ${item.comparisons} relative games; ${resultLabel}`
+        : `${item.name}: ${displayValue(item.value)} net relative stake; ${item.comparisons} relative games; ${resultLabel}`
+      return <g key={item.name} data-team-row={item.name}>
+        <text data-team-label x={left - 9 - (singleWeek ? outcomes.length * 18 : 0)} y={y + 12} textAnchor="end">{labels[index]}</text>
+        {singleWeek && outcomes.map(([label, count], outcomeIndex) => <TeamOutcomeBadge key={label} label={label} count={count} x={left - 16 - (outcomes.length - outcomeIndex - 1) * 18} y={y + 8} />)}
         <rect x={Math.min(zero, finalX)} y={y + 2} width={Math.abs(finalX - zero)} height={13} fill={(item.finalValue ?? item.value) >= 0 ? COLORS[0] : COLORS[2]} rx="3">
           <title>{tooltip}</title>
         </rect>
         {item.liveGames > 0 && <rect data-live-bar={item.name} x={Math.min(finalX, valueX)} y={y + 2} width={Math.max(2, Math.abs(valueX - finalX))} height={13} fill="none" stroke="#66ccee" strokeWidth="2" strokeDasharray="4,2" rx="2"><title>{item.name}: live contribution {displayValue(item.liveValue)}; {resultLabel}</title></rect>}
-        <text x={compact ? 18 : left} y={y + 29} style={{ fontSize: 11 }}>{lines.map((line, lineIndex) => <tspan key={lineIndex} x={compact ? 18 : left} dy={lineIndex ? 14 : 0}>{line}</tspan>)}</text>
         <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} style={valueLabel.fill ? { fill: valueLabel.fill } : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
     })}
@@ -521,7 +545,7 @@ export function GotwChart({ history }) {
 export function CurrentWeekChart({ current }) {
   const [mode, setMode] = useState('vs_total_leader')
   const data = currentWeekChartData(current, mode)
-  return <ChartFrame id="current-week" title="Current week" description={mode === 'points_lost' ? 'Bars: points lost, including GOTW stakes. P: maximum possible losses if every unfinished pick loses, including live games. Live losses follow the app’s provisional scoring setting.' : 'Bars: earned points. Dashed markers (P): potential totals. Leader comparisons subtract the same leader’s earned or potential total, respectively.'} modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_lost', label: 'Points lost' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', mode === 'points_lost' ? 'Lost' : 'Earned', mode === 'points_lost' ? 'Maximum possible losses' : 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
+  return <ChartFrame id="current-week" title="Current week" description={mode === 'points_lost' ? 'Bars: lost points shown below zero, including GOTW stakes. Smallest losses appear first. P: maximum possible losses if every unfinished pick loses, including live games. Live losses follow the app’s provisional scoring setting.' : 'Bars: earned points. Dashed markers (P): potential totals. Leader comparisons subtract the same leader’s earned or potential total, respectively.'} modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_lost', label: 'Points lost' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }, { value: 'vs_leader', label: 'Vs weekly leader' }, { value: 'vs_total_leader', label: 'Vs season leader' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Current week points" columns={['Player', mode === 'points_lost' ? 'Lost' : 'Earned', mode === 'points_lost' ? 'Maximum possible losses' : 'Potential total']} rows={data.map((item) => [item.name, item.value, item.potential])} />}><BarSvg data={data} potential ariaLabel={`Current week points, ${mode}`} /></ChartFrame>
 }
 
 export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKeys, weekLabels, selectedPoolKey }) {
@@ -579,7 +603,8 @@ export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, view
   const missingBenchmark = benchmarkPlayer ? 'Games where the comparison player has no usable pick are excluded.' : 'Games missing the selected model input are excluded.'
   const description = impactView
     ? `${includeLive ? 'Completed and live games. Live results use the current scoreboard; a tied live game has zero impact.' : 'Completed games only.'} Solid bars show completed contributions; dashed outlines extend from the completed value to the total including live games. Each player-benchmark difference is one relative position: lower confidence in a team is equivalent to being overweight its opponent, while opposite picks combine both scoring stakes. The realized net-point difference is attributed once to the team the player is overweight versus the selected ${benchmarkType}. Stakes include GOTW bonuses. Positive bars mean the tilt beat the benchmark; negative bars mean it hurt. ${missingBenchmark}`
-    : `${includeLive ? 'Completed and live games.' : 'Completed games only.'} Solid bars show completed stakes; dashed outlines show live stakes. Won/Lost and Leading/Trailing labels describe the team’s game results, not whether the tilt helped. Shows net relative scoring stake by team versus the selected ${benchmarkType}. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. ${missingBenchmark}`
+    : `${includeLive ? 'Completed and live games.' : 'Completed games only.'} Solid bars show completed stakes; dashed outlines show live stakes. Shows net relative scoring stake by team versus the selected ${benchmarkType}. Each player-game contributes +relative stake to the overweight team and the same amount as −relative stake to the opponent, so this view intentionally records both sides and sums to zero across teams. Stakes include GOTW bonuses. Positive bars mean overweight; negative bars mean underweight. ${missingBenchmark}`
+  const resultLegend = period === 'all' ? 'W/L (and T for ties) beside each team counts distinct completed games with a relative position; live games remain provisional.' : 'Team symbols: ✓ won or leading, × lost or trailing, — tied. Dashed symbols mark live results. These describe the team’s result, independently of the position’s impact.'
   const table = impactView
     ? <AccessibleTable caption="Net impact versus benchmark by overweight team" columns={['Team', 'Net impact', 'Relative stake', 'Player net', 'Benchmark net', 'Relative games', 'Live contribution', 'Results']} rows={data.map((item) => [item.name, item.value, item.relativeStake, item.playerNet, item.benchmarkNet, item.comparisons, item.liveValue, teamResultLabel(item)])} />
     : <AccessibleTable caption="Overweight and underweight versus benchmark by team" columns={['Team', 'Net relative stake', 'Relative games', 'Live stake', 'Results']} rows={data.map((item) => [item.name, item.value, item.comparisons, item.liveValue, teamResultLabel(item)])} />
@@ -588,10 +613,10 @@ export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, view
   return <ChartFrame
     id="team-net-vs-model"
     title={impactView ? 'Net points vs benchmark by team' : 'Over/underweight vs benchmark by team'}
-    description={description}
+    description={`${description} ${resultLegend}`}
     controls={controls}
     table={table}
-  ><RankedTeamBarSvg data={data} ariaLabel={impactView
+  ><RankedTeamBarSvg data={data} singleWeek={period !== 'all'} ariaLabel={impactView
     ? `Net impact versus ${benchmarkLabel} by overweight team, ${playerLabel}, ${periodLabel}`
     : `Overweight and underweight versus ${benchmarkLabel} by team, ${playerLabel}, ${periodLabel}`} /></ChartFrame>
 }
