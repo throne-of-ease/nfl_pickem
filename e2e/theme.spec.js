@@ -15,7 +15,7 @@ test('theme defaults dark, persists, and renders all views without overflow', as
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     if (view === 'Charts') {
       await expect(page.locator('.chart text').first()).toHaveCSS('fill', 'rgb(23, 34, 49)')
-      await expect(page.locator('.chart > rect').first()).toHaveCSS('fill', 'rgb(244, 246, 249)')
+      await expect(page.locator('.chart > rect').first()).toHaveCSS('fill', 'rgb(240, 240, 240)')
     }
     await page.screenshot({ path: testInfo.outputPath(`light-${view.replaceAll(' ', '-')}.png`), fullPage: true })
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamBarValueLabelLayout, teamBenchmarkRelativeExposure, teamBenchmarkRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, leaderAxisTicks, teamBarValueLabelLayout, teamBenchmarkRelativeExposure, teamBenchmarkRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 import { buildSeasonHistory } from '../src/domain.js'
 
 const history = {
@@ -64,7 +64,13 @@ describe('tracker-compatible chart transformations', () => {
     for (let index = 1; index < layout.length; index += 1) {
       if (layout[index].row === layout[index - 1].row) expect(layout[index].x).toBeGreaterThanOrEqual(layout[index - 1].x + layout[index - 1].width)
     }
-    expect(COLORS[3]).toBe('#b795ff')
+    expect(COLORS).toEqual(['#008fd5', '#fc4f30', '#e5ae38', '#6d904f'])
+  })
+
+  it('uses even, readable leader-gap ticks including zero', () => {
+    expect(leaderAxisTicks([-21, -15, -6, 0])).toEqual([-25, -20, -15, -10, -5, 0])
+    expect(leaderAxisTicks([-21, 2])).toEqual([-25, -20, -15, -10, -5, 0, 5])
+    expect(leaderAxisTicks([0, 0])).toEqual([-1, 0, 1])
   })
 
   it('uses only finished or locked GOTW games in percentage denominators', () => {
