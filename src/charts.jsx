@@ -92,6 +92,35 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
+export function teamModelRelativePoints(players, gamesByPool, picksByUser, playerId, kind, poolKeys = Object.keys(gamesByPool)) {
+  const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
+  const totals = new Map()
+  for (const poolKey of poolKeys) {
+    const games = gamesByPool[poolKey] ?? []
+    const gamesById = new Map(games.map((game) => [game.id, game]))
+    const models = new Map(modelPicks(games, kind).map((pick) => [pick.gameId, pick]))
+    for (const player of selectedPlayers) {
+      for (const pick of picksByUser[player.id]?.[poolKey] ?? []) {
+        const game = gamesById.get(pick.gameId)
+        const model = models.get(pick.gameId)
+        if (!game || !model || !['final', 'post'].includes(game.status) || !Number.isFinite(game.homeScore) || !Number.isFinite(game.awayScore)
+          || !Number.isInteger(pick.confidence) || ![game.away, game.home].includes(pick.team)) continue
+        const playerScore = scorePick(pick, game)
+        const modelScore = scorePick(model, game)
+        const playerNet = playerScore.correct ? playerScore.points : -playerScore.stake
+        const modelNet = modelScore.correct ? modelScore.points : -modelScore.stake
+        const current = totals.get(pick.team) ?? { name: pick.team, value: 0, playerNet: 0, modelNet: 0, comparisons: 0 }
+        current.value += playerNet - modelNet
+        current.playerNet += playerNet
+        current.modelNet += modelNet
+        current.comparisons += 1
+        totals.set(pick.team, current)
+      }
+    }
+  }
+  return [...totals.values()].sort((a, b) => b.value - a.value || b.comparisons - a.comparisons || a.name.localeCompare(b.name))
+}
+
 export function aggressivenessChartData(players, gamesByPool, picksByUser, kind, poolKeys = Object.keys(gamesByPool)) {
   const comparisons = Object.fromEntries(players.map((player) => [player.id, []]))
   for (const poolKey of poolKeys) {
@@ -296,6 +325,33 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
   </svg>
 }
 
+function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
+  const width = 800, top = 24, bottom = 24, left = 78, right = 64, rowHeight = 18
+  const height = Math.max(360, top + bottom + data.length * rowHeight)
+  const values = data.map((item) => item.value)
+  const min = Math.min(0, ...values), max = Math.max(0, ...values), span = max - min || 1
+  const x = (value) => left + (value - min) * (width - left - right) / span
+  const zero = x(0)
+  return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+    <rect width={width} height={height} fill="#0c192b" rx="10" />
+    <line x1={zero} x2={zero} y1={top - 8} y2={height - bottom + 4} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />
+    {!data.length && <text x={width / 2} y={height / 2} textAnchor="middle">No completed comparable picks</text>}
+    {data.map((item, index) => {
+      const y = top + index * rowHeight
+      const valueX = x(item.value)
+      const barX = Math.min(zero, valueX)
+      const barWidth = Math.max(1, Math.abs(valueX - zero))
+      return <g key={item.name}>
+        <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
+        <rect x={barX} y={y + 2} width={barWidth} height={13} fill={item.value >= 0 ? COLORS[0] : COLORS[2]} rx="3">
+          <title>{item.name}: {displayValue(item.value)} vs model; player net {displayValue(item.playerNet)}; model net {displayValue(item.modelNet)}; {item.comparisons} pick-games</title>
+        </rect>
+        <text x={valueX + (item.value >= 0 ? 6 : -6)} y={y + 12} textAnchor={item.value >= 0 ? 'start' : 'end'}>{item.value > 0 ? '+' : ''}{displayValue(item.value)}</text>
+      </g>
+    })}
+  </svg>
+}
+
 function AccessibleTable({ caption, columns, rows }) {
   return <details><summary>View chart data</summary><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell == null ? '—' : typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></details>
 }
@@ -335,6 +391,30 @@ export function AggressivenessChart({ players, gamesByPool, picksByUser, poolKey
     ? <AccessibleTable caption="Weekly aggressiveness index" columns={['Player', ...weekLabels]} rows={weekly.map((item) => [item.name, ...item.values])} />
     : <AccessibleTable caption={view === 'selected_week' ? 'Selected week aggressiveness index' : 'Season average aggressiveness index'} columns={['Player', 'Index', 'Compared locked picks']} rows={data.map((item) => [item.name, item.value, item.comparisons])} />
   return <ChartFrame id="aggressiveness" title="Aggressiveness index" description="Mean absolute gap from the selected model's signed confidence, using locked picks only." modes={[{ value: 'weekly', label: 'Weekly by player' }, { value: 'selected_week', label: 'Selected week' }, { value: 'season_average', label: 'Season average' }]} mode={view} onMode={setView} modeLabel="View" controls={modelControl} table={table}>{view === 'weekly' ? <LineSvg series={weekly} labels={weekLabels} ariaLabel={`Aggressiveness index by week, ${kind}`} /> : <BarSvg data={data} ariaLabel={`Aggressiveness index ${view === 'selected_week' ? 'for selected week' : 'season average'}, ${kind}`} />}</ChartFrame>
+}
+
+export function TeamModelRelativeChart({ players, gamesByPool, picksByUser, viewerId, poolKeys, weekLabels }) {
+  const [kind, setKind] = useState('aggregate')
+  const [selectedPlayer, setSelectedPlayer] = useState(null)
+  const [selectedPeriod, setSelectedPeriod] = useState('all')
+  const allPlayers = selectedPlayer === 'all'
+  const playerId = allPlayers ? null : players.some((player) => player.id === selectedPlayer) ? selectedPlayer
+    : players.some((player) => player.id === viewerId) ? viewerId : players[0]?.id
+  const period = selectedPeriod === 'all' || poolKeys.includes(selectedPeriod) ? selectedPeriod : 'all'
+  const selectedPools = period === 'all' ? poolKeys : [period]
+  const data = teamModelRelativePoints(players, gamesByPool, picksByUser, playerId, kind, selectedPools)
+  const controls = <>
+    <label>Player <select aria-label="Net points vs model player" value={allPlayers ? 'all' : playerId ?? ''} onChange={(event) => setSelectedPlayer(event.target.value)}><option value="all">All players</option>{players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
+    <label>Week <select aria-label="Net points vs model week" value={period} onChange={(event) => setSelectedPeriod(event.target.value)}><option value="all">All weeks</option>{poolKeys.map((key, index) => <option key={key} value={key}>{weekLabels[index]}</option>)}</select></label>
+    <label>Model <select aria-label="Net points vs model baseline" value={kind} onChange={(event) => setKind(event.target.value)}><option value="predictor">FPI</option><option value="moneyline">Moneyline</option><option value="aggregate">FPI + moneyline average</option></select></label>
+  </>
+  return <ChartFrame
+    id="team-net-vs-model"
+    title="Net points vs model by team"
+    description="Completed games only. Each contribution is player net points − selected model net points for the same game, grouped by the team the player picked. Correct picks are +stake; losing picks are −stake, including GOTW bonuses. All players sums every player-game contribution; games missing the selected model input are excluded."
+    controls={controls}
+    table={<AccessibleTable caption="Net points versus model by picked team" columns={['Team', 'Vs model', 'Player net', 'Model net', 'Pick-games']} rows={data.map((item) => [item.name, item.value, item.playerNet, item.modelNet, item.comparisons])} />}
+  ><RankedTeamBarSvg data={data} ariaLabel={`Net points versus ${kind} model by picked team, ${allPlayers ? 'all players' : players.find((player) => player.id === playerId)?.name ?? 'player'}, ${period === 'all' ? 'all weeks' : weekLabels[poolKeys.indexOf(period)]}`} /></ChartFrame>
 }
 
 export function DivisionWinnersChart({ rows, pointsPerCorrect }) {

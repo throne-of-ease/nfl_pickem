@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
-import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, RelativeGamePointsTable, WeeklyPointsChart } from "./charts.jsx";
+import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, RelativeGamePointsTable, TeamModelRelativeChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
 import AdminPanel from "./adminPanel.jsx";
 import DivisionWinnersView from "./divisionWinners.jsx";
@@ -1272,7 +1272,7 @@ export default function App() {
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />
                   <AggressivenessChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />
-                  <RelativeGamePointsTable players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />
+                  <RelativeGamePointsTable players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} selectedPoolKey={poolKey} />\n                  <TeamModelRelativeChart players={appUsers} gamesByPool={chartGamesByPool} picksByUser={normalPicksByUser} viewerId={userId} poolKeys={chartHistory.pools} weekLabels={chartHistory.weeks} />
                 </div>
               </section>
             )}

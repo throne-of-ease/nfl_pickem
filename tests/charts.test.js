@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamModelRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 import { buildSeasonHistory } from '../src/domain.js'
 
 const history = {
@@ -133,5 +133,51 @@ describe('tracker-compatible chart transformations', () => {
     const picks = [...lockedGames.map((game, index) => ({ gameId: game.id, team: game.home, confidence: index + 1 })), { gameId: 'future', team: 'AF', confidence: 17 }]
     const [result] = aggressivenessChartData([{ id: 'alex', name: 'Alex' }], { 'week-01': [...lockedGames, unlocked] }, { alex: { 'week-01': picks } }, 'predictor')
     expect(result).toMatchObject({ value: 0, comparisons: 16 })
+  })
+})
+
+
+describe('net points versus model by picked team', () => {
+  const players = [{ id: 'alex', name: 'Alex' }, { id: 'blair', name: 'Blair' }]
+  const gamesByPool = {
+    'week-01': [
+      { id: 'g1', home: 'HOME', away: 'AWAY', status: 'final', homeScore: 24, awayScore: 14, predictorHome: .90, homeMoneyline: -300, awayMoneyline: 250 },
+      { id: 'g2', home: 'H2', away: 'A2', status: 'final', homeScore: 21, awayScore: 17, predictorHome: .60, homeMoneyline: -140, awayMoneyline: 120 },
+    ],
+    'week-02': [
+      { id: 'g3', home: 'H3', away: 'A3', status: 'final', homeScore: 10, awayScore: 20, predictorHome: .80, homeMoneyline: -200, awayMoneyline: 170 },
+    ],
+  }
+
+  it('uses net scoring and attributes the model-relative result to the team the player picked', () => {
+    const picks = { alex: { 'week-01': [
+      { gameId: 'g1', team: 'HOME', confidence: 1 },
+      { gameId: 'g2', team: 'A2', confidence: 2 },
+    ] } }
+    const rows = teamModelRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-01'])
+    expect(rows).toEqual([
+      { name: 'HOME', value: -1, playerNet: 1, modelNet: 2, comparisons: 1 },
+      { name: 'A2', value: -3, playerNet: -2, modelNet: 1, comparisons: 1 },
+    ])
+  })
+
+  it('sums contributions across players for All players and obeys the selected-week scope', () => {
+    const picks = {
+      alex: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 1 }], 'week-02': [{ gameId: 'g3', team: 'A3', confidence: 1 }] },
+      blair: { 'week-01': [{ gameId: 'g1', team: 'HOME', confidence: 2 }] },
+    }
+    const weekOne = teamModelRelativePoints(players, gamesByPool, picks, null, 'predictor', ['week-01'])
+    expect(weekOne).toEqual([{ name: 'HOME', value: -1, playerNet: 3, modelNet: 4, comparisons: 2 }])
+    expect(teamModelRelativePoints(players, gamesByPool, picks, 'alex', 'predictor', ['week-02'])).toEqual([
+      { name: 'A3', value: 2, playerNet: 1, modelNet: -1, comparisons: 1 },
+    ])
+  })
+
+  it('uses the requested model baseline', () => {
+    const game = { id: 'g', home: 'HOME', away: 'AWAY', status: 'final', homeScore: 28, awayScore: 20, predictorHome: .8, homeMoneyline: 200, awayMoneyline: -200 }
+    const picks = { alex: { 'week-01': [{ gameId: 'g', team: 'HOME', confidence: 1 }] } }
+    const games = { 'week-01': [game] }
+    expect(teamModelRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])[0].value).toBe(0)
+    expect(teamModelRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])[0].value).toBe(2)
   })
 })
