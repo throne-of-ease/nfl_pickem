@@ -62,7 +62,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.119.0
       - name: Apply database migrations
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN"
