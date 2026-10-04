@@ -325,6 +325,16 @@ function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
   </svg>
 }
 
+export function teamBarValueLabelLayout(value, valueX, barX, barWidth, left) {
+  const label = `${value > 0 ? '+' : ''}${displayValue(value)}`
+  const estimatedWidth = Math.max(14, label.length * 7)
+  const outsideX = value >= 0 ? valueX + 6 : valueX - 6
+  const overlapsTeamColumn = value < 0 && outsideX - estimatedWidth < left - 1
+  const fitsInsideBar = barWidth >= estimatedWidth + 12
+  if (overlapsTeamColumn && fitsInsideBar) return { x: barX + 6, anchor: 'start', inside: true, label }
+  return { x: outsideX, anchor: value >= 0 ? 'start' : 'end', inside: false, label }
+}
+
 function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
   const width = 800, top = 24, bottom = 24, left = 78, right = 64, rowHeight = 18
   const height = Math.max(360, top + bottom + data.length * rowHeight)
@@ -341,12 +351,13 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel }) {
       const valueX = x(item.value)
       const barX = Math.min(zero, valueX)
       const barWidth = Math.max(1, Math.abs(valueX - zero))
+      const valueLabel = teamBarValueLabelLayout(item.value, valueX, barX, barWidth, left)
       return <g key={item.name}>
         <text x={left - 9} y={y + 12} textAnchor="end">{item.name}</text>
         <rect x={barX} y={y + 2} width={barWidth} height={13} fill={item.value >= 0 ? COLORS[0] : COLORS[2]} rx="3">
           <title>{item.name}: {displayValue(item.value)} vs model; player net {displayValue(item.playerNet)}; model net {displayValue(item.modelNet)}; {item.comparisons} pick-games</title>
         </rect>
-        <text x={valueX + (item.value >= 0 ? 6 : -6)} y={y + 12} textAnchor={item.value >= 0 ? 'start' : 'end'}>{item.value > 0 ? '+' : ''}{displayValue(item.value)}</text>
+        <text x={valueLabel.x} y={y + 12} textAnchor={valueLabel.anchor} fill={valueLabel.inside ? '#fff' : undefined} data-value-label-placement={valueLabel.inside ? 'inside' : 'outside'}>{valueLabel.label}</text>
       </g>
     })}
   </svg>

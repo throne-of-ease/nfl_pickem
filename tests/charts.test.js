@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamModelRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
+import { COLORS, aggressivenessChartData, chartLegendLayout, cumulativeChartSeries, currentWeekChartData, gotwChartData, teamBarValueLabelLayout, teamModelRelativePoints, weeklyAggressivenessSeries, weeklyChartSeries } from '../src/charts.jsx'
 import { buildSeasonHistory } from '../src/domain.js'
 
 const history = {
@@ -179,5 +179,22 @@ describe('net points versus model by picked team', () => {
     const games = { 'week-01': [game] }
     expect(teamModelRelativePoints(players, games, picks, 'alex', 'predictor', ['week-01'])[0].value).toBe(0)
     expect(teamModelRelativePoints(players, games, picks, 'alex', 'moneyline', ['week-01'])[0].value).toBe(2)
+  })
+})
+
+
+describe('team model chart label layout', () => {
+  it('moves a far-left negative value label inside its bar instead of into the team-name column', () => {
+    expect(teamBarValueLabelLayout(-17, 78, 78, 120, 78)).toEqual({
+      x: 84,
+      anchor: 'start',
+      inside: true,
+      label: '-17',
+    })
+  })
+
+  it('keeps smaller negative and positive labels outside their bars', () => {
+    expect(teamBarValueLabelLayout(-2, 240, 240, 80, 78)).toMatchObject({ x: 234, anchor: 'end', inside: false, label: '-2' })
+    expect(teamBarValueLabelLayout(7, 500, 400, 100, 78)).toMatchObject({ x: 506, anchor: 'start', inside: false, label: '+7' })
   })
 })
