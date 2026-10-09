@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('prime-time season totals, filters, live scoring, models and export work on every viewport', async ({ page }, testInfo) => {
+test('prime-time earned, net and over/underweight views, filters and export work on every viewport', async ({ page }, testInfo) => {
   const session = { access_token: 'prime-time-test', refresh_token: 'prime-time-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'alex' } }
   const profiles = [{ id: 'alex', name: 'Alex' }, { id: 'blair', name: 'Blair' }, { id: 'casey', name: 'Casey' }, { id: 'devon', name: 'Devon' }]
   const games = [
@@ -50,6 +50,50 @@ test('prime-time season totals, filters, live scoring, models and export work on
   await expect(points('FPI')).toHaveText('4.0')
   await filter.selectOption('all')
   await expect(points('FPI')).toHaveText('24.0')
+  const view = card.getByLabel('Prime-time games view')
+  await expect(view).toHaveValue('earned')
+  await expect(card.getByLabel('Prime-time games model')).toHaveCount(0)
+  await view.selectOption('net')
+  await expect(card.getByRole('img', { name: 'Prime-time games net points, all' })).toBeVisible()
+  await expect(points('Alex')).toHaveText('21.0')
+  await expect(points('Blair')).toHaveText('-21.0')
+  await expect(points('Devon')).toHaveText('0.0')
+  await expect(table.getByRole('columnheader', { name: 'Lost', exact: true })).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Include provisional live scores' }).check()
+  await expect(points('Alex')).toHaveText('23.0')
+  await expect(points('Blair')).toHaveText('-23.0')
+  await page.getByRole('checkbox', { name: 'Include provisional live scores' }).uncheck()
+  await card.screenshot({ path: testInfo.outputPath('prime-time-net-dark.png') })
+  await view.selectOption('model')
+  const model = card.getByLabel('Prime-time games model')
+  await expect(model).toHaveValue('aggregate')
+  await expect(model.locator('option')).toHaveCount(3)
+  const impact = name => table.getByRole('row').filter({ has: page.getByRole('cell', { name, exact: true }) }).getByRole('cell').nth(1)
+  for (const benchmark of ['predictor', 'moneyline', 'aggregate']) {
+    await model.selectOption(benchmark)
+    await expect(impact('Alex')).toHaveText('-3.0')
+    await expect(impact('Blair')).toHaveText('-45.0')
+    await expect(impact('Devon')).toHaveText('0.0')
+    await expect(impact('FPI')).toHaveText('0.0')
+  }
+  for (const [category, total] of [['tnf', '0.0'], ['snf', '-1.0'], ['mnf', '-2.0'], ['all', '-3.0']]) {
+    await filter.selectOption(category)
+    await expect(impact('Alex')).toHaveText(total)
+  }
+  await expect(table.getByRole('columnheader', { name: 'Model net', exact: true })).toBeVisible()
+  expect(await card.locator('.chart-data .table-scroll').evaluate(scroll => scroll.scrollWidth <= scroll.clientWidth + 1)).toBe(true)
+  expect(await card.locator('svg.chart > g').evaluateAll(groups => groups.every(group => {
+    const labels = [...group.children].filter(child => child.tagName.toLowerCase() === 'text')
+    if (labels.length < 2 || Number.parseFloat(labels[0].textContent) >= 0) return true
+    const valueBox = labels[0].getBBox(), nameBox = labels.at(-1).getBBox()
+    return valueBox.y + valueBox.height < nameBox.y - 3
+  }))).toBe(true)
+  await expect(card).toContainText('full weekly slate')
+  await model.selectOption('moneyline')
+  await view.selectOption('net')
+  await expect(card.getByLabel('Prime-time games model')).toHaveCount(0)
+  await view.selectOption('model')
+  await expect(model).toHaveValue('moneyline')
   await page.getByRole('button', { name: 'Switch to light mode' }).click()
   await card.screenshot({ path: testInfo.outputPath('prime-time-light.png') })
   await page.getByRole('button', { name: 'Switch to dark mode' }).click()

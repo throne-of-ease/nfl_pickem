@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { isLocked, modelPicks, scorePick } from './domain.js'
+import { isLocked, modelPicks, relativeModelWeight, scorePick } from './domain.js'
 import { primeTimeCategory } from './time.js'
 
 // Paul Tol's colorblind-friendly bright palette, reordered for four player hues.
@@ -106,17 +106,38 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 
-export function primeTimeChartData(players, gamesByPool, picksByUser, category = 'all', poolKeys = Object.keys(gamesByPool), provisional = false) {
-  const selectedPools = poolKeys.map((poolKey) => ({ poolKey, games: (gamesByPool[poolKey] ?? []).filter((game) => {
-    const slot = primeTimeCategory(game.kickoff)
-    return slot && (category === 'all' || slot === category)
-  }) }))
+export function primeTimeChartData(players, gamesByPool, picksByUser, category = 'all', poolKeys = Object.keys(gamesByPool), provisional = false, { view = 'earned', benchmark = 'aggregate' } = {}) {
+  const selectedPools = poolKeys.map((poolKey) => {
+    const allGames = gamesByPool[poolKey] ?? []
+    // Model ranks must use the complete weekly slate, before the slot filter.
+    const models = view === 'model' ? new Map(modelPicks(allGames, benchmark).map((pick) => [pick.gameId, pick])) : null
+    const games = allGames.filter((game) => {
+      const slot = primeTimeCategory(game.kickoff)
+      return slot && (category === 'all' || slot === category)
+    })
+    return { poolKey, games, models }
+  })
   return players.map((player, colorIndex) => {
-    const value = selectedPools.reduce((total, { poolKey, games }) => {
+    let earned = 0, lost = 0, modelNet = 0, compared = 0
+    for (const { poolKey, games, models } of selectedPools) {
       const picks = new Map((picksByUser[player.id]?.[poolKey] ?? []).map((pick) => [pick.gameId, pick]))
-      return total + games.reduce((sum, game) => sum + scorePick(picks.get(game.id), game, provisional).points, 0)
-    }, 0)
-    return { name: player.name, colorIndex, value }
+      for (const game of games) {
+        const pick = picks.get(game.id)
+        const score = scorePick(pick, game, provisional)
+        if (!score.scored) continue
+        if (view === 'model') {
+          const model = models.get(game.id)
+          if (!relativeModelWeight(game, pick, model)) continue
+          const modelScore = scorePick(model, game, provisional)
+          modelNet += modelScore.correct ? modelScore.points : -modelScore.stake
+          compared += 1
+        }
+        earned += score.points
+        lost += score.correct ? 0 : score.stake
+      }
+    }
+    const value = view === 'earned' ? earned : earned - lost - (view === 'model' ? modelNet : 0)
+    return { name: player.name, colorIndex, value, ...(view !== 'earned' ? { earned, lost, modelNet, compared } : {}) }
   }).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
 }
 
@@ -443,10 +464,10 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   </svg>
 }
 
-function BarSvg({ data, chartRef, ariaLabel, potential = false }) {
+function BarSvg({ data, chartRef, ariaLabel, potential = false, negativeLabelPadding = 0 }) {
   const compact = useCompactChart()
   const width = compact ? 360 : 800
-  const height = compact ? 300 : 324, left = compact ? 40 : 50, right = 24, top = 28, bottom = compact ? 54 : 42
+  const height = compact ? 300 : 324, left = compact ? 40 : 50, right = 24, top = 28, bottom = (compact ? 54 : 42) + (data.some((item) => item.value < 0) ? negativeLabelPadding : 0)
   const { min, max, span } = safeRange(data.flatMap((item) => [item.value, item.potential ?? item.value]))
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const zero = y(0), group = (width - left - right) / Math.max(1, data.length), bar = Math.min(84, group * .55)
@@ -559,8 +580,22 @@ export function GotwChart({ history }) {
 
 export function PrimeTimeChart({ players, gamesByPool, picksByUser, poolKeys, provisional }) {
   const [category, setCategory] = useState('all')
-  const data = primeTimeChartData(players, gamesByPool, picksByUser, category, poolKeys, provisional)
-  return <ChartFrame id="prime-time-points" title="Prime-time games" description="Season points earned, including GOTW bonuses. TNF includes all Wednesday, Thursday and Friday games; SNF and MNF include evening kickoffs (18:00 or later, US Eastern time). Live points follow the provisional-scoring setting." modes={[{ value: 'all', label: 'All prime-time games' }, { value: 'tnf', label: 'TNF (Thu, Fri & Wed)' }, { value: 'snf', label: 'SNF (Sunday night)' }, { value: 'mnf', label: 'MNF (Monday night)' }]} mode={category} onMode={setCategory} modeLabel="Filter" table={<AccessibleTable caption="Prime-time games points" columns={['Player', 'Points']} rows={data.map((item) => [item.name, item.value])} />}><BarSvg data={data} ariaLabel={`Prime-time games points, ${category}`} /></ChartFrame>
+  const [view, setView] = useState('earned')
+  const [benchmark, setBenchmark] = useState('aggregate')
+  const data = primeTimeChartData(players, gamesByPool, picksByUser, category, poolKeys, provisional, { view, benchmark })
+  const benchmarkLabel = benchmark === 'predictor' ? 'FPI' : benchmark === 'moneyline' ? 'Moneyline' : 'AVG'
+  const controls = <>
+    <label>View <select aria-label="Prime-time games view" value={view} onChange={(event) => setView(event.target.value)}><option value="earned">Points earned</option><option value="net">Net points</option><option value="model">Over/underweight</option></select></label>
+    {view === 'model' && <label>Model <select aria-label="Prime-time games model" value={benchmark} onChange={(event) => setBenchmark(event.target.value)}><option value="predictor">FPI</option><option value="moneyline">Moneyline</option><option value="aggregate">AVG (FPI + moneyline)</option></select></label>}
+  </>
+  const explanation = view === 'earned' ? 'Season points earned, including GOTW bonuses.'
+    : view === 'net' ? 'Net points = earned points minus committed points on losing picks, including GOTW stakes. Missed picks count as zero; final ties follow official scoring.'
+      : `Net impact of each player’s overweight/underweight choices versus ${benchmarkLabel}: player net points minus model net points, counted once per game. Lower confidence in a team means overweight its opponent; opposite picks combine both stakes. Positive bars mean the tilt beat the model; negative bars mean it hurt. Model confidence ranks use the full weekly slate. Missing picks or model inputs are excluded. Stakes include GOTW bonuses; final ties follow official scoring.`
+  const description = `${explanation} TNF includes all Wednesday, Thursday and Friday games; SNF and MNF include evening kickoffs (18:00 or later, US Eastern time). Live points follow the provisional-scoring setting.`
+  const columns = view === 'earned' ? ['Player', 'Points'] : view === 'net' ? ['Player', 'Earned', 'Lost', 'Net points'] : ['Player', 'Net impact', 'Player net', 'Model net', 'Games']
+  const rows = data.map((item) => view === 'earned' ? [item.name, item.value] : view === 'net' ? [item.name, item.earned, item.lost, item.value] : [item.name, item.value, item.earned - item.lost, item.modelNet, String(item.compared)])
+  const ariaLabel = view === 'earned' ? `Prime-time games points, ${category}` : view === 'net' ? `Prime-time games net points, ${category}` : `Prime-time games overweight/underweight net impact versus ${benchmarkLabel}, ${category}`
+  return <ChartFrame id="prime-time-points" title="Prime-time games" description={description} modes={[{ value: 'all', label: 'All prime-time games' }, { value: 'tnf', label: 'TNF (Thu, Fri & Wed)' }, { value: 'snf', label: 'SNF (Sunday night)' }, { value: 'mnf', label: 'MNF (Monday night)' }]} mode={category} onMode={setCategory} modeLabel="Filter" controls={controls} table={<AccessibleTable caption="Prime-time games points" columns={columns} rows={rows} />}><BarSvg data={data} ariaLabel={ariaLabel} negativeLabelPadding={12} /></ChartFrame>
 }
 
 export function CurrentWeekChart({ current }) {

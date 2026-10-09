@@ -76,3 +76,77 @@ it('defaults to all games, changes totals with each filter, and exposes the char
   expect(screen.getByRole('button', { name: 'Download chart as PNG' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Share chart as PNG' })).toBeInTheDocument()
 })
+
+it('subtracts losing stakes once, including GOTW, without charging missed or unfinished picks', () => {
+  const net = primeTimeChartData(players, games, picks, 'all', Object.keys(games), false, { view: 'net' })
+  expect(net.find(row => row.name === 'Alex')).toMatchObject({ value: 18, earned: 20, lost: 2, colorIndex: 0 })
+  expect(net.find(row => row.name === 'Blair')).toMatchObject({ value: -4, earned: 2, lost: 6, colorIndex: 1 })
+  expect(net.find(row => row.name === 'Casey')).toMatchObject({ value: 0, earned: 0, lost: 0 })
+  expect(primeTimeChartData(players, games, picks, 'all', Object.keys(games), true, { view: 'net' }).find(row => row.name === 'Alex').value).toBe(25)
+})
+
+const modelGames = {
+  'week-01': [
+    game('day', '2026-09-13T17:00:00Z', { predictorHome: .95, homeMoneyline: -900, awayMoneyline: 800 }),
+    game('tnf', '2026-09-11T00:20:00Z', { gotw: true, predictorHome: .8, homeMoneyline: 150, awayMoneyline: -180 }),
+    game('snf', '2026-09-14T00:20:00Z', { predictorHome: .7, homeMoneyline: -150, awayMoneyline: 130 }),
+    game('mnf', '2026-09-15T00:20:00Z', { predictorHome: .6, homeMoneyline: -400, awayMoneyline: 330, homeScore: 10, awayScore: 20 }),
+  ],
+}
+const modelPlayer = [{ id: 'p', name: 'Player' }]
+const modelPicks = { p: { 'week-01': [
+  { gameId: 'tnf', team: 'HOME', confidence: 5 },
+  { gameId: 'snf', team: 'AWAY', confidence: 1 },
+  { gameId: 'mnf', team: 'HOME', confidence: 3 },
+] } }
+
+it.each([['predictor', -3, 2, 9], ['moneyline', 15, 17, -9], ['aggregate', 1, 4, 5]])('scores over/underweight impact against %s using full-week ranks before filtering', (benchmark, total, tnf, modelNet) => {
+  const args = [modelPlayer, modelGames, modelPicks]
+  const row = primeTimeChartData(...args, 'all', ['week-01'], false, { view: 'model', benchmark })[0]
+  expect(row).toMatchObject({ value: total, earned: 10, lost: 4, modelNet, compared: 3 })
+  expect(primeTimeChartData(...args, 'tnf', ['week-01'], false, { view: 'model', benchmark })[0].value).toBe(tnf)
+  const categorySum = ['tnf', 'snf', 'mnf'].reduce((sum, category) => sum + primeTimeChartData(...args, category, ['week-01'], false, { view: 'model', benchmark })[0].value, 0)
+  expect(categorySum).toBe(total)
+})
+
+it.each([
+  ['HOME', 1, 20, 10, -2], ['HOME', 5, 20, 10, 2], ['AWAY', 1, 20, 10, -14],
+  ['HOME', 1, 10, 20, 2], ['AWAY', 1, 10, 20, 14], ['AWAY', 1, 10, 10, -2],
+])('handles same-side under/overweight, opposing GOTW picks and final ties: %s/%s', (team, confidence, homeScore, awayScore, expected) => {
+  const slate = { 'week-01': modelGames['week-01'].map(g => g.id === 'tnf' ? { ...g, homeScore, awayScore } : g) }
+  const submitted = { p: { 'week-01': [{ gameId: 'tnf', team, confidence }] } }
+  expect(primeTimeChartData(modelPlayer, slate, submitted, 'tnf', ['week-01'], false, { view: 'model', benchmark: 'predictor' })[0]).toMatchObject({ value: expected, compared: 1 })
+})
+
+it('excludes unavailable models and missed picks from the model comparison, and follows live scoring', () => {
+  expect(primeTimeChartData(modelPlayer, modelGames, {}, 'all', ['week-01'], false, { view: 'model' })[0]).toMatchObject({ value: 0, compared: 0 })
+  const unavailable = { 'week-01': modelGames['week-01'].map(g => ({ ...g, predictorHome: null })) }
+  expect(primeTimeChartData(modelPlayer, unavailable, modelPicks, 'all', ['week-01'], false, { view: 'model' })[0]).toMatchObject({ value: 0, compared: 0 })
+  const live = { 'week-01': modelGames['week-01'].map(g => g.id === 'tnf' ? { ...g, status: 'live' } : g) }
+  expect(primeTimeChartData(modelPlayer, live, modelPicks, 'tnf', ['week-01'], false, { view: 'model', benchmark: 'predictor' })[0]).toMatchObject({ value: 0, compared: 0 })
+  expect(primeTimeChartData(modelPlayer, live, modelPicks, 'tnf', ['week-01'], true, { view: 'model', benchmark: 'predictor' })[0]).toMatchObject({ value: 2, compared: 1 })
+})
+
+it('switches between earned, net and model views, retaining the slot and selected model', () => {
+  render(<PrimeTimeChart players={modelPlayer} gamesByPool={modelGames} picksByUser={modelPicks} poolKeys={['week-01']} />)
+  const view = screen.getByLabelText('Prime-time games view')
+  expect(view).toHaveValue('earned')
+  expect(screen.queryByLabelText('Prime-time games model')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'View chart data' }))
+  fireEvent.change(view, { target: { value: 'net' } })
+  expect(screen.getByRole('img', { name: 'Prime-time games net points, all' })).toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: 'Lost' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Prime-time games filter'), { target: { value: 'tnf' } })
+  fireEvent.change(view, { target: { value: 'model' } })
+  const model = screen.getByLabelText('Prime-time games model')
+  expect(model).toHaveValue('aggregate')
+  expect(within(model).getAllByRole('option')).toHaveLength(3)
+  fireEvent.change(model, { target: { value: 'moneyline' } })
+  expect(screen.getByRole('img', { name: 'Prime-time games overweight/underweight net impact versus Moneyline, tnf' })).toHaveTextContent('17.0')
+  expect(screen.getByRole('columnheader', { name: 'Model net' })).toBeInTheDocument()
+  fireEvent.change(view, { target: { value: 'net' } })
+  expect(screen.queryByLabelText('Prime-time games model')).not.toBeInTheDocument()
+  fireEvent.change(view, { target: { value: 'model' } })
+  expect(screen.getByLabelText('Prime-time games model')).toHaveValue('moneyline')
+  expect(screen.getByLabelText('Prime-time games filter')).toHaveValue('tnf')
+})

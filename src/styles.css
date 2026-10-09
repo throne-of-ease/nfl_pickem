@@ -309,6 +309,11 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .chart-heading p { margin: .25rem 0 .8rem; }
 .chart-card .chart-heading { align-items: flex-start; gap: .5rem; margin-bottom: .15rem; }
 .chart-card .chart-heading h3 { margin: 0; }
+.chart-card-prime-time-points .chart-heading { flex-wrap: wrap; }
+.chart-card-prime-time-points .chart-heading > .chart-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.chart-card-prime-time-points .chart-data table { table-layout: fixed; }
+.chart-card-prime-time-points .chart-data th,
+.chart-card-prime-time-points .chart-data td { white-space: normal; overflow-wrap: anywhere; }
 .chart-actions { display: flex; align-items: end; gap: .45rem; }
 .chart-actions label { display: grid; gap: .2rem; color: var(--muted); font-size: .68rem; }
 .chart-actions .potential-toggle { display: flex; align-items: center; gap: .3rem; min-height: 1.5rem; cursor: pointer; white-space: nowrap; font-size: .75rem; }
@@ -486,13 +491,14 @@ footer [data-testid="real-data-status"] { display: block; }
   .chart-card-cumulative-points .chart-heading,
   .chart-card-current-week .chart-heading,
   .chart-card-weekly-points .chart-heading,
-  .chart-card-gotw-points .chart-heading,
-  .chart-card-prime-time-points .chart-heading { flex-direction: row; align-items: flex-start; }
+  .chart-card-gotw-points .chart-heading { flex-direction: row; align-items: flex-start; }
   .chart-card-cumulative-points .chart-actions,
   .chart-card-current-week .chart-actions:not(.chart-actions-bottom),
   .chart-card-weekly-points .chart-actions:not(.chart-actions-bottom),
-  .chart-card-gotw-points .chart-actions:not(.chart-actions-bottom),
-  .chart-card-prime-time-points .chart-actions:not(.chart-actions-bottom) { width: auto; justify-content: flex-end; }
+  .chart-card-gotw-points .chart-actions:not(.chart-actions-bottom) { width: auto; justify-content: flex-end; }
+  .chart-card-prime-time-points .chart-heading > .chart-actions { width: 100%; justify-content: flex-start; }
+  .chart-card-prime-time-points .chart-data th,
+  .chart-card-prime-time-points .chart-data td { padding-inline: .25rem; font-size: .7rem; }
   .leaderboard li { grid-template-columns: 2rem 1fr auto; }
   .leaderboard small { grid-column: 2 / -1; text-align: left; }
   .standings-options { align-items: flex-start; justify-content: flex-start; flex-direction: column; gap: .35rem; }
