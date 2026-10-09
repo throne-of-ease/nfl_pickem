@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { isLocked, modelPicks, scorePick } from './domain.js'
+import { primeTimeCategory } from './time.js'
 
 // Paul Tol's colorblind-friendly bright palette, reordered for four player hues.
 // Theme variants improve contrast; marker shapes identify series without color.
@@ -104,6 +105,20 @@ export const gotwChartData = (history, mode) => history.users.map((user, colorIn
       ? (user.gotwLockedCount ? user.gotwCorrect / user.gotwLockedCount * 100 : 0)
       : user.gotw,
 })).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+
+export function primeTimeChartData(players, gamesByPool, picksByUser, category = 'all', poolKeys = Object.keys(gamesByPool), provisional = false) {
+  const selectedPools = poolKeys.map((poolKey) => ({ poolKey, games: (gamesByPool[poolKey] ?? []).filter((game) => {
+    const slot = primeTimeCategory(game.kickoff)
+    return slot && (category === 'all' || slot === category)
+  }) }))
+  return players.map((player, colorIndex) => {
+    const value = selectedPools.reduce((total, { poolKey, games }) => {
+      const picks = new Map((picksByUser[player.id]?.[poolKey] ?? []).map((pick) => [pick.gameId, pick]))
+      return total + games.reduce((sum, game) => sum + scorePick(picks.get(game.id), game, provisional).points, 0)
+    }, 0)
+    return { name: player.name, colorIndex, value }
+  }).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+}
 
 function teamBenchmarkComparisons(players, gamesByPool, picksByUser, playerId, benchmark, poolKeys, includeLive) {
   const selectedPlayers = playerId == null ? players : players.filter((player) => player.id === playerId)
@@ -540,6 +555,12 @@ export function GotwChart({ history }) {
   const [mode, setMode] = useState('absolute')
   const data = gotwChartData(history, mode)
   return <ChartFrame id="gotw-points" title="Game of the Week" description="Confidence plus the five-point bonus." modes={[{ value: 'absolute', label: 'Points' }, { value: 'points_percentage', label: 'Points %' }, { value: 'correct_percentage', label: 'Correct picks %' }]} mode={mode} onMode={setMode} table={<AccessibleTable caption="Game of the Week points" columns={['Player', 'Value']} rows={data.map((item) => [item.name, item.value])} />}><BarSvg data={data} ariaLabel={`Game of the Week points, ${mode}`} /></ChartFrame>
+}
+
+export function PrimeTimeChart({ players, gamesByPool, picksByUser, poolKeys, provisional }) {
+  const [category, setCategory] = useState('all')
+  const data = primeTimeChartData(players, gamesByPool, picksByUser, category, poolKeys, provisional)
+  return <ChartFrame id="prime-time-points" title="Prime-time games" description="Season points earned, including GOTW bonuses. TNF includes all Wednesday, Thursday and Friday games; SNF and MNF include evening kickoffs (18:00 or later, US Eastern time). Live points follow the provisional-scoring setting." modes={[{ value: 'all', label: 'All prime-time games' }, { value: 'tnf', label: 'TNF (Thu, Fri & Wed)' }, { value: 'snf', label: 'SNF (Sunday night)' }, { value: 'mnf', label: 'MNF (Monday night)' }]} mode={category} onMode={setCategory} modeLabel="Filter" table={<AccessibleTable caption="Prime-time games points" columns={['Player', 'Points']} rows={data.map((item) => [item.name, item.value])} />}><BarSvg data={data} ariaLabel={`Prime-time games points, ${category}`} /></ChartFrame>
 }
 
 export function CurrentWeekChart({ current }) {
