@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { clearSession, loadPool, refreshRevealedPicks } from '../src/api.js'
+import { mergeRefreshedVisibility } from '../src/overview.jsx'
 
 afterEach(() => {
   clearSession()
@@ -74,4 +75,26 @@ it('does not expose a future saved pick while refreshing visibility', async () =
 
   expect(calls.some(([url]) => url.endsWith('/functions/v1/sync-season'))).toBe(false)
   expect(result.picksByUser.u2).toEqual([{ gameId: 'g1', saved: true }])
+})
+
+it('replaces revealed placeholders while preserving the signed-in players future draft', () => {
+  const games = [
+    { id: 'g1', kickoff: '2026-10-11T17:00:00Z', status: 'live', locked: false },
+    { id: 'g2', kickoff: '2099-10-11T17:00:00Z', status: 'scheduled', locked: false },
+  ]
+  const base = {
+    u1: [{ gameId: 'g1', team: 'GB', confidence: 7 }, { gameId: 'g2', team: 'DET', confidence: 3 }],
+    u2: [{ gameId: 'g1', saved: true }, { gameId: 'g2', saved: true }],
+  }
+  const refreshed = {
+    u1: [{ gameId: 'g1', team: 'GB', confidence: 7 }, { gameId: 'g2', saved: true }],
+    u2: [{ gameId: 'g1', team: 'CHI', confidence: 5 }, { gameId: 'g2', saved: true }],
+  }
+
+  const merged = mergeRefreshedVisibility(base, refreshed, games)
+
+  expect(merged.u1).toContainEqual({ gameId: 'g1', team: 'GB', confidence: 7 })
+  expect(merged.u1).toContainEqual({ gameId: 'g2', team: 'DET', confidence: 3 })
+  expect(merged.u2).toContainEqual({ gameId: 'g1', team: 'CHI', confidence: 5 })
+  expect(merged.u2).toContainEqual({ gameId: 'g2', saved: true })
 })
