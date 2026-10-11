@@ -22,6 +22,22 @@ export function TeamLogo({ team, size = 'small' }) {
 
 const isRevealed = (game) => game.status !== 'scheduled' || isLocked(game)
 
+export function mergeRefreshedVisibility(base = {}, refreshed = {}, games = []) {
+  const revealedGameIds = new Set(games.filter(isRevealed).map((game) => game.id))
+  const users = new Set([...Object.keys(base), ...Object.keys(refreshed)])
+  return Object.fromEntries([...users].map((userId) => {
+    const byGame = new Map()
+    for (const pick of base[userId] ?? []) {
+      // A revealed game's old placeholder is no longer authoritative. Likewise,
+      // hidden status placeholders should be replaced by the latest server view.
+      // Keep full future picks (the signed-in player's own draft) intact.
+      if (!revealedGameIds.has(pick.gameId) && pick?.team && Number.isFinite(pick.confidence)) byGame.set(pick.gameId, pick)
+    }
+    for (const pick of refreshed[userId] ?? []) byGame.set(pick.gameId, pick)
+    return [userId, [...byGame.values()]]
+  }))
+}
+
 function GameSummary({ game }) {
   return <div className="overview-game">
     <span className="overview-game-line"><a className="espn-game-link" href={espnGameUrl(game.id)} target="_blank" rel="noopener noreferrer"><strong className="overview-matchup">{game.away}@{game.home}</strong></a></span>
@@ -84,7 +100,7 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
     }
   }, [pool?.key, revealKey])
 
-  const visiblePicksByUser = revealedPicks ?? picksByUser
+  const visiblePicksByUser = revealedPicks ? mergeRefreshedVisibility(picksByUser, revealedPicks, games) : picksByUser
   const exportTable = async (share) => {
     setExporting(true)
     setExportError('')
