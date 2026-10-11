@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { isLocked, modelPicks, relativeModelWeight, scorePick } from './domain.js'
 import { primeTimeCategory } from './time.js'
+import { svgToPngBlob } from './chartExport.js'
+export { svgToPngBlob } from './chartExport.js'
 
 // Paul Tol's colorblind-friendly bright palette, reordered for four player hues.
 // Theme variants improve contrast; marker shapes identify series without color.
@@ -278,31 +280,6 @@ export function currentWeekChartData(current, mode) {
   }).sort((a, b) => mode === 'vs_total_leader' && a.name === seasonLeader?.name ? -1 : mode === 'vs_total_leader' && b.name === seasonLeader?.name ? 1 : b.value - a.value || a.name.localeCompare(b.name))
 }
 
-export function svgToPngBlob(svg) {
-  return new Promise((resolve, reject) => {
-    const copy = svg.cloneNode(true)
-    const originals = [svg, ...svg.querySelectorAll('*')]
-    ;[copy, ...copy.querySelectorAll('*')].forEach((element, index) => {
-      const style = getComputedStyle(originals[index])
-      for (const property of ['fill', 'stroke', 'font-family', 'font-size', 'font-weight']) element.style.setProperty(property, style.getPropertyValue(property))
-    })
-    const source = new XMLSerializer().serializeToString(copy)
-    const canvas = document.createElement('canvas')
-    canvas.width = 1200
-    canvas.height = 600
-    const context = canvas.getContext('2d')
-    const image = new Image()
-    image.onload = () => {
-    context.fillStyle = '#07111f'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob(resolve, 'image/png')
-    }
-    image.onerror = reject
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
-  })
-}
-
 export function downloadPngBlob(blob, filename) {
   const link = document.createElement('a')
   link.download = filename
@@ -332,11 +309,28 @@ export function ChartIcon({ type }) {
 }
 
 function ChartActions({ id, chartRef, showData, onToggleData }) {
-  return <div className="chart-actions chart-actions-bottom">
-    <button type="button" className="chart-data-toggle" aria-expanded={showData} aria-controls={`${id}-data`} onClick={onToggleData}>View chart data</button>
-    <button type="button" title="Share chart as PNG" aria-label="Share chart as PNG" onClick={() => shareSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="share" /></button>
-    <button type="button" title="Download chart as PNG" aria-label="Download chart as PNG" onClick={() => downloadSvgAsPng(chartRef.current, `${id}.png`)}><ChartIcon type="download" /></button>
-  </div>
+  const [exporting, setExporting] = useState(false)
+  const [error, setError] = useState('')
+  const exportChart = async (share) => {
+    if (exporting) return
+    setExporting(true)
+    setError('')
+    try {
+      const blob = await svgToPngBlob(chartRef.current)
+      if (share) await sharePngBlob(blob, `${id}.png`)
+      else downloadPngBlob(blob, `${id}.png`)
+    } catch (cause) {
+      if (cause.name !== 'AbortError') setError('Could not export the chart. Please try again.')
+    } finally { setExporting(false) }
+  }
+  return <>
+    <div className="chart-actions chart-actions-bottom" aria-busy={exporting}>
+      <button type="button" className="chart-data-toggle" aria-expanded={showData} aria-controls={`${id}-data`} onClick={onToggleData}>View chart data</button>
+      <button type="button" title="Share chart as PNG" aria-label="Share chart as PNG" disabled={exporting} onClick={() => exportChart(true)}><ChartIcon type="share" /></button>
+      <button type="button" title="Download chart as PNG" aria-label="Download chart as PNG" disabled={exporting} onClick={() => exportChart(false)}><ChartIcon type="download" /></button>
+    </div>
+    {error && <p className="notice error" role="alert">{error}</p>}
+  </>
 }
 
 function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', controls, children, table }) {
