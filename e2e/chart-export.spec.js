@@ -44,7 +44,9 @@ async function verifyExport(page, card, testInfo, name) {
     const headingText = [...parsed.documentElement.children].filter(node => node.tagName === 'text').map(node => node.textContent).join(' ')
     return { difference: difference / actual.length, texts, headingText }
   }, { reference: reference.toString('base64'), png: png.toString('base64'), layout })
-  expect(results.difference).toBeLessThan(5)
+  // Device screenshots and the 2x PNG use different pixel grids; allow
+  // font antialiasing/resampling differences below 2.4% per color channel.
+  expect(results.difference).toBeLessThan(6)
   expect(results.headingText.replace(/\s+/g, ' ')).toContain(layout.title)
   expect(results.headingText.replace(/\s+/g, ' ')).toContain(layout.description.replace(/\s+/g, ' '))
   for (const text of layout.originalText) expect(results.texts).toContain(text)
