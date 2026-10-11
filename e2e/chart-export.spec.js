@@ -11,7 +11,8 @@ async function verifyExport(page, card, testInfo, name) {
   await card.scrollIntoViewIfNeeded()
   const reference = await card.locator('svg.chart').screenshot()
   const layout = await card.locator('svg.chart').evaluate(async svg => {
-    const { buildChartExport } = await import('/src/chartExport.js')
+    const entry = document.querySelector('script[type="module"][src$="/src/main.jsx"]')
+    const { buildChartExport } = await import(new URL('chartExport.js', entry.src).href)
     const canvas = document.createElement('canvas')
     const result = buildChartExport(svg, canvas.getContext('2d'))
     const title = svg.closest('.chart-card').querySelector('h3').textContent
@@ -91,10 +92,14 @@ for (const theme of ['dark', 'light']) test(`every chart downloads and shares fa
 test('division winners, tall team charts and long legends keep their full content', async ({ page }, testInfo) => {
   await page.goto('/?scenario=final&pool=week-01')
   await page.evaluate(async () => {
-    const React = (await import('/node_modules/.vite/deps/react.js')).default
-    const { createRoot } = (await import('/node_modules/.vite/deps/react-dom_client.js')).default
-    const { DivisionWinnersChart, WeeklyPointsChart, TeamModelRelativeChart } = await import('/src/charts.jsx')
+    const entry = document.querySelector('script[type="module"][src$="/src/main.jsx"]')
+    const base = new URL('../', entry.src)
+    const React = (await import(new URL('node_modules/.vite/deps/react.js', base).href)).default
+    const { createRoot } = (await import(new URL('node_modules/.vite/deps/react-dom_client.js', base).href)).default
+    const { DivisionWinnersChart, WeeklyPointsChart, TeamModelRelativeChart } = await import(new URL('src/charts.jsx', base).href)
     const container = document.createElement('div')
+    // Preserve Vite's entry URL while replacing the app with edge-case fixtures.
+    document.head.append(entry)
     document.body.replaceChildren(container)
     const names = ['A very long player name that should never be truncated', 'Another extraordinarily long legend label', 'Marek']
     const users = names.map((name, index) => ({ id: `u${index}`, name, points: index * 5, correct: index, values: [index, index + 2] }))
