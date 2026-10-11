@@ -381,6 +381,21 @@ footer [data-testid="real-data-status"] { display: block; }
 .admin-override-history table { margin-top: 0; }
 .admin-override-history td time { color: var(--muted); font-size: .7rem; white-space: nowrap; }
 .override-picks { color: var(--muted); font-size: .72rem; }
+.override-player { display: flex; align-items: end; gap: 1rem; margin: .75rem 0; }
+.override-player label { display: grid; gap: .3rem; min-width: 0; max-width: 100%; }
+.override-player select { min-width: 0; max-width: 100%; }
+.override-sheet { padding: .75rem; border: 1px solid var(--line); background: var(--surface); margin-bottom: .75rem; }
+.override-sheet .section-title h3 { margin: 0; }
+.override-game .game-meta time { font-size: .65rem; overflow-wrap: anywhere; }
+.override-state { grid-area: drag; color: var(--muted); text-align: center; }
+.override-actions { display: flex; flex-wrap: wrap; justify-content: end; align-items: center; gap: .5rem; margin-top: .75rem; }
+.override-actions > span { margin-right: auto; color: var(--muted); font-size: .72rem; }
+@media (max-width: 700px) {
+  .override-player { flex-wrap: wrap; }
+  .override-sheet { padding: .35rem; }
+  .override-sheet .game { grid-template-columns: 1rem 4.3rem minmax(0, 1fr) 2.5rem; gap: .2rem; }
+  .override-sheet .game .teams label { min-width: 0; }
+}
 .danger-button { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--line)); background: transparent; font-size: .7rem; font-weight: 800; }
 .admin-gotw, .admin-gotw-overview { display: grid; gap: .75rem; }
 .admin-division { display: grid; gap: .75rem; }

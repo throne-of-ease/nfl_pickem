@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
 
 const player = { id: 'player-1', name: 'Alexandria Montgomery', username: 'alexandria_montgomery_pickem', contactEmail: 'alexandria.montgomery+football@example.com' }
-const game = { id: 'g1', pool_key: 'week-02', away_team: 'PIT', home_team: 'BUF', kickoff: '2099-09-20T17:00:00Z', status: 'scheduled', gotw: true, matchup_quality: 91.2 }
+const game = { id: 'g1', pool_key: 'week-02', away_team: 'PIT', home_team: 'BUF', kickoff: '2020-09-20T17:00:00Z', status: 'final', gotw: true, matchup_quality: 91.2, away_score: 7, home_score: 14 }
+const upcomingGame = { ...game, id: 'g2', away_team: 'KC', home_team: 'DEN', kickoff: '2099-09-20T17:00:00Z', status: 'scheduled', gotw: false }
 
 async function openAdmin(page) {
   const session = { access_token: 'test-access', refresh_token: 'test-refresh', expires_in: 3600, user: { id: 'admin-user' } }
@@ -12,7 +13,7 @@ async function openAdmin(page) {
   const responses = {
     get_season_data: { profiles: [player], games: [game], revealedPicks: [], viewer: { id: 'admin-user', name: 'Admin', isAdmin: true } },
     get_my_draft: { draftRevision: 1, picks: [] },
-    get_admin_data: { registrationOpen: true, players: [player], games: [game], picks: [] },
+    get_admin_data: { registrationOpen: true, players: [player], games: [game, upcomingGame], picks: [{ userId: player.id, gameId: 'g1', team: 'PIT', confidence: 1 }, { userId: player.id, gameId: 'g2', team: 'DEN', confidence: 2 }] },
     get_admin_gotw_data: { games: [game] },
     get_admin_override_history: { overrides: [{ id: 1, createdAt: '2026-09-02T00:00:00Z', playerName: player.name, playerId: player.id, poolKey: 'conference', adminName: 'Administrator Longdisplayname', picks: [{ gameId: 'a-long-game-identifier-to-test-wrapping', team: 'BUF', confidence: 16 }] }] },
     get_division_winner_data: { settings: { lockWeek: 5, lockAt: '2026-10-11T17:00:00Z', pointsPerCorrect: 5 }, players: [], drafts: [] },
@@ -51,6 +52,12 @@ test('all admin tables and controls fit without horizontal scrolling, including 
       }
       if (tab === 'GOTW overview') await expect(page.getByTestId('gotw-overview-table').getByRole('row')).toHaveCount(23)
       if (tab === 'Pick overrides') {
+        const futureRow = page.getByTestId('override-game-g2')
+        await expect(futureRow.getByRole('combobox')).toHaveValue('')
+        await expect(futureRow.getByRole('combobox')).toBeDisabled()
+        await expect(futureRow.locator('input:checked')).toHaveCount(0)
+        await expect(page.getByRole('radio', { name: 'PIT at BUF: PIT', exact: true })).toBeChecked()
+        await expect(page.getByRole('radio', { name: 'PIT at BUF: BUF', exact: true })).toBeEnabled()
         await page.getByText('1 picks', { exact: true }).click()
         await expect(page.getByText('a-long-game-identifier-to-test-wrapping: BUF (#16)', { exact: true })).toBeVisible()
       }
@@ -58,4 +65,24 @@ test('all admin tables and controls fit without horizontal scrolling, including 
       if (width === 390) await page.locator('.admin-panel').screenshot({ path: testInfo.outputPath(`admin-${tab.replaceAll(' ', '-')}.png`) })
     }
   }
+})
+
+
+test('failed overrides keep edits for retry; only the locked patch is sent', async ({ page }) => {
+  await openAdmin(page)
+  await page.getByRole('tab', { name: 'Pick overrides' }).click()
+  let saves = 0
+  await page.route('**/rest/v1/rpc/admin_replace_picks', async route => {
+    const body = route.request().postDataJSON()
+    expect(body.p_picks).toEqual([{ gameId: 'g1', team: 'BUF', confidence: 1 }])
+    saves += 1
+    await route.fulfill(saves === 1 ? { status: 400, json: { code: 'P0001', message: 'CONFIDENCE_UNAVAILABLE' } } : { json: { draftRevision: 2, picks: body.p_picks } })
+  })
+  await page.getByRole('radio', { name: 'PIT at BUF: BUF', exact: true }).check()
+  await page.getByRole('button', { name: 'Save override' }).click()
+  await expect(page.getByText(/Confidence unavailable\./)).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'PIT at BUF: BUF', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: 'Save override' }).click()
+  await expect(page.getByText('PICK OVERRIDE SAVED', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save override' })).toBeDisabled()
 })

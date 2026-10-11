@@ -583,7 +583,7 @@ test('admin manages registration and overrides a submitted pick', async ({ page 
   await page.getByRole('button', { name: 'Stop new registrations' }).click()
   await expect(page.getByText('NEW REGISTRATIONS STOPPED')).toBeVisible()
   await page.getByRole('tab', { name: 'Pick overrides' }).click()
-  await page.getByRole('region', { name: 'Pick overrides' }).getByLabel('Pick').selectOption('B')
+  await page.getByRole('region', { name: 'Pick overrides' }).getByRole('radio', { name: 'A at B: B', exact: true }).check()
   await page.getByRole('button', { name: 'Save override' }).click()
   await expect(page.getByText('PICK OVERRIDE SAVED')).toBeVisible()
   await expect(page.getByTestId('override-history-table')).toContainText('Pat')

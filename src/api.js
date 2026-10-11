@@ -22,7 +22,7 @@ async function request(path, options = {}) {
   })
   const data = await result.json().catch(() => ({}))
   if (!result.ok) {
-    const message = data.code ?? data.error_code ?? data.msg ?? data.message
+    const message = data.code === 'P0001' ? data.message : data.code ?? data.error_code ?? data.msg ?? data.message
     const duplicate = /already|registered|exists/i.test(String(message ?? ''))
     const code = duplicate ? 'EMAIL_ALREADY_REGISTERED' : message || (result.status === 401 ? 'INVALID_LOGIN' : 'REQUEST_FAILED')
     throw apiError(String(code).toUpperCase().replaceAll(' ', '_'), result.status)

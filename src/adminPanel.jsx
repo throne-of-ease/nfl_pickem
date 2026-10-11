@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { POOLS, gameQuality, presetConfidencePicks } from './domain.js'
+import { POOLS, gameQuality } from './domain.js'
 import { deleteAdminOverride, deleteAdminPlayer, loadAdminData, loadAdminGotwData, loadAdminOverrideHistory, loadDivisionWinnerData, mergeGames, resetAdminPassword, saveAdminPicks, setDivisionWinnerSettings, setGameOfWeek, setRegistrationOpen } from './api.js'
+import AdminPickOverrides from './adminPickOverrides.jsx'
 import { TeamLogo } from './overview.jsx'
 import { formatCETKickoff } from './time.js'
 import { DEFAULT_DIVISION_SETTINGS, resolveDivisionDeadline } from './divisionWinners.js'
@@ -35,9 +36,6 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
   const [gotwPoolKey, setGotwPoolKey] = useState(poolKey)
   const [selectedGotwGameId, setSelectedGotwGameId] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [selectedGameId, setSelectedGameId] = useState('')
-  const [team, setTeam] = useState('')
-  const [confidence, setConfidence] = useState('')
   const [message, setMessage] = useState('')
   const [gotwMessage, setGotwMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -60,7 +58,6 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
       const result = await loadAdminData(poolKey, token)
       setData(result)
       setSelectedUserId((current) => result.players.some((player) => player.id === current) ? current : result.players[0]?.id ?? '')
-      setSelectedGameId((current) => result.games.some((game) => game.id === current) ? current : result.games[0]?.id ?? '')
       setMessage('')
     } catch (error) { setMessage((error.code ?? 'ADMIN_LOAD_FAILED').replaceAll('_', ' ')) }
     finally { setBusy(false) }
@@ -82,10 +79,8 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
     return () => { active = false }
   }, [token, gotwPoolKey])
 
-  const selectedGame = data?.games.find((game) => game.id === selectedGameId)
   const selectedPlayer = data?.players.find((player) => player.id === selectedUserId)
   const currentPicks = selectedUserId ? data?.picksByUser[selectedUserId] ?? [] : []
-  const currentPick = currentPicks.find((pick) => pick.gameId === selectedGameId)
   const storedGotwGames = (gotwData?.games ?? []).filter((game) => game.poolKey === gotwPoolKey)
   const gotwGames = mergeGames(storedGotwGames, browserGamesByPool?.[gotwPoolKey] ?? [])
   const eligibleGotwGames = beforeMidnightOnly ? gotwGames.filter(startsBeforeBerlinMidnight) : gotwGames
@@ -99,11 +94,6 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
     return Date.parse(a.kickoff) - Date.parse(b.kickoff) || a.id.localeCompare(b.id)
   })
   const gotwOverview = POOLS.map((pool) => ({ pool, game: (gotwData?.games ?? []).find((game) => game.poolKey === pool.key && game.gotw) }))
-
-  useEffect(() => {
-    setTeam(currentPick?.team ?? selectedGame?.away ?? '')
-    setConfidence(currentPick?.confidence ?? '')
-  }, [selectedUserId, selectedGameId, data])
 
   useEffect(() => { setSelectedGotwGameId(assignedGotwGameId) }, [gotwPoolKey, gotwData])
 
@@ -183,22 +173,21 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
     finally { setDeleteOverrideId(null) }
   }
 
-  const submitOverride = async (event) => {
-    event.preventDefault()
-    if (!selectedPlayer || !selectedGame || !team || !confidence) return
-    const picks = presetConfidencePicks(data.games, currentPicks)
-    const occupied = picks.find((pick) => pick.gameId !== selectedGame.id && pick.confidence === Number(confidence))
-    const selectedConfidence = picks.find((pick) => pick.gameId === selectedGame.id)?.confidence
-    const nextPicks = picks.map((pick) => pick.gameId === selectedGame.id ? { ...pick, team, confidence: Number(confidence) } : occupied?.gameId === pick.gameId ? { ...pick, confidence: selectedConfidence } : pick)
+  const submitOverride = async (changes) => {
+    if (!selectedPlayer || busy) return
+    const playerId = selectedPlayer.id
     setBusy(true)
     try {
-      await saveAdminPicks(poolKey, token, selectedPlayer.id, nextPicks)
-      setData((current) => ({ ...current, picksByUser: { ...current.picksByUser, [selectedPlayer.id]: nextPicks } }))
-      onPicksUpdated(selectedPlayer.id, nextPicks)
+      const result = await saveAdminPicks(poolKey, token, playerId, changes)
+      // The backend returns only revealed picks, never future picks.
+      const nextPicks = result.picks
+      setData((current) => ({ ...current, picksByUser: { ...current.picksByUser, [playerId]: nextPicks }, pickCountsByUser: { ...current.pickCountsByUser, [playerId]: result.pickCount ?? nextPicks.filter((pick) => pick.team).length } }))
+      onPicksUpdated(playerId, nextPicks)
       loadAdminOverrideHistory(token).then(setOverrideHistory).catch(() => {})
       setMessage('PICK OVERRIDE SAVED')
-    } catch (error) { setMessage((error.code ?? 'PICK_OVERRIDE_FAILED').replaceAll('_', ' ')) }
-    finally { setBusy(false) }
+    } catch (error) {
+      setMessage(error.code === 'CONFIDENCE_UNAVAILABLE' ? 'Confidence unavailable. Upcoming picks remain private and unchanged. Choose another rank or refresh.' : (error.code ?? 'PICK_OVERRIDE_FAILED').replaceAll('_', ' '))
+    } finally { setBusy(false) }
   }
 
   const assignGotw = async (gameId = selectedGotwGameId) => {
@@ -243,10 +232,10 @@ export default function AdminPanel({ poolKey, token, browserGamesByPool, onPicks
 
     {adminTab === 'players' && <>
       <div className="admin-registration"><strong>Player registration</strong><span>{data.registrationOpen === false ? 'Closed' : 'Open'}</span><button type="button" onClick={toggleRegistration} disabled={busy}>{data.registrationOpen === false ? 'Allow new registrations' : 'Stop new registrations'}</button></div>
-      <div className="admin-list"><h3>Registered players</h3><table className="admin-record-table" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Player</th><th role="columnheader" scope="col">Username</th><th role="columnheader" scope="col">Contact</th><th role="columnheader" scope="col">Picks made / games</th><th role="columnheader" scope="col">Action</th></tr></thead><tbody role="rowgroup">{data.players.length ? data.players.map((player) => { const picksMade = (data.picksByUser[player.id] ?? []).filter((pick) => pick.team).length; return <tr role="row" key={player.id}><AdminCell label="Player">{player.name}</AdminCell><AdminCell label="Username">{player.username}</AdminCell><AdminCell label="Contact">{player.contactEmail || '-'}</AdminCell><AdminCell label="Picks made / games" data-testid={`pick-count-${player.id}`} title="Games with a team pick submitted">{picksMade} / {data.games.length}</AdminCell><AdminCell label="Action" className="admin-player-actions"><button type="button" aria-label={`Reset password for ${player.name}`} onClick={() => resetPlayerPassword(player)} disabled={busy || Boolean(resetBusyUserId)}>{resetBusyUserId === player.id ? 'Resetting...' : 'Reset password'}</button><button type="button" className="danger-button" aria-label={`Delete ${player.name}`} onClick={() => removePlayer(player)} disabled={busy || Boolean(resetBusyUserId)}>Delete</button></AdminCell></tr> }) : <tr role="row"><td colSpan="5">No registered players.</td></tr>}</tbody></table>{resetPassword && <div className="password-share" role="status"><strong>Temporary password for {resetPassword.playerName}</strong><code>{resetPassword.password}</code><button type="button" onClick={copyResetPassword}>Copy temporary password</button><small>Share it privately. They can sign in with it, then choose Change password.</small></div>}</div>
+      <div className="admin-list"><h3>Registered players</h3><table className="admin-record-table" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Player</th><th role="columnheader" scope="col">Username</th><th role="columnheader" scope="col">Contact</th><th role="columnheader" scope="col">Picks made / games</th><th role="columnheader" scope="col">Action</th></tr></thead><tbody role="rowgroup">{data.players.length ? data.players.map((player) => { const picksMade = data.pickCountsByUser?.[player.id] ?? (data.picksByUser[player.id] ?? []).filter((pick) => pick.team).length; return <tr role="row" key={player.id}><AdminCell label="Player">{player.name}</AdminCell><AdminCell label="Username">{player.username}</AdminCell><AdminCell label="Contact">{player.contactEmail || '-'}</AdminCell><AdminCell label="Picks made / games" data-testid={`pick-count-${player.id}`} title="Games with a team pick submitted">{picksMade} / {data.games.length}</AdminCell><AdminCell label="Action" className="admin-player-actions"><button type="button" aria-label={`Reset password for ${player.name}`} onClick={() => resetPlayerPassword(player)} disabled={busy || Boolean(resetBusyUserId)}>{resetBusyUserId === player.id ? 'Resetting...' : 'Reset password'}</button><button type="button" className="danger-button" aria-label={`Delete ${player.name}`} onClick={() => removePlayer(player)} disabled={busy || Boolean(resetBusyUserId)}>Delete</button></AdminCell></tr> }) : <tr role="row"><td colSpan="5">No registered players.</td></tr>}</tbody></table>{resetPassword && <div className="password-share" role="status"><strong>Temporary password for {resetPassword.playerName}</strong><code>{resetPassword.password}</code><button type="button" onClick={copyResetPassword}>Copy temporary password</button><small>Share it privately. They can sign in with it, then choose Change password.</small></div>}</div>
     </>}
 
-    {adminTab === 'overrides' && <section className="admin-overrides" aria-label="Pick overrides"><form className="admin-override" onSubmit={submitOverride}><h3>Override a pick - {poolKey}</h3><label>Player<select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>{data.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label><label>Game<select value={selectedGameId} onChange={(event) => setSelectedGameId(event.target.value)}>{data.games.map((game) => <option key={game.id} value={game.id}>{game.away}@{game.home}</option>)}</select></label><label>Pick<select value={team} onChange={(event) => setTeam(event.target.value)}>{selectedGame && <><option value={selectedGame.away}>{selectedGame.away}</option><option value={selectedGame.home}>{selectedGame.home}</option></>}</select></label><label>Confidence<select value={confidence} onChange={(event) => setConfidence(event.target.value)}>{data.games.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label><button type="submit" disabled={busy || !selectedPlayer || !selectedGame}>Save override</button></form><div className="admin-override-history"><h3>Override history</h3>{overrideHistory.length ? <div className="table-scroll"><table className="admin-record-table" role="table" data-testid="override-history-table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Player</th><th role="columnheader" scope="col">Week</th><th role="columnheader" scope="col">Changed by</th><th role="columnheader" scope="col">Submitted picks</th><th role="columnheader" scope="col">Action</th></tr></thead><tbody role="rowgroup">{overrideHistory.map((override) => <tr role="row" key={override.id}><AdminCell label="When"><time dateTime={override.createdAt}>{formatKickoff(override.createdAt)}</time></AdminCell><AdminCell label="Player">{override.playerName || override.playerId}</AdminCell><AdminCell label="Week">{override.poolKey}</AdminCell><AdminCell label="Changed by">{override.adminName || 'Admin'}</AdminCell><AdminCell label="Submitted picks"><details><summary>{override.picks?.length ?? 0} picks</summary><div className="override-picks">{(override.picks ?? []).map((pick) => <div key={pick.gameId}>{pick.gameId}: {pick.team || 'No team'}{pick.confidence == null ? '' : ` (#${pick.confidence})`}</div>)}</div></details></AdminCell><AdminCell label="Action"><button type="button" className="danger-button" aria-label={`Delete override ${override.id}`} onClick={() => removeOverride(override)} disabled={deleteOverrideId !== null}>{deleteOverrideId === override.id ? 'Deleting...' : 'Delete'}</button></AdminCell></tr>)}</tbody></table></div> : <p className="notice">No pick overrides have been recorded.</p>}</div></section>}
+    {adminTab === 'overrides' && <section className="admin-overrides" aria-label="Pick overrides"><div className="override-player"><label>Player<select value={selectedUserId} disabled={busy} onChange={(event) => { setSelectedUserId(event.target.value); setMessage('') }}>{data.players.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label><strong>{POOLS.find((pool) => pool.key === poolKey)?.label ?? poolKey}</strong></div><AdminPickOverrides games={data.games} picks={currentPicks} playerId={selectedUserId} playerName={selectedPlayer?.name} busy={busy} onSave={submitOverride} /><div className="admin-override-history"><h3>Override history</h3>{overrideHistory.length ? <div className="table-scroll"><table className="admin-record-table" role="table" data-testid="override-history-table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Player</th><th role="columnheader" scope="col">Week</th><th role="columnheader" scope="col">Changed by</th><th role="columnheader" scope="col">Submitted picks</th><th role="columnheader" scope="col">Action</th></tr></thead><tbody role="rowgroup">{overrideHistory.map((override) => <tr role="row" key={override.id}><AdminCell label="When"><time dateTime={override.createdAt}>{formatKickoff(override.createdAt)}</time></AdminCell><AdminCell label="Player">{override.playerName || override.playerId}</AdminCell><AdminCell label="Week">{override.poolKey}</AdminCell><AdminCell label="Changed by">{override.adminName || 'Admin'}</AdminCell><AdminCell label="Submitted picks"><details><summary>{override.picks?.length ?? 0} picks</summary><div className="override-picks">{(override.picks ?? []).map((pick) => <div key={pick.gameId}>{pick.gameId}: {pick.team || 'No team'}{pick.confidence == null ? '' : ` (#${pick.confidence})`}</div>)}</div></details></AdminCell><AdminCell label="Action"><button type="button" className="danger-button" aria-label={`Delete override ${override.id}`} onClick={() => removeOverride(override)} disabled={deleteOverrideId !== null}>{deleteOverrideId === override.id ? 'Deleting...' : 'Delete'}</button></AdminCell></tr>)}</tbody></table></div> : <p className="notice">No pick overrides have been recorded.</p>}</div></section>}
 
     {adminTab === 'gotw' && <section className="admin-gotw" aria-label="Game of the Week assignments"><div className="section-title"><div><h3>Weekly Game of the Week</h3><p>Choose one game for each pool. The five-point bonus follows this assignment.</p></div><div className="gotw-controls"><label>Week<select aria-label="GOTW week" value={gotwPoolKey} onChange={(event) => setGotwPoolKey(event.target.value)}>{POOLS.map((pool) => <option key={pool.key} value={pool.key}>{pool.label}</option>)}</select></label><label className="provisional-toggle"><input type="checkbox" checked={beforeMidnightOnly} onChange={(event) => setBeforeMidnightOnly(event.target.checked)} /><span className="option-label">Before midnight only</span></label></div></div>{gotwBusy && !gotwGames.length ? <p className="notice" role="status">Loading games for {POOLS.find((pool) => pool.key === gotwPoolKey)?.label ?? gotwPoolKey}...</p> : sortedGotwGames.length ? <div className="table-scroll"><table className="gotw-table"><thead><tr><th aria-sort={gotwSortOrder('game')}><button className="table-sort-button" type="button" data-testid="gotw-sort-game" onClick={() => sortGotwBy('game')}>Game{gotwSortIndicator('game')}</button></th><th aria-sort={gotwSortOrder('kickoff')}><button className="table-sort-button" type="button" data-testid="gotw-sort-kickoff" onClick={() => sortGotwBy('kickoff')}>Kickoff{gotwSortIndicator('kickoff')}</button></th><th aria-sort={gotwSortOrder('quality')}><button className="table-sort-button" type="button" data-testid="gotw-sort-quality" onClick={() => sortGotwBy('quality')}>GQ{gotwSortIndicator('quality')}</button></th><th aria-sort={gotwSortOrder('assigned')}><button className="table-sort-button" type="button" data-testid="gotw-sort-assigned" onClick={() => sortGotwBy('assigned')}>State{gotwSortIndicator('assigned')}</button></th></tr></thead><tbody>{sortedGotwGames.map((game) => <tr className={selectedGotwGameId === game.id ? 'selected' : ''} key={game.id}><td><span className="gotw-matchup"><TeamLogo team={game.away} /><strong>{game.away}</strong><span>@</span><strong>{game.home}</strong><TeamLogo team={game.home} /></span></td><td><time dateTime={game.kickoff}>{formatKickoff(game.kickoff)}</time></td><td>{gameQuality(game) == null ? '—' : gameQuality(game).toFixed(1)}</td><td className="gotw-state"><label><input type="radio" name="gotw-game" value={game.id} aria-label={`Assign ${game.away} @ ${game.home} as Game of the Week`} checked={selectedGotwGameId === game.id} disabled={gotwBusy} onChange={() => { setSelectedGotwGameId(game.id); assignGotw(game.id) }} />{game.gotw ? <b>ASSIGNED</b> : 'Assign'}</label></td></tr>)}</tbody></table></div> : <p className="notice">{gotwGames.length ? 'No games start before midnight Berlin time.' : 'No games are available for this pool yet.'}</p>}<div className="gotw-actions"><button type="button" onClick={() => assignGotw('')} disabled={gotwBusy || !assignedGotwGameId}>Clear assignment</button></div>{gotwMessage && <p className="notice" role="status">{gotwMessage}</p>}</section>}
 
