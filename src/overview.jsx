@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { gameQuality, isLocked, modelPicks, pickDeviation, poolMetrics, scorePick } from './domain.js'
+import { refreshRevealedPicks } from './api.js'
 import { ChartIcon, downloadPngBlob, sharePngBlob } from './charts.jsx'
 import { tableToPngBlob } from './tableExport.js'
 import { formatCETDate, formatCETTime } from './time.js'
@@ -43,6 +44,7 @@ function PickCell({ game, pick, provisional, publicPick = false }) {
     const saved = Boolean(pick?.saved || (pick?.team && Number.isFinite(pick.confidence)))
     return <span className="pick-hidden" aria-label={saved ? 'Pick saved; hidden until kickoff' : 'No pick saved yet'}>{saved ? '?' : '–'}</span>
   }
+  if (!publicPick && pick?.saved && !pick?.team) return <span className="pick-hidden" aria-label="Pick saved; reveal refreshing">?</span>
   if (!pick?.team || !Number.isFinite(pick.confidence)) return <span className="pick-empty" aria-label="No pick">-</span>
   const score = scorePick(pick, game, provisional)
   const state = score.scored ? score.correct ? 'correct' : 'incorrect' : 'pending'
@@ -57,6 +59,32 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
   const tableRef = useRef(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [revealedPicks, setRevealedPicks] = useState(null)
+  const revealKey = games.map((game) => `${game.id}:${game.kickoff}:${game.status}:${game.locked ? 1 : 0}:${isRevealed(game) ? 1 : 0}`).join('|')
+
+  useEffect(() => {
+    setRevealedPicks(null)
+    if (!pool?.key || !games.some(isRevealed)) return undefined
+    let active = true
+    let retry = null
+    const refresh = async () => {
+      try {
+        const result = await refreshRevealedPicks(pool.key, games)
+        if (!active || !result) return
+        setRevealedPicks(result.picksByUser)
+        if (result.needsRetry) retry = setTimeout(refresh, 30 * 1000)
+      } catch {
+        if (active) retry = setTimeout(refresh, 30 * 1000)
+      }
+    }
+    refresh()
+    return () => {
+      active = false
+      if (retry) clearTimeout(retry)
+    }
+  }, [pool?.key, revealKey])
+
+  const visiblePicksByUser = revealedPicks ?? picksByUser
   const exportTable = async (share) => {
     setExporting(true)
     setExportError('')
@@ -76,7 +104,7 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
   const [sort, setSort] = useState({ key: 'score', direction: 'ascending' })
   const sortBy = (key) => setSort((current) => ({ key, direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   const sortIndicator = (key) => sort.key === key ? (sort.direction === 'ascending' ? ' ▲' : ' ▼') : ''
-  const deviationByGame = new Map(games.map((game) => [game.id, pickDeviation(game, picksByUser)]))
+  const deviationByGame = new Map(games.map((game) => [game.id, pickDeviation(game, visiblePicksByUser)]))
   const overviewGames = [...games].sort((a, b) => {
     const aLive = a.status === 'live' || a.status === 'in'
     const bLive = b.status === 'live' || b.status === 'in'
@@ -93,7 +121,7 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
   })
   const totals = new Map(history.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
   const modelTotals = new Map(modelHistory.users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))
-  const metrics = poolMetrics(players, games, picksByUser, provisional)
+  const metrics = poolMetrics(players, games, visiblePicksByUser, provisional)
     .map((player) => ({ ...player, seasonTotal: totals.get(player.id) ?? 0, displayTotal: totals.get(player.id) ?? 0 }))
     .sort((a, b) => b.displayTotal - a.displayTotal || b.points - a.points || a.name.localeCompare(b.name))
   const leader = metrics[0]?.displayTotal ?? 0
@@ -114,7 +142,7 @@ export function Overview({ players, games, picksByUser, history, modelHistory, p
          <thead><tr><th className="overview-game-column" aria-sort={sort.key === 'game' ? sort.direction : 'none'}><button className="table-sort-button" type="button" data-testid="overview-sort-game" onClick={() => sortBy('game')}>Game{sortIndicator('game')}</button></th><th className="overview-score-column" aria-sort={sort.key === 'score' ? sort.direction : 'none'} title="Scores and scheduled kickoffs shown in Central European time (CET/CEST)"><button className="table-sort-button" type="button" data-testid="overview-sort-score" onClick={() => sortBy('score')}>Score{sortIndicator('score')}</button></th>{columns.map((player, index) => <th key={player.id} className={player.model ? `model-column ${player.id === 'model-moneyline' ? 'model-moneyline-column' : ''}` : ''}>
           <div className="overview-player"><strong>{player.name}</strong><b title="Total season score">{player.displayTotal}</b><span>{!player.model && index === 0 ? 'LEAD' : `${player.displayTotal - leader}`}</span><small title="This week: points / points lost / points left">{player.points}/-{player.pointsLost}/{player.potential}</small></div>
          </th>)}{showGameMetrics && <><th className="game-metric"><button className="table-sort-button" type="button" data-testid="overview-sort-gq" onClick={() => sortBy('gq')}>GQ{sortIndicator('gq')}</button></th><th className="game-metric overview-dev-column"><button className="table-sort-button" type="button" data-testid="overview-sort-dev" onClick={() => sortBy('dev')}>Dev{sortIndicator('dev')}</button></th></>}</tr></thead>
-        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? `model-column ${player.id === 'model-moneyline' ? 'model-moneyline-column' : ''}` : ''}><PickCell game={game} pick={(player.model ? player.picks : picksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
+        <tbody>{overviewGames.map((game) => <tr key={game.id} data-testid={`overview-row-${game.id}`} className={`${game.status} ${game.gotw ? 'gotw-row' : ''}`}><td className="overview-game-column"><GameSummary game={game} /></td><td className="overview-score-column"><ScoreCell game={game} /></td>{columns.map((player) => <td key={player.id} className={player.model ? `model-column ${player.id === 'model-moneyline' ? 'model-moneyline-column' : ''}` : ''}><PickCell game={game} pick={(player.model ? player.picks : visiblePicksByUser[player.id])?.find((pick) => pick.gameId === game.id)} provisional={provisional} publicPick={player.model} /></td>)}{showGameMetrics && <><td className="game-metric">{gameQuality(game) === null ? '—' : gameQuality(game).toFixed(1)}</td><td className="game-metric">{deviationByGame.get(game.id) === null ? '—' : deviationByGame.get(game.id).toFixed(1)}</td></>}</tr>)}</tbody>
       </table>
     </div>
     <div className="chart-actions chart-actions-bottom">
