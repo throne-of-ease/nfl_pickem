@@ -33,7 +33,12 @@ export function mergeRefreshedVisibility(base = {}, refreshed = {}, games = []) 
       // Keep full future picks (the signed-in player's own draft) intact.
       if (!revealedGameIds.has(pick.gameId) && pick?.team && Number.isFinite(pick.confidence)) byGame.set(pick.gameId, pick)
     }
-    for (const pick of refreshed[userId] ?? []) byGame.set(pick.gameId, pick)
+    for (const pick of refreshed[userId] ?? []) {
+      const existing = byGame.get(pick.gameId)
+      const hiddenStatus = pick?.saved && !pick?.team
+      if (!revealedGameIds.has(pick.gameId) && hiddenStatus && existing?.team && Number.isFinite(existing.confidence)) continue
+      byGame.set(pick.gameId, pick)
+    }
     return [userId, [...byGame.values()]]
   }))
 }
