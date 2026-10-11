@@ -256,7 +256,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-table tr.live td:first-child { background: color-mix(in srgb, var(--live) 6%, var(--surface)); }
 .overview-table tr.live .overview-game-column { border-left: 3px solid var(--live); }
 .overview-table tr.gotw-row { box-shadow: inset 3px 0 var(--warning); }
-.overview-player { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: .08rem; align-items: baseline; }
+.overview-player { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: .12rem; align-items: start; }
 .overview-player strong { max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; color: var(--ink); text-align: center; line-height: 1.15; }
 .overview-player b { color: var(--warning); font-size: 1rem; }
 .overview-player span { color: var(--success); font-size: .62rem; text-align: center; letter-spacing: .08em; }
@@ -264,7 +264,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .overview-game { display: grid; justify-items: center; gap: .02rem; min-width: 0; text-align: center; }
 .overview-game-line { display: flex; align-items: center; justify-content: center; gap: .08rem; min-width: 0; }
 .overview-game .live-badge { padding: 1px 3px; font-size: .42rem !important; letter-spacing: .02em !important; }
-.overview-matchup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .66rem; }
+.overview-matchup { display: block; max-width: 100%; white-space: nowrap; font-size: .66rem; letter-spacing: 0; }
 .overview-gotw { display: block; color: var(--warning); font-size: .52rem; line-height: 1; }
 .overview-score { display: grid; justify-items: center; align-content: center; gap: .04rem; min-height: 2rem; font-variant-numeric: tabular-nums; line-height: 1; }
 .overview-score strong { font-size: .7rem; }

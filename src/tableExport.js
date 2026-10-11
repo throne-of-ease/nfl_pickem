@@ -78,37 +78,71 @@ function drawBox(context, element, tableRect, offsetY) {
   }
 }
 
+// Reuse the browser's actual line breaks. Rewrapping with canvas metrics can
+// add a line to a narrow name cell and paint it over the season total below.
+function browserTextLines(element) {
+  if (!document.createRange) return []
+  const lines = []
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  const range = document.createRange()
+  while (walker.nextNode()) {
+    const node = walker.currentNode
+    for (let index = 0; index < node.length; index++) {
+      range.setStart(node, index)
+      range.setEnd(node, index + 1)
+      // jsdom has no text layout; the fallback below also supports that case.
+      if (!range.getBoundingClientRect) return []
+      const rect = range.getBoundingClientRect()
+      if (!rect.width || !rect.height) continue
+      let line = lines.at(-1)
+      if (!line || Math.abs(line.top - rect.top) > .5) {
+        line = { text: '', left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+        lines.push(line)
+      }
+      line.text += node.data[index]
+      line.left = Math.min(line.left, rect.left)
+      line.right = Math.max(line.right, rect.right)
+    }
+  }
+  return lines
+}
+
 function drawText(context, item, cell, tableRect, offsetY) {
   const element = item.element
   if (!visible(element)) return
   const style = getComputedStyle(element)
   const rect = element.getBoundingClientRect()
   const cellRect = cell.getBoundingClientRect()
-  const x = rect.left - tableRect.left
-  const y = rect.top - tableRect.top + offsetY
-  const availableWidth = Math.max(1, Math.min(rect.width || cellRect.width, cellRect.width) - 2)
   const fontSize = parseFloat(style.fontSize) || 12
   const lineHeight = parseFloat(style.lineHeight) || fontSize * 1.2
+  context.save()
   context.font = canvasFont(style)
   context.fillStyle = style.color
-  context.textAlign = style.textAlign === 'left' || style.textAlign === 'start' ? 'left' : style.textAlign === 'right' || style.textAlign === 'end' ? 'right' : 'center'
-  let text = item.text
-  if (style.textTransform === 'uppercase') text = text.toLocaleUpperCase()
-  else if (style.textTransform === 'lowercase') text = text.toLocaleLowerCase()
-  else if (style.textTransform === 'capitalize') text = text.replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase())
-  if (style.textOverflow === 'ellipsis' && context.measureText(text).width > availableWidth) {
-    while (text && context.measureText(`${text}…`).width > availableWidth) text = text.slice(0, -1)
-    text = `${text}…`
+  context.textAlign = 'left'
+  context.textBaseline = 'alphabetic'
+  if ('letterSpacing' in context) context.letterSpacing = style.letterSpacing === 'normal' ? '0px' : style.letterSpacing
+  const transform = text => style.textTransform === 'uppercase' ? text.toLocaleUpperCase() : style.textTransform === 'lowercase' ? text.toLocaleLowerCase() : style.textTransform === 'capitalize' ? text.replace(/\b\p{L}/gu, letter => letter.toLocaleUpperCase()) : text
+  let lines = browserTextLines(element)
+  if (!lines.length) {
+    const availableWidth = Math.max(1, rect.width || cellRect.width)
+    const text = transform(item.text)
+    const wrapped = style.whiteSpace === 'nowrap' ? [text] : wrapText(context, text, availableWidth, style.overflowWrap === 'anywhere' || style.wordBreak === 'break-word')
+    lines = wrapped.map((text, index) => ({ text, left: rect.left, right: rect.left + availableWidth, top: rect.top + index * lineHeight, bottom: rect.top + (index + 1) * lineHeight }))
   }
-  const lines = style.whiteSpace === 'nowrap' ? [text] : wrapText(context, text, availableWidth, style.overflowWrap === 'anywhere' || style.wordBreak === 'break-word')
-  const textHeight = lineHeight * lines.length
-  const baseY = y + Math.max(0, (rect.height - textHeight) / 2)
-  const anchorX = context.textAlign === 'left' ? x : context.textAlign === 'right' ? x + rect.width : x + rect.width / 2
-  context.save()
   context.beginPath()
-  context.rect(cellRect.left - tableRect.left, cellRect.top - tableRect.top + offsetY, cellRect.width, cellRect.height)
+  // Keep each text block inside its browser allocation, including wrapped names.
+  context.rect(cellRect.left - tableRect.left, rect.top - tableRect.top + offsetY, cellRect.width, rect.height || cellRect.height)
   context.clip()
-  lines.forEach((line, index) => context.fillText(line, anchorX, baseY + lineHeight * (index + .82)))
+  for (const line of lines) {
+    const text = transform(line.text)
+    const metrics = context.measureText(text)
+    const ascent = metrics.fontBoundingBoxAscent ?? fontSize * .8
+    const descent = metrics.fontBoundingBoxDescent ?? fontSize * .2
+    const baseline = line.top + (line.bottom - line.top - ascent - descent) / 2 + ascent
+    const width = Math.max(1, Math.min(line.right, cellRect.right) - Math.max(line.left, cellRect.left))
+    // Scaling only when metrics differ avoids artificial ellipses and clipping.
+    context.fillText(text, line.left - tableRect.left, baseline - tableRect.top + offsetY, width)
+  }
   context.restore()
 }
 
@@ -147,12 +181,12 @@ function drawLegend(context, legend, width, y) {
 // Draw the displayed cells so hidden picks stay hidden and browser theme/logo styling is preserved.
 export async function tableToPngBlob(table, title) {
   if (!table) throw new Error('Table is unavailable')
+  await document.fonts?.ready
   const logos = [...table.querySelectorAll('img')]
   await Promise.all(logos.map(waitForImage))
   const tableRect = table.getBoundingClientRect()
   const width = Math.ceil(Math.max(tableRect.width, table.scrollWidth))
   const tableHeight = Math.ceil(tableRect.height)
-  const headingHeight = 48
   const section = table.closest('section')
   const legend = section?.querySelector('.overview-legend')
   const legendHeight = legend ? Math.ceil(legend.getBoundingClientRect().height || 20) + 12 : 0
@@ -161,17 +195,21 @@ export async function tableToPngBlob(table, title) {
   const ink = rootStyle.getPropertyValue('--ink').trim() || rootStyle.color
   const font = rootStyle.fontFamily
   const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil(width * 2)
-  canvas.height = Math.ceil((headingHeight + tableHeight + legendHeight) * 2)
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas is unavailable')
+  const headingFont = `700 16px ${font}`
+  context.font = headingFont
+  const headingLines = wrapText(context, `NFL Pick\u2019em 2026 \u00b7 ${title}`, Math.max(1, width - 24), true)
+  const headingHeight = Math.max(48, 24 + headingLines.length * 20)
+  canvas.width = Math.ceil(width * 2)
+  canvas.height = Math.ceil((headingHeight + tableHeight + legendHeight) * 2)
   context.scale(2, 2)
   context.fillStyle = paper
   context.fillRect(0, 0, width, headingHeight + tableHeight + legendHeight)
   context.fillStyle = ink
-  context.font = `700 16px ${font}`
+  context.font = headingFont
   context.textAlign = 'left'
-  context.fillText(`NFL Pick\u2019em 2026 \u00b7 ${title}`, 12, 28)
+  headingLines.forEach((line, index) => context.fillText(line, 12, 28 + index * 20))
 
   const rows = [...table.rows]
   rows.forEach((row) => [...row.cells].forEach((cell) => {

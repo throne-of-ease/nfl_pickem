@@ -88,6 +88,8 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
     const table = document.querySelector('.overview-table')
     const tableRect = table.getBoundingClientRect()
     const headerRect = table.tHead.rows[0].cells[0].getBoundingClientRect()
+    const legendHeight = Math.ceil(table.closest('section').querySelector('.overview-legend').getBoundingClientRect().height || 20) + 12
+    const headingHeight = bitmap.height / 2 - Math.ceil(tableRect.height) - legendHeight
     const sample = (x, y) => {
       context.clearRect(0, 0, 1, 1)
       context.drawImage(bitmap, x, y, 1, 1, 0, 0, 1, 1)
@@ -95,7 +97,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
     }
     return {
       page: sample(4, 4),
-      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((48 + headerRect.top - tableRect.top + 5) * 2)),
+      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((headingHeight + headerRect.top - tableRect.top + 5) * 2)),
     }
   })
   expect(darkPixels).toEqual({ page: [11, 17, 24, 255], tableHeader: [23, 34, 49, 255] })
@@ -111,6 +113,8 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
     const table = document.querySelector('.overview-table')
     const tableRect = table.getBoundingClientRect()
     const headerRect = table.tHead.rows[0].cells[0].getBoundingClientRect()
+    const legendHeight = Math.ceil(table.closest('section').querySelector('.overview-legend').getBoundingClientRect().height || 20) + 12
+    const headingHeight = bitmap.height / 2 - Math.ceil(tableRect.height) - legendHeight
     const sample = (x, y) => {
       context.clearRect(0, 0, 1, 1)
       context.drawImage(bitmap, x, y, 1, 1, 0, 0, 1, 1)
@@ -118,7 +122,7 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
     }
     return {
       page: sample(4, 4),
-      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((48 + headerRect.top - tableRect.top + 5) * 2)),
+      tableHeader: sample(Math.round((headerRect.left - tableRect.left + 5) * 2), Math.round((headingHeight + headerRect.top - tableRect.top + 5) * 2)),
     }
   })
   expect(lightPixels).toEqual({ page: [255, 255, 255, 255], tableHeader: [233, 238, 244, 255] })
@@ -142,4 +146,60 @@ test('exports PNG, shares a file, falls back to download and handles cancellatio
   await page.getByRole('button', { name: 'Download table as PNG' }).click()
   await expect(page.getByRole('alert')).toHaveText('Could not export the table. Please try again.')
   expect(errors).toEqual([])
+})
+
+test('long names stay above season totals and complete matchups survive PNG export', async ({ page }, testInfo) => {
+  const longNames = ['AlexanderthegreatNFLsupporter', 'A player with an exceptionally long name', 'Marek', 'NFLsuperfan']
+  await page.addInitScript(names => localStorage.setItem('nfl-pickem-rehearsal-v1', JSON.stringify({ users: names.map((name, index) => ({ id: `u${index + 1}`, name })), picksByUser: {} })), longNames)
+  await page.goto('/?scenario=final&pool=week-01')
+  await page.getByLabel('Include model picks', { exact: true }).check()
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 850 })
+    const layout = await page.locator('.overview-table').evaluate(table => {
+      const rect = table.getBoundingClientRect()
+      return {
+        names: [...table.querySelectorAll('.overview-player > strong')].map(el => {
+          const name = el.getBoundingClientRect(), total = el.nextElementSibling.getBoundingClientRect()
+          return { text: el.textContent, top: name.top - rect.top, bottom: name.bottom - rect.top, totalTop: total.top - rect.top, left: name.left - rect.left, right: name.right - rect.left }
+        }),
+        matchups: [...table.querySelectorAll('.overview-matchup')].map(el => el.textContent),
+        tableHeight: Math.ceil(rect.height),
+        legendHeight: Math.ceil(table.closest('section').querySelector('.overview-legend').getBoundingClientRect().height || 20) + 12,
+        noOverflow: table.closest('.overview-scroll').scrollWidth <= table.closest('.overview-scroll').clientWidth + 1,
+      }
+    })
+    expect(layout.noOverflow).toBe(true)
+    for (const name of layout.names) expect(name.bottom).toBeLessThanOrEqual(name.totalTop)
+    await page.evaluate(() => {
+      window.exportLines = []
+      const original = CanvasRenderingContext2D.prototype.fillText
+      CanvasRenderingContext2D.prototype.fillText = function(text, x, y, maxWidth) {
+        const metrics = this.measureText(text)
+        window.exportLines.push({ text, x, top: y - metrics.actualBoundingBoxAscent, bottom: y + metrics.actualBoundingBoxDescent, maxWidth, color: this.fillStyle })
+        return original.apply(this, arguments)
+      }
+    })
+    const pending = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Download table as PNG' }).click()
+    const download = await pending
+    await download.saveAs(testInfo.outputPath(`overview-long-names-${width}.png`))
+    const stream = await download.createReadStream()
+    const chunks = []
+    for await (const chunk of stream) chunks.push(chunk)
+    const png = Buffer.concat(chunks)
+    const headingHeight = png.readUInt32BE(20) / 2 - layout.tableHeight - layout.legendHeight
+    const lines = await page.evaluate(() => window.exportLines)
+    expect(lines.filter(line => line.top < headingHeight).map(line => line.text).join(' ')).toContain('Includes provisional live scores')
+    for (const name of layout.names) { name.top += headingHeight; name.bottom += headingHeight; name.totalTop += headingHeight }
+    for (const matchup of layout.matchups) expect(lines.map(line => line.text)).toContain(matchup)
+    expect(lines.some(line => line.text.includes('…'))).toBe(false)
+    for (const name of layout.names) {
+      const nameLines = lines.filter(line => line.x >= name.left - 1 && line.x <= name.right + 1 && line.top >= name.top - 1 && line.top < name.bottom)
+      expect(nameLines.map(line => line.text).join('').replace(/\s/g, '')).toContain(name.text.toUpperCase().replace(/\s/g, ''))
+      for (const line of nameLines) expect(line.bottom).toBeLessThanOrEqual(name.totalTop + .5)
+    }
+    // Restore instrumentation so the next width records each line once.
+    await page.reload()
+    await page.getByLabel('Include model picks', { exact: true }).check()
+  }
 })
