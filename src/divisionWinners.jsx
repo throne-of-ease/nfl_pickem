@@ -28,7 +28,7 @@ const mapData = (data, viewerId, players = [], fixture = false) => {
   const local = fixture ? readFixtureDraft(viewerId) : null
   return {
     settings,
-    locked: fixture ? Date.parse(settings.lockAt) <= Date.now() : Boolean(data?.locked ?? data?.isLocked),
+    locked: fixture ? Boolean(data?.locked) : Boolean(data?.locked ?? data?.isLocked),
     revision: Number(data?.viewerRevision ?? viewer?.revision ?? data?.revision ?? 0),
     picks: local && Object.keys(local).length ? local : draftPicks(viewer),
     players: data?.players ?? players,
