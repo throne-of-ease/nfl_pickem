@@ -3,6 +3,7 @@ import { fetchEspnPool, mergeLatestGame } from './espnAdapter.js'
 
 const SESSION_KEY = 'nfl-pickem-session-v1'
 const ESPN_CACHE_KEY = 'nfl-pickem-espn-cache-v2'
+let activeAccessToken = null
 
 const configuration = () => ({
   url: import.meta.env.VITE_SUPABASE_URL || globalThis.__NFL_SUPABASE_URL || '',
@@ -30,7 +31,10 @@ async function request(path, options = {}) {
   return data
 }
 
-const saveSession = (session) => localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+const saveSession = (session) => {
+  activeAccessToken = session?.access_token ?? activeAccessToken
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+}
 
 export async function authenticate(action, values = {}) {
   if (action === 'refresh') {
@@ -76,9 +80,15 @@ export async function restoreSession() {
   catch { clearSession(); return null }
 }
 
-export function clearSession() { localStorage.removeItem(SESSION_KEY) }
+export function clearSession() {
+  activeAccessToken = null
+  localStorage.removeItem(SESSION_KEY)
+}
 
-const bearer = (token) => ({ authorization: `Bearer ${token}` })
+const bearer = (token) => {
+  if (token) activeAccessToken = token
+  return { authorization: `Bearer ${token}` }
+}
 
 const loadSeason = (poolKey, token) => request('/rest/v1/rpc/get_season_data', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey }) })
 const loadDraft = (poolKey, token) => request('/rest/v1/rpc/get_my_draft', { method: 'POST', headers: bearer(token), body: JSON.stringify({ p_pool_key: poolKey }) })
@@ -198,6 +208,26 @@ export async function loadAdminData(poolKey, token) {
 }
 
 const syncPool = (poolKey, token) => request('/functions/v1/sync-season', { method: 'POST', headers: bearer(token), body: JSON.stringify({ pool: poolKey }), signal: AbortSignal.timeout?.(15000) })
+
+const startedGame = (game, now = Date.now()) => Boolean(game?.locked) || game?.status !== 'scheduled' || Date.parse(game?.kickoff) <= now
+
+export async function refreshRevealedPicks(poolKey, games = []) {
+  const token = activeAccessToken
+  if (!poolKey || !token) return null
+  const now = Date.now()
+  if (games.some((game) => startedGame(game, now) && !game.locked)) {
+    try { await syncPool(poolKey, token) } catch { /* the season RPC may still be able to reveal by kickoff time */ }
+  }
+  const season = await loadSeason(poolKey, token)
+  const mapped = mapSeason(season, {})
+  const serverGames = new Map(mapped.games.map((game) => [game.id, game]))
+  const needsRetry = games.some((game) => {
+    if (!startedGame(game, now)) return false
+    const serverGame = serverGames.get(game.id)
+    return !serverGame || (!serverGame.locked && serverGame.status === 'scheduled' && Date.parse(serverGame.kickoff) > now)
+  })
+  return { picksByUser: mapped.picksByUser, games: mapped.games, needsRetry }
+}
 
 export async function loadAdminGotwData(token, poolKey) {
   const load = () => request('/rest/v1/rpc/get_admin_gotw_data', { method: 'POST', headers: bearer(token), body: '{}' })
