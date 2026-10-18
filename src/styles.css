@@ -1,9 +1,18 @@
 @import './stylesBase.css';
 
-.correlation-matrix-chart { display: block; width: 100%; height: auto; min-width: 0; }
 .chart-card-pick-correlation { grid-column: 1 / -1; }
-.correlation-data .table-scroll { overflow-x: auto; }
-.correlation-data table { min-width: 520px; }
+.chart-card-pick-correlation .chart-title { margin: 0; color: var(--ink); font-size: 1.17em; font-weight: 800; }
+.correlation-matrix-visual { width: 100%; max-width: 100%; padding: .55rem; overflow: hidden; border-radius: 10px; background: #0c192b; }
+.correlation-grid-row { display: grid; gap: 2px; align-items: stretch; margin-bottom: 2px; }
+.correlation-grid-header { align-items: end; }
+.correlation-corner,
+.correlation-column-label,
+.correlation-row-label { min-width: 0; color: #edf2f7; font-size: .68rem; font-weight: 700; overflow-wrap: anywhere; }
+.correlation-corner { align-self: center; color: #b7c7da; text-align: center; }
+.correlation-column-label { padding: .2rem .08rem .32rem; text-align: center; line-height: 1.05; }
+.correlation-row-label { display: flex; align-items: center; padding-right: .3rem; line-height: 1.05; }
+.correlation-cell { display: grid; min-width: 0; aspect-ratio: 1; place-items: center; border-radius: 3px; color: #fff; font-weight: 800; line-height: 1; }
+.correlation-legend { margin-top: .4rem; color: #b7c7da; font-size: .66rem; text-align: center; }
 
 @media (max-width: 430px) {
   .division-matrix { padding: .55rem .35rem; }
@@ -13,5 +22,12 @@
   .division-matrix td { padding: .22rem .08rem; font-size: .58rem; line-height: 1.15; text-align: center; overflow-wrap: anywhere; word-break: break-word; }
   .division-matrix th:first-child { width: 4.35rem; text-align: left; }
   .division-matrix td { white-space: normal; }
-  .correlation-data table { min-width: 460px; }
+  .correlation-matrix-visual { padding: .35rem; }
+  .correlation-grid-row { gap: 1px; margin-bottom: 1px; }
+  .correlation-corner,
+  .correlation-column-label,
+  .correlation-row-label { font-size: .52rem; }
+  .correlation-column-label { padding: .1rem .03rem .2rem; }
+  .correlation-row-label { padding-right: .12rem; }
+  .correlation-legend { font-size: .54rem; }
 }
