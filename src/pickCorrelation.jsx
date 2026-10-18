@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ChartIcon, downloadSvgAsPng, shareSvgAsPng } from './charts.jsx'
-import { isLocked } from './domain.js'
+import { isLocked, modelPicks } from './domain.js'
+import { svgToPngBlob } from './chartExport.js'
+
+const MODEL_DEFINITIONS = [
+  { id: 'model-fpi', name: 'FPI', kind: 'predictor' },
+  { id: 'model-moneyline', name: 'Moneyline', kind: 'moneyline' },
+  { id: 'model-avg', name: 'AVG', kind: 'aggregate' },
+]
 
 const signedConfidence = (pick, game) => {
   if (!pick || !game || !Number.isFinite(pick.confidence) || pick.confidence <= 0) return null
@@ -51,11 +57,27 @@ export function pickConfidenceCorrelationMatrix(players, gamesByPool, picksByUse
       xs.push(value)
       ys.push(columnValues.get(key))
     }
-    const value = pearsonCorrelation(xs, ys)
-    return { rowId: row.id, columnId: column.id, value, count: xs.length }
+    return { rowId: row.id, columnId: column.id, value: pearsonCorrelation(xs, ys), count: xs.length }
   }))
 
   return { entities, cells }
+}
+
+const modelToggleChecked = () => typeof document !== 'undefined' && [...document.querySelectorAll('.standings-options input[type="checkbox"]')]
+  .some((input) => input.checked && input.closest('label')?.textContent?.includes('Include model picks'))
+
+function useIncludeModelPicks() {
+  const [includeModels, setIncludeModels] = useState(false)
+  useEffect(() => {
+    const sync = () => setIncludeModels(modelToggleChecked())
+    const onChange = (event) => {
+      if (event.target?.matches?.('.standings-options input[type="checkbox"]') && event.target.closest('label')?.textContent?.includes('Include model picks')) sync()
+    }
+    sync()
+    document.addEventListener('change', onChange)
+    return () => document.removeEventListener('change', onChange)
+  }, [])
+  return includeModels
 }
 
 const compactName = (name, compact) => compact && name.length > 9 ? `${name.slice(0, 8)}…` : name
@@ -97,12 +119,12 @@ function CorrelationMatrixSvg({ matrix, chartRef }) {
     <rect width={width} height={height} fill="#0c192b" rx="10" />
     {entities.map((entity, index) => {
       const x = matrixLeft + (index + .5) * cellSize
-      return <text key={`column-${entity.id}`} x={x} y={top - 10} fontSize={fontSize} textAnchor="start" transform={`rotate(-48 ${x} ${top - 10})`} style={{ fill: '#edf2f7' }}><title>{entity.name}</title>{compactName(entity.name, compact)}</text>
+      return <text key={`column-${entity.id}`} x={x} y={top - 10} fontSize={fontSize} textAnchor="start" transform={`rotate(-48 ${x} ${top - 10})`} fill="#edf2f7"><title>{entity.name}</title>{compactName(entity.name, compact)}</text>
     })}
     {entities.map((entity, rowIndex) => {
       const y = top + (rowIndex + .5) * cellSize
       return <g key={`row-${entity.id}`}>
-        <text x={matrixLeft - 7} y={y + 4} fontSize={fontSize} textAnchor="end" style={{ fill: '#edf2f7' }}><title>{entity.name}</title>{compactName(entity.name, compact)}</text>
+        <text x={matrixLeft - 7} y={y + 4} fontSize={fontSize} textAnchor="end" fill="#edf2f7"><title>{entity.name}</title>{compactName(entity.name, compact)}</text>
         {cells[rowIndex].map((cell, columnIndex) => {
           const x = matrixLeft + columnIndex * cellSize
           const cellY = top + rowIndex * cellSize
@@ -120,8 +142,35 @@ function CorrelationMatrixSvg({ matrix, chartRef }) {
   </svg>
 }
 
+function ExportIcon({ share }) {
+  return share
+    ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 5 8 2 5 5M8 2v8M3 8v5h10V8" /></svg>
+    : <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 12v2h10v-2" /></svg>
+}
+
+const downloadBlob = (blob, filename) => {
+  const link = document.createElement('a')
+  link.download = filename
+  link.href = URL.createObjectURL(blob)
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+}
+
+const exportSvg = async (svg, filename, share) => {
+  const blob = await svgToPngBlob(svg)
+  if (!share) return downloadBlob(blob, filename)
+  const file = new File([blob], filename, { type: 'image/png' })
+  if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) return navigator.share({ title: 'NFL Pick’em 2026', files: [file] })
+  return downloadBlob(blob, filename)
+}
+
 export default function PickCorrelationMatrix({ players, gamesByPool, picksByUser, poolKeys }) {
-  const matrix = pickConfidenceCorrelationMatrix(players, gamesByPool, picksByUser, poolKeys)
+  const includeModels = useIncludeModelPicks()
+  const modelPlayers = MODEL_DEFINITIONS.map(({ id, name }) => ({ id, name, model: true }))
+  const modelPicksByUser = Object.fromEntries(MODEL_DEFINITIONS.map((model) => [model.id, Object.fromEntries(poolKeys.map((poolKey) => [poolKey, modelPicks(gamesByPool[poolKey] ?? [], model.kind)]))]))
+  const matrixPlayers = includeModels ? [...players, ...modelPlayers] : players
+  const matrixPicks = includeModels ? { ...picksByUser, ...modelPicksByUser } : picksByUser
+  const matrix = pickConfidenceCorrelationMatrix(matrixPlayers, gamesByPool, matrixPicks, poolKeys)
   const chartRef = useRef(null)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
@@ -130,19 +179,18 @@ export default function PickCorrelationMatrix({ players, gamesByPool, picksByUse
     setExporting(true)
     setError('')
     try {
-      if (share) await shareSvgAsPng(chartRef.current, 'pick-confidence-correlation.png')
-      else await downloadSvgAsPng(chartRef.current, 'pick-confidence-correlation.png')
+      await exportSvg(chartRef.current, 'pick-confidence-correlation.png', share)
     } catch (cause) {
       if (cause?.name !== 'AbortError') setError('Could not export the correlation matrix. Please try again.')
     } finally { setExporting(false) }
   }
-  return <section className="chart-card chart-card-pick-correlation" data-testid="pick-correlation-matrix" data-entity-count={matrix.entities.length} style={{ order: 999 }} aria-labelledby="pick-correlation-title">
+  return <section className="chart-card chart-card-pick-correlation" data-testid="pick-correlation-matrix" data-entity-count={matrix.entities.length} aria-labelledby="pick-correlation-title">
     <div className="chart-heading"><h3 id="pick-correlation-title">Pick confidence correlation</h3></div>
     <div className="chart-scroll"><CorrelationMatrixSvg matrix={matrix} chartRef={chartRef} /></div>
-    <p className="chart-description">Pearson correlation of signed confidence across common locked games. Home picks are positive and away picks negative, so picking opposite teams correctly counts as an opposing signal. Missing picks are excluded pairwise. When “Include model picks” is enabled, FPI, Moneyline and AVG are included as additional columns and rows.</p>
+    <p className="chart-description">Pearson correlation of signed confidence across common locked games. Home picks are positive and away picks negative, so opposite-team picks correctly count as opposing signals. Missing picks are excluded pairwise. When “Include model picks” is enabled, FPI, Moneyline and AVG are added as rows and columns.</p>
     <div className="chart-actions chart-actions-bottom" aria-busy={exporting}>
-      <button type="button" title="Share correlation matrix as PNG" aria-label="Share correlation matrix as PNG" disabled={exporting} onClick={() => exportChart(true)}><ChartIcon type="share" /></button>
-      <button type="button" title="Download correlation matrix as PNG" aria-label="Download correlation matrix as PNG" disabled={exporting} onClick={() => exportChart(false)}><ChartIcon type="download" /></button>
+      <button type="button" title="Share correlation matrix as PNG" aria-label="Share correlation matrix as PNG" disabled={exporting} onClick={() => exportChart(true)}><ExportIcon share /></button>
+      <button type="button" title="Download correlation matrix as PNG" aria-label="Download correlation matrix as PNG" disabled={exporting} onClick={() => exportChart(false)}><ExportIcon /></button>
     </div>
     {error && <p className="notice error" role="alert">{error}</p>}
     <details className="chart-data correlation-data"><summary>View chart data</summary><div className="table-scroll"><table><caption>Pick confidence correlations</caption><thead><tr><th>Player / model</th>{matrix.entities.map((entity) => <th key={entity.id}>{entity.name}</th>)}</tr></thead><tbody>{matrix.entities.map((entity, rowIndex) => <tr key={entity.id}><th scope="row">{entity.name}</th>{matrix.cells[rowIndex].map((cell) => <td key={cell.columnId} title={`${cell.count} common locked games`}>{Number.isFinite(cell.value) ? cell.value.toFixed(2) : '—'}</td>)}</tr>)}</tbody></table></div></details>
