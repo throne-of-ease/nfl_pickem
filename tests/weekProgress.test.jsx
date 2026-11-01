@@ -156,3 +156,22 @@ it('defaults to weekly leader comparison and provides an independent live-game s
     expect(screen.getByLabelText('Week progress benchmark')).toHaveValue(benchmark)
   }
 })
+
+
+it('keeps all output invariant to hidden draft contents, including viewer drafts and relative benchmarks', () => {
+  const sample = games.map((game, i) => ({ ...game, kickoff: `2099-01-0${i+1}T18:00:00Z`, status: 'scheduled', predictorHome: .7, homeMoneyline: -200, awayMoneyline: 180 }))
+  const changed = Object.fromEntries(Object.entries(picks).map(([id, entries]) => [id, entries.map(pick => ({ ...pick, confidence: 5 - pick.confidence, team: 'PRIVATE_SECRET' }))]))
+  for (const metric of ['earned', 'lost', 'potential', 'net'])
+    for (const order of ['kickoff', 'predictor', 'moneyline', 'aggregate', 'dev'])
+      for (const benchmark of ['absolute', 'weekly-leader', 'season-leader', 'a', 'b', 'model-fpi', 'model-moneyline', 'model-avg'])
+        for (const groupKickoffs of [false, true]) for (const includeLive of [false, true]) {
+          const options = { metric, order, benchmark, groupKickoffs, includeLive, provisional: includeLive, viewerId: 'a', seasonTotals: new Map([['a', 1], ['b', 2]]) }
+          expect(weekProgressData(players, sample, changed, options)).toEqual(weekProgressData(players, sample, picks, options))
+        }
+})
+
+it('uses only revealed inputs for leader selection even if an unopened game has a premature result', () => {
+  const sample = games.map((game, i) => ({ ...game, kickoff: `2099-01-0${i+1}T18:00:00Z`, status: 'final' }))
+  const options = { benchmark: 'weekly-leader', viewerId: 'a', provisional: true }
+  expect(weekProgressData(players, sample, picks, options)).toEqual(weekProgressData(players, sample, {}, options))
+})

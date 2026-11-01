@@ -42,6 +42,10 @@ export function kickoffGroupLabel(game) {
 // Future private picks must not influence another player's visible trajectory.
 // Allocate their public remaining confidence budget in kickoff order instead.
 export function weekProgressData(players, games, picksByUser, { metric = 'earned', groupKickoffs = false, provisional = false, viewerId, order = 'kickoff', ascending = false, includeLive = true, benchmark = 'absolute', seasonTotals = new Map() } = {}) {
+  // Use one public-only input for lines, leader selection, Dev and exports.
+  // Even the viewer's future draft is excluded: shared charts must be safe.
+  const publicModels = new Set(players.filter((player) => player.model).map((player) => player.id))
+  picksByUser = Object.fromEntries(Object.entries(picksByUser).map(([id, picks]) => [id, picks.filter((pick) => games.some((game) => game.id === pick.gameId && (publicModels.has(id) || isLocked(game))))]))
   const ordered = [...games].sort((a, b) => kickoffTime(a) - kickoffTime(b) || String(a.id).localeCompare(String(b.id)))
   const groups = []
   for (const game of ordered.filter((game) => includeLive || game.status !== 'live')) {
@@ -72,7 +76,7 @@ export function weekProgressData(players, games, picksByUser, { metric = 'earned
   const series = entities.map((player, colorIndex) => {
     const picks = (selectedModel?.id === player.id ? modelPicks(games, selectedModel.kind) : (picksByUser[player.id] ?? [])).filter((pick) => {
       const game = games.find((item) => item.id === pick.gameId)
-      return game && (isLocked(game) || player.id === viewerId || player.model)
+      return game && (isLocked(game) || player.model)
     })
     const pickByGame = new Map(picks.map((pick) => [pick.gameId, pick]))
     const scores = new Map(ordered.map((game) => [game.id, scorePick(pickByGame.get(game.id), game, provisional)]))
@@ -129,7 +133,7 @@ export function WeekProgressChart({ players, games, picksByUser, provisional = f
   const data = weekProgressData(players, games, picksByUser, { metric, groupKickoffs, provisional: includeLive, viewerId, order, ascending, includeLive, benchmark, seasonTotals: includeLive ? seasonTotals : seasonFinalTotals })
   const series = data.series.filter((player) => !excluded.includes(player.id))
   const metricLabel = METRICS.find((item) => item.value === metric).label
-  const description = `${weekLabel}: cumulative ${metricLabel.toLowerCase()} in ${order === 'kickoff' ? 'kickoff order' : `${ORDERS.find((item) => item.value === order).label} order (${ascending ? 'lowest first' : 'highest first'})`}, starting at zero. ${benchmark === 'absolute' ? 'Absolute totals.' : `Relative to ${data.benchmarkName ?? 'the selected benchmark'} at every step; the same benchmark is used throughout the week. Leaders are human players ranked by earned points.`} ${groupKickoffs ? 'Games sharing a kickoff stay together; Sunday late kickoffs (16:05 and 16:25 ET) merge into one window; sorting uses their mean confidence or Dev.' : 'Each step is one game.'} Dev measures disagreement among revealed human picks; unavailable values sort last. Slate labels use US Eastern time. ${metric === 'potential' ? 'Potential = earned plus remaining points. Hidden/unassigned future stakes are estimated, highest available confidence first; their per-game path is not a prediction.' : metric === 'lost' ? 'Losses accumulate as positive values.' : metric === 'net' ? 'Net = earned minus lost points.' : 'Only scored games add earned points.'} Includes GOTW bonuses. Live games ${includeLive ? 'included with provisional scores' : 'excluded from the chart'}. Hover a marker or view chart data for game details.${series.length ? '' : ' Select at least one player to show a line.'}`
+  const description = `${weekLabel}: cumulative ${metricLabel.toLowerCase()} in ${order === 'kickoff' ? 'kickoff order' : `${ORDERS.find((item) => item.value === order).label} order (${ascending ? 'lowest first' : 'highest first'})`}, starting at zero. ${benchmark === 'absolute' ? 'Absolute totals.' : `Relative to ${data.benchmarkName ?? 'the selected benchmark'} at every step; the same benchmark is used throughout the week. Leaders are human players ranked by earned points.`} ${groupKickoffs ? 'Games sharing a kickoff stay together; Sunday late kickoffs (16:05 and 16:25 ET) merge into one window; sorting uses their mean confidence or Dev.' : 'Each step is one game.'} Dev measures disagreement among revealed human picks; unavailable values sort last. Slate labels use US Eastern time. ${metric === 'potential' ? 'Potential = earned plus remaining points. All human picks stay hidden until kickoff, including your own in shared charts. Future stakes are estimated from the public remaining budget, highest available confidence first; their per-game path is not a prediction.' : metric === 'lost' ? 'Losses accumulate as positive values.' : metric === 'net' ? 'Net = earned minus lost points.' : 'Only scored games add earned points.'} Includes GOTW bonuses. Live games ${includeLive ? 'included with provisional scores' : 'excluded from the chart'}. Hover a marker or view chart data for game details.${series.length ? '' : ' Select at least one player to show a line.'}`
   const controls = <>
     <label>Compare with <select aria-label="Week progress benchmark" value={benchmark} onChange={(event) => setBenchmark(event.target.value)}>
       <option value="weekly-leader">Weekly leader (default)</option><option value="season-leader">Season total leader</option><option value="absolute">Absolute points</option>
