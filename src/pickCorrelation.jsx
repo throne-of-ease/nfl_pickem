@@ -91,18 +91,26 @@ function useCompactMatrix() {
 
 const compactName = (name, compact) => compact && name.length > 7 ? `${name.slice(0, 6)}…` : name
 
-const correlationFill = (value) => {
-  if (!Number.isFinite(value)) return '#293746'
-  if (value >= 0.67) return '#2f6696'
-  if (value >= 0.25) return '#4f86a6'
-  if (value <= -0.67) return '#8f3f62'
-  if (value <= -0.25) return '#b14f62'
-  return '#566372'
+export function correlationRange(cells) {
+  const values = cells.flat().filter((cell) => cell.rowId !== cell.columnId && Number.isFinite(cell.value)).map((cell) => Math.max(-1, Math.min(1, cell.value)))
+  return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null
+}
+
+export function correlationColor(value, range) {
+  if (!Number.isFinite(value) || !range) return { background: '#293746', color: '#fff' }
+  const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)))
+  // Perceptually ordered purple → teal → yellow, scaled to this sample.
+  const stops = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]]
+  const index = Math.min(3, Math.floor(t * 4)), fraction = t * 4 - index
+  const rgb = stops[index].map((channel, i) => Math.round(channel + (stops[index + 1][i] - channel) * fraction))
+  const luminance = rgb.map((channel) => channel / 255).map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4).reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i], 0)
+  return { background: `rgb(${rgb.join(', ')})`, color: luminance > 0.179 ? '#000' : '#fff' }
 }
 
 function CorrelationMatrix({ matrix }) {
   const compact = useCompactMatrix()
   const { entities, cells } = matrix
+  const range = correlationRange(cells)
   const gridTemplateColumns = `minmax(${compact ? 52 : 92}px, 1.35fr) repeat(${Math.max(1, entities.length)}, minmax(0, 1fr))`
   const valueFontSize = compact && entities.length > 5 ? '.48rem' : compact ? '.56rem' : '.72rem'
   return <div className="correlation-matrix-visual" data-testid="pick-correlation-visual" aria-label="Pick confidence correlation matrix">
@@ -116,10 +124,18 @@ function CorrelationMatrix({ matrix }) {
         const other = entities[columnIndex]
         const valueLabel = Number.isFinite(cell.value) ? cell.value.toFixed(2) : '—'
         const detail = `${entity.name} vs ${other.name}: ${Number.isFinite(cell.value) ? `r = ${cell.value.toFixed(3)}` : 'correlation unavailable'}; ${cell.count} common locked ${cell.count === 1 ? 'game' : 'games'}`
-        return <div key={cell.columnId} className="correlation-cell" data-correlation-cell={`${entity.id}:${cell.columnId}`} title={detail} aria-label={detail} style={{ background: correlationFill(cell.value), fontSize: valueFontSize }}>{valueLabel}</div>
+        return <div key={cell.columnId} className="correlation-cell" data-correlation-cell={`${entity.id}:${cell.columnId}`} title={detail} aria-label={detail} style={{ ...(cell.rowId === cell.columnId ? { background: '#293746', color: '#fff' } : correlationColor(cell.value, range)), fontSize: valueFontSize }}>{valueLabel}</div>
       })}
     </div>)}
-    <div className="correlation-legend">−1 opposite · 0 unrelated · +1 aligned</div>
+    <div className="correlation-legend">
+      {range ? <div className="correlation-scale" data-testid="correlation-scale" data-min={range.min} data-max={range.max}>
+        <span>{range.min.toFixed(3)}</span>
+        <span className="correlation-gradient" style={{ background: range.min === range.max ? correlationColor(range.min, range).background : 'linear-gradient(90deg, #440154, #3b528b, #21918c, #5ec962, #fde725)' }} />
+        <span>{range.max.toFixed(3)}</span>
+      </div> : <div>No comparable player pairs yet</div>}
+      <div>{range?.min === range?.max && range ? 'All pair correlations equal. ' : ''}Colors: sample minimum → maximum; self-correlations excluded. Grey: self / unavailable.</div>
+      <div>−1 opposite · 0 unrelated · +1 aligned</div>
+    </div>
   </div>
 }
 
@@ -137,3 +153,4 @@ export default function PickCorrelationMatrix({ players, gamesByPool, picksByUse
     <p className="chart-description">Pearson correlation of signed confidence across common locked games. Home picks are positive and away picks negative, so opposite-team picks correctly count as opposing signals. Missing picks are excluded pairwise. When “Include model picks” is enabled, FPI, Moneyline and AVG are added as rows and columns.</p>
   </section>
 }
+

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, relativeModelWeight, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
-import { AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, PrimeTimeChart, RelativeGamePointsTable, TeamModelRelativeChart, WeeklyPointsChart } from "./charts.jsx";
+import { WeekProgressChart, AggressivenessChart, CumulativePointsChart, CurrentWeekChart, GotwChart, PrimeTimeChart, RelativeGamePointsTable, TeamModelRelativeChart, WeeklyPointsChart } from "./charts.jsx";
 import { Overview, TeamLogo } from "./overview.jsx";
 import AdminPanel from "./adminPanel.jsx";
 import DivisionWinnersView from "./divisionWinners.jsx";
@@ -1286,6 +1286,7 @@ export default function App() {
                 <div className="charts">
                   <CumulativePointsChart history={chartHistory} />
                   {games.length > 0 && <CurrentWeekChart current={current} />}
+                  {games.length > 0 && <WeekProgressChart players={chartUsers} games={games} picksByUser={Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []]))} provisional={provisional} viewerId={userId} weekLabel={pool.label} />}
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />
                   <PrimeTimeChart players={chartUsers} gamesByPool={chartGamesByPool} picksByUser={chartPicksByUser} poolKeys={chartHistory.pools} provisional={provisional} />
@@ -1467,3 +1468,4 @@ export default function App() {
     </>
   );
 }
+

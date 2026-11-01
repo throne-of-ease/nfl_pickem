@@ -31,3 +31,17 @@
   .correlation-row-label { padding-right: .12rem; }
   .correlation-legend { font-size: .54rem; }
 }
+
+
+.correlation-scale { display: flex; gap: .5rem; align-items: center; max-width: 340px; margin: .4rem auto; }
+.correlation-gradient { flex: 1; height: .65rem; border-radius: 3px; }
+.chart-card-week-progress .chart-heading { flex-wrap: wrap; }
+.chart-card-week-progress .chart-heading > .chart-actions { flex-wrap: wrap; max-width: 100%; }
+.chart-card-week-progress .chart { min-width: 0; }
+.week-progress-players { min-width: 9rem; font-size: .75rem; }
+.week-progress-players summary { cursor: pointer; padding: .4rem; border: 1px solid var(--line); }
+.week-progress-players [role="group"] { display: grid; gap: .3rem; padding: .5rem; }
+.week-progress-players [role="group"] label { display: flex; align-items: center; gap: .4rem; overflow-wrap: anywhere; }
+.week-progress-players input { width: 1rem; height: 1rem; margin: 0; }
+.chart-card-week-progress .chart-data table { table-layout: fixed; width: 100%; }
+.chart-card-week-progress .chart-data th, .chart-card-week-progress .chart-data td { white-space: normal; overflow-wrap: anywhere; }

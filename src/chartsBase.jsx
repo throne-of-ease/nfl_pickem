@@ -333,7 +333,7 @@ function ChartActions({ id, chartRef, showData, onToggleData }) {
   </>
 }
 
-function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', controls, children, table }) {
+export function ChartFrame({ id, title, description, modes = [], mode, onMode, modeLabel = 'Display', controls, children, table }) {
   const ref = useRef(null)
   const [showData, setShowData] = useState(false)
   return <section className={`chart-card chart-card-${id}`} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}>
@@ -421,7 +421,7 @@ function spreadEndLabels(items, minY, maxY) {
 
 const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toFixed(1)
 
-function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false }) {
+export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false, stepped = false }) {
   const compact = useCompactChart()
   const width = compact ? 360 : 800
   const height = compact ? 310 : 330, left = compact ? 36 : 54, right = endValues ? (compact ? 52 : 74) : 24, bottom = 32
@@ -431,6 +431,11 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   const ticks = zeroReference ? leaderAxisTicks(values) : natural ? weeklyAxisTicks(values) : null
   const { min, max, span } = ticks ? { min: ticks[0], max: ticks.at(-1), span: ticks.at(-1) - ticks[0] } : natural ? naturalRange(values) : safeRange(values)
   const x = (index) => labels.length === 1 ? (width - right + left) / 2 : left + index * (width - left - right) / (labels.length - 1)
+  const linePoints = (values) => values.flatMap((value, index) => {
+    if (!Number.isFinite(value)) return []
+    const corner = stepped && index > 0 && Number.isFinite(values[index - 1]) ? [`${x(index)},${y(values[index - 1])}`] : []
+    return [...corner, `${x(index)},${y(value)}`]
+  }).join(' ')
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const endLabels = endValues ? spreadEndLabels(series.flatMap((item, seriesIndex) => [
     { item, seriesIndex, kind: 'earned', values: item.values },
@@ -442,18 +447,18 @@ function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroR
   }), top + 7, height - bottom - 7) : []
   return <svg ref={chartRef} className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
     <rect width={width} height={height} fill="#0c192b" rx="10" />
-    {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[index % COLORS.length]} strokeWidth="4" /><SeriesMarker index={index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
+    {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="4" /><SeriesMarker index={item.colorIndex ?? index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
     {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value} data-axis-tick={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks || natural ? displayValue(value) : Math.round(value)}</text></g>)}
     {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
     {labels.map((label, index) => (compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={label} x={x(index)} y={height - 10} textAnchor="middle">{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
-      <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" points={item.values.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />
-      {item.potentialValues && <polyline fill="none" stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={item.potentialValues.flatMap((value, index) => Number.isFinite(value) ? [`${x(index)},${y(value)}`] : []).join(' ')} />}
-      {item.values.map((value, index) => Number.isFinite(value) ? <SeriesMarker key={index} index={seriesIndex} x={x(index)} y={y(value)} title={`${item.name}, ${labels[index]}: ${value.toFixed(1)}`} /> : null)}
+      <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" points={linePoints(item.values)} />
+      {item.potentialValues && <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={linePoints(item.potentialValues)} />}
+      {item.values.map((value, index) => Number.isFinite(value) ? <SeriesMarker key={index} index={item.colorIndex ?? seriesIndex} x={x(index)} y={y(value)} title={item.pointTitles?.[index] ?? `${item.name}, ${labels[index]}: ${value.toFixed(1)}`} /> : null)}
     </g>)}
     {endLabels.map(({ item, seriesIndex, kind, value, targetX, targetY, labelY }) => <g key={`${item.name}-${kind}`} data-end-label={kind}>
-      <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[seriesIndex % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />
-      <text x={width - right + 12} y={labelY + 4} style={{ fill: `var(--chart-color-${seriesIndex % COLORS.length}, ${COLORS[seriesIndex % COLORS.length]})` }}>{displayValue(value)}{kind === 'potential' ? ' P' : ''}</text>
+      <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />
+      <text x={width - right + 12} y={labelY + 4} style={{ fill: `var(--chart-color-${(item.colorIndex ?? seriesIndex) % COLORS.length}, ${COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]})` }}>{displayValue(value)}{kind === 'potential' ? ' P' : ''}</text>
     </g>)}
   </svg>
 }
@@ -549,7 +554,7 @@ function RankedTeamBarSvg({ data, chartRef, ariaLabel, singleWeek = false }) {
   </svg>
 }
 
-function AccessibleTable({ caption, columns, rows }) {
+export function AccessibleTable({ caption, columns, rows }) {
   return <div className="chart-data"><div className="table-scroll"><table><caption>{caption}</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell == null ? '—' : typeof cell === 'number' ? cell.toFixed(1) : cell}</td>)}</tr>)}</tbody></table></div></div>
 }
 
@@ -680,3 +685,4 @@ export function DivisionWinnersChart({ rows, pointsPerCorrect }) {
     table={<AccessibleTable caption="Division winners hypothetical points" columns={['Player', 'Correct', 'Points']} rows={rows.map((row) => [row.name, row.correct, row.points])} />}
   ><BarSvg data={data} ariaLabel="Division winners hypothetical points" /></ChartFrame>
 }
+

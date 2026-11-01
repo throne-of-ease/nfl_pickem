@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pearsonCorrelation, pickConfidenceCorrelationMatrix } from '../src/pickCorrelation.jsx'
+import { correlationRange, correlationColor, pearsonCorrelation, pickConfidenceCorrelationMatrix } from '../src/pickCorrelation.jsx'
 
 describe('pick confidence correlation matrix', () => {
   it('returns standard Pearson correlation values', () => {
@@ -61,4 +61,24 @@ describe('pick confidence correlation matrix', () => {
     expect(matrix.cells[0][1].count).toBe(2)
     expect(matrix.cells[0][1].value).toBeCloseTo(-1)
   })
+})
+
+
+
+it('scales the heatmap to finite off-diagonal sample extrema, including narrow positive ranges', () => {
+  const cells = [[{ rowId: 'a', columnId: 'a', value: 1 }, { rowId: 'a', columnId: 'b', value: .81 }], [{ rowId: 'b', columnId: 'c', value: .84 }, { rowId: 'b', columnId: 'd', value: null }]]
+  const range = correlationRange(cells)
+  expect(range).toEqual({ min: .81, max: .84 })
+  expect(correlationColor(.81, range).background).toBe('rgb(68, 1, 84)')
+  expect(correlationColor(.84, range).background).toBe('rgb(253, 231, 37)')
+  expect(correlationColor(.825, range).background).not.toBe(correlationColor(.81, range).background)
+  expect(correlationColor(.81, range).color).toBe('#fff')
+  expect(correlationColor(.84, range).color).toBe('#000')
+})
+
+it('handles equal correlations, negative-only ranges and unavailable samples', () => {
+  expect(correlationColor(.5, { min: .5, max: .5 }).background).toBe('rgb(33, 145, 140)')
+  expect(correlationColor(-.9, { min: -.9, max: -.6 }).background).not.toBe(correlationColor(-.6, { min: -.9, max: -.6 }).background)
+  expect(correlationRange([[{ rowId: 'a', columnId: 'a', value: 1 }]])).toBeNull()
+  expect(correlationColor(null, { min: 0, max: 1 }).background).toBe('#293746')
 })

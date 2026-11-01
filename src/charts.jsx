@@ -9,3 +9,6 @@ export function TeamModelRelativeChart(props) {
     <PickCorrelationMatrix players={props.players} gamesByPool={props.gamesByPool} picksByUser={props.picksByUser} poolKeys={props.poolKeys} />
   </>
 }
+
+
+export { WeekProgressChart } from './weekProgress.jsx'

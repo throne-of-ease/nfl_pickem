@@ -67,7 +67,7 @@ for (const theme of ['dark', 'light']) test(`every chart downloads and shares fa
     Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.chartSharedFile = files[0] } })
   })
   const cards = page.locator('.chart-card').filter({ has: page.locator('svg.chart') })
-  expect(await cards.count()).toBe(7)
+  expect(await cards.count()).toBe(8)
   for (let index = 0; index < await cards.count(); index++) {
     const card = cards.nth(index)
     const id = await card.getAttribute('aria-labelledby')
@@ -143,3 +143,4 @@ test('sharing fallback, cancellation and PNG failures are handled', async ({ pag
   await expect(card.getByRole('alert')).toHaveText('Could not export the chart. Please try again.')
   expect(errors).toEqual([])
 })
+
