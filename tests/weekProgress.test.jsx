@@ -18,14 +18,14 @@ const picks = {
 
 it('orders games deterministically and computes earned, lost, potential and net with GOTW', () => {
   const options = { viewerId: 'a', provisional: true }
-  const expected = { earned: [0, 1, 1, 1, 1], lost: [0, 0, 7, 10, 10], potential: [0, 1, 1, 1, 5], net: [0, 1, -6, -9, -9] }
+  const expected = { earned: [0, 1, 1, 1, 1], lost: [0, 0, 7, 10, 10], potential: [0, 1, 1, 1, 1, 5], net: [0, 1, -6, -9, -9] }
   for (const [metric, values] of Object.entries(expected)) {
     const data = weekProgressData(players, games, picks, { ...options, metric })
     expect(data.series[0].values).toEqual(values)
     expect(data.details[1]).toContain('A1 @ H1')
     expect(data.details[1]).toContain('19:00 Berlin')
     const grouped = weekProgressData(players, games, picks, { ...options, metric, groupKickoffs: true })
-    expect(grouped.series[0].values).toEqual([0, values[2], values[3], values[4]])
+    expect(grouped.series[0].values).toEqual(metric === 'potential' ? [0, 1, 1, 1, 5] : [0, values[2], values[3], values[4]])
     expect(grouped.details[1]).toContain('A1 @ H1, A2 @ H2')
   }
 })
@@ -47,7 +47,8 @@ it('does not expose private future confidence or team through another player’s
   const changed = weekProgressData(players, futureGames, { ...picks, a: picks.a.map((pick) => ({ ...pick, team: 'PRIVATE', confidence: 5 - pick.confidence })) }, { metric: 'potential', viewerId: 'b' })
   expect(changed).toEqual(first)
   expect(first.series[0].values.at(-1)).toBe(15)
-  expect(first.series[0].pointTitles[1]).toContain('Estimated allocation')
+  expect(first.series[0].values.slice(0, -1)).toEqual([0, 0, 0, 0, 0])
+  expect(first.series[0].pointTitles.at(-1)).toContain('Aggregate only')
 })
 
 it('handles ties, absent picks, empty data and unknown kickoffs', () => {
@@ -174,4 +175,14 @@ it('uses only revealed inputs for leader selection even if an unopened game has 
   const sample = games.map((game, i) => ({ ...game, kickoff: `2099-01-0${i+1}T18:00:00Z`, status: 'final' }))
   const options = { benchmark: 'weekly-leader', viewerId: 'a', provisional: true }
   expect(weekProgressData(players, sample, picks, options)).toEqual(weekProgressData(players, sample, {}, options))
+})
+
+
+it('does not invent future-game potential movements even against a public model', () => {
+  const sample = games.map((game, i) => ({ ...game, kickoff: `2099-01-0${i+1}T18:00:00Z`, status: 'scheduled', predictorHome: .6 + .08*i, homeMoneyline: -200, awayMoneyline: 180 }))
+  for (const order of ['kickoff', 'predictor', 'moneyline', 'aggregate', 'dev']) for (const groupKickoffs of [false, true]) for (const benchmark of ['absolute', 'weekly-leader', 'a', 'model-fpi']) {
+    const data = weekProgressData(players, sample, picks, { metric: 'potential', order, groupKickoffs, benchmark })
+    expect(data.labels.at(-1)).toBe('Remaining potential')
+    data.series.forEach(player => expect(player.values.slice(0, -1).every(value => value === 0)).toBe(true))
+  }
 })
