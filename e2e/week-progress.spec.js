@@ -31,7 +31,7 @@ test('weekly progress supports metrics, multiple players, grouping and week chan
   }
   await card.getByLabel('Week progress order', { exact: true }).selectOption('kickoff')
   await card.locator('summary').click()
-  const choices = card.getByRole('checkbox')
+  const choices = card.getByRole('group', { name: 'Week progress players' }).getByRole('checkbox')
   const remainingColor = await card.locator('polyline').nth(1).getAttribute('stroke')
   await choices.nth(0).uncheck()
   await expect(card.locator('polyline')).toHaveCount(3)
