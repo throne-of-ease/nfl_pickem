@@ -12,6 +12,17 @@ test('weekly progress supports metrics, multiple players, grouping and week chan
     expect(await card.locator('[data-end-label] text').allTextContents()).toEqual(individual)
     await card.getByLabel('Week progress grouping').selectOption('game')
   }
+  await expect(card.locator('[data-x-label]')).toHaveCount(5)
+  expect(await card.locator('[data-x-label]').nth(1).textContent()).toContain(' @ ')
+  expect(await card.locator('[data-x-label]').nth(1).getAttribute('transform')).toContain('rotate(90')
+  for (const order of ['predictor', 'moneyline', 'aggregate', 'dev']) {
+    const endpoint = await card.locator('[data-end-label] text').allTextContents()
+    await card.getByLabel('Week progress order', { exact: true }).selectOption(order)
+    expect(await card.locator('[data-end-label] text').allTextContents()).toEqual(endpoint)
+    await card.getByLabel('Week progress sort direction').selectOption('ascending')
+    expect(await card.locator('[data-end-label] text').allTextContents()).toEqual(endpoint)
+  }
+  await card.getByLabel('Week progress order', { exact: true }).selectOption('kickoff')
   await card.locator('summary').click()
   const choices = card.getByRole('checkbox')
   const remainingColor = await card.locator('polyline').nth(1).getAttribute('stroke')

@@ -96,12 +96,14 @@ export function correlationRange(cells) {
   return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null
 }
 
+// RColorBrewer RdBu, reversed: low blue → neutral → high red.
+export const CORRELATION_COLORS = ['#053061', '#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#f7f7f7', '#fddbc7', '#f4a582', '#d6604d', '#b2182b', '#67001f']
+
 export function correlationColor(value, range) {
   if (!Number.isFinite(value) || !range) return { background: '#293746', color: '#fff' }
   const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)))
-  // Perceptually ordered purple → teal → yellow, scaled to this sample.
-  const stops = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]]
-  const index = Math.min(3, Math.floor(t * 4)), fraction = t * 4 - index
+  const stops = CORRELATION_COLORS.map((hex) => [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16)))
+  const index = Math.min(stops.length - 2, Math.floor(t * (stops.length - 1))), fraction = t * (stops.length - 1) - index
   const rgb = stops[index].map((channel, i) => Math.round(channel + (stops[index + 1][i] - channel) * fraction))
   const luminance = rgb.map((channel) => channel / 255).map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4).reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i], 0)
   return { background: `rgb(${rgb.join(', ')})`, color: luminance > 0.179 ? '#000' : '#fff' }
@@ -130,10 +132,10 @@ function CorrelationMatrix({ matrix }) {
     <div className="correlation-legend">
       {range ? <div className="correlation-scale" data-testid="correlation-scale" data-min={range.min} data-max={range.max}>
         <span>{range.min.toFixed(3)}</span>
-        <span className="correlation-gradient" style={{ background: range.min === range.max ? correlationColor(range.min, range).background : 'linear-gradient(90deg, #440154, #3b528b, #21918c, #5ec962, #fde725)' }} />
+        <span className="correlation-gradient" style={{ background: range.min === range.max ? correlationColor(range.min, range).background : `linear-gradient(90deg, ${CORRELATION_COLORS.join(', ')})` }} />
         <span>{range.max.toFixed(3)}</span>
       </div> : <div>No comparable player pairs yet</div>}
-      <div>{range?.min === range?.max && range ? 'All pair correlations equal. ' : ''}Colors: sample minimum → maximum; self-correlations excluded. Grey: self / unavailable.</div>
+      <div>{range?.min === range?.max && range ? 'All pair correlations equal. ' : ''}Colors: blue → white → red (RColorBrewer RdBu), sample minimum → maximum; self-correlations excluded. Grey: self / unavailable.</div>
       <div>−1 opposite · 0 unrelated · +1 aligned</div>
     </div>
   </div>

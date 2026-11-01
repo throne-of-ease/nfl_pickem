@@ -2,7 +2,7 @@ import React from 'react'
 import { expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { poolMetrics } from '../src/domain.js'
-import { WeekProgressChart, weekProgressData } from '../src/weekProgress.jsx'
+import { WeekProgressChart, weekProgressData, kickoffGroupLabel } from '../src/weekProgress.jsx'
 
 const players = [{ id: 'a', name: 'Alex' }, { id: 'b', name: 'Blair' }]
 const games = [
@@ -73,4 +73,39 @@ it('allows multiple lines and preserves remaining player colors when filtering',
   expect(chart.querySelectorAll('polyline')).toHaveLength(2)
   fireEvent.click(screen.getByText('View chart data'))
   expect(screen.getByRole('table')).toHaveTextContent('A1 @ H1, A2 @ H2')
+})
+
+
+it('names kickoff windows using Eastern time across European daylight-saving changes', () => {
+  for (const [kickoff, label] of [
+    ['2026-10-30T00:15:00Z', 'TNF'],
+    ['2026-11-01T18:00:00Z', 'Sunday early slate'],
+    ['2026-11-01T21:25:00Z', 'Sunday late window'],
+    ['2026-11-02T01:20:00Z', 'SNF'],
+    ['2026-11-03T01:15:00Z', 'MNF'],
+    ['2026-11-01T14:30:00Z', 'Sunday 09:30 ET'],
+    ['2026-11-07T18:00:00Z', 'Saturday 13:00 ET'],
+  ]) expect(kickoffGroupLabel({ kickoff })).toBe(label)
+})
+
+it('sorts by model confidence, preserves grouped endpoints and labels every game', () => {
+  const sample = games.map((game, i) => ({ ...game, predictorHome: [.6, .9, .8, .7][i], homeMoneyline: [-110, -400, -200, -150][i], awayMoneyline: [100, 300, 180, 130][i] }))
+  for (const order of ['predictor', 'moneyline', 'aggregate']) {
+    const chronological = weekProgressData(players, sample, picks, { metric: 'potential', viewerId: 'a' })
+    const sorted = weekProgressData(players, sample, picks, { order, metric: 'potential', viewerId: 'a' })
+    expect(sorted.labels[1]).toBe('A2 @ H2')
+    expect(sorted.series.map(s => s.values.at(-1))).toEqual(chronological.series.map(s => s.values.at(-1)))
+    const ascending = weekProgressData(players, sample, picks, { order, ascending: true })
+    expect(ascending.labels[1]).toBe('A3 @ H3')
+    const grouped = weekProgressData(players, sample, picks, { order, metric: 'potential', viewerId: 'a', groupKickoffs: true })
+    expect(grouped.series.map(s => s.values.at(-1))).toEqual(chronological.series.map(s => s.values.at(-1)))
+    expect(grouped.details.some(detail => detail.includes('A1 @ H1, A2 @ H2'))).toBe(true)
+  }
+})
+
+it('Dev ordering never depends on private future picks', () => {
+  const future = games.map((game, i) => ({ ...game, kickoff: `2099-01-0${i+1}T18:00:00Z` }))
+  const first = weekProgressData(players, future, picks, { order: 'dev', metric: 'potential', viewerId: 'b' })
+  const changed = weekProgressData(players, future, { ...picks, a: picks.a.map(pick => ({ ...pick, confidence: 5 - pick.confidence, team: 'PRIVATE' })) }, { order: 'dev', metric: 'potential', viewerId: 'b' })
+  expect(changed).toEqual(first)
 })
