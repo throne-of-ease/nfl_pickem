@@ -381,6 +381,8 @@ test('Week 3 player keeps a saved pick and reserves an unpicked locked rank whil
   const session = { access_token: 'test-access', refresh_token: 'test-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'test-user' } }
   const savedPick = { gameId: 'locked-game', team: 'PIT', confidence: 1 }
   const saves = []
+  let draftRevision = 1
+  let draftPicks = [savedPick, { gameId: 'missed-game', team: null, confidence: null }, { gameId: 'future-game', team: null, confidence: null }]
   await page.addInitScript((value) => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
   await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => route.fulfill({ json: session }))
   await page.route('**/cdn.espn.com/**', (route) => route.abort())
@@ -393,11 +395,13 @@ test('Week 3 player keeps a saved pick and reserves an unpicked locked rank whil
     profiles: [{ id: 'test-user', name: 'Test player' }], revealedPicks: [{ userId: 'test-user', ...savedPick }],
     viewer: { id: 'test-user', name: 'Test player', username: 'nflstresstest2026', isAdmin: false }, asOf: '2026-09-27T00:00:00Z',
   } }))
-  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision: 1, picks: [savedPick, { gameId: 'missed-game', team: null, confidence: null }, { gameId: 'future-game', team: null, confidence: null }] } }))
+  await page.route('**/rest/v1/rpc/get_my_draft', (route) => route.fulfill({ json: { draftRevision, picks: draftPicks } }))
   await page.route('**/rest/v1/rpc/replace_picks', (route) => {
     const body = JSON.parse(route.request().postData())
     saves.push(body)
-    return route.fulfill({ json: { draftRevision: 1 + saves.length, picks: body.p_picks } })
+    draftRevision += 1
+    draftPicks = body.p_picks
+    return route.fulfill({ json: { draftRevision, picks: draftPicks } })
   })
 
   await page.goto('/?pool=week-03')
@@ -740,4 +744,3 @@ for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 's
     await page.screenshot({ path: testInfo.outputPath(`${state}.png`), fullPage: true })
   })
 }
-
