@@ -1286,7 +1286,7 @@ export default function App() {
                 <div className="charts">
                   <CumulativePointsChart history={chartHistory} />
                   {games.length > 0 && <CurrentWeekChart current={current} />}
-                  {games.length > 0 && <WeekProgressChart players={chartUsers} games={games} picksByUser={Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []]))} provisional={provisional} viewerId={userId} weekLabel={pool.label} />}
+                  {games.length > 0 && <WeekProgressChart players={chartUsers} games={games} picksByUser={Object.fromEntries(chartUsers.map((user) => [user.id, chartPicksByUser[user.id]?.[poolKey] ?? []]))} provisional={provisional} viewerId={userId} weekLabel={pool.label} seasonTotals={new Map(buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, true).users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))} seasonFinalTotals={new Map(buildSeasonHistory(chartUsers, chartGamesByPool, chartPicksByUser, false).users.map((user) => [user.id, user.cumulative.at(-1) ?? 0]))} />}
                   <WeeklyPointsChart history={chartHistory} />
                   <GotwChart history={chartHistory} />
                   <PrimeTimeChart players={chartUsers} gamesByPool={chartGamesByPool} picksByUser={chartPicksByUser} poolKeys={chartHistory.pools} provisional={provisional} />

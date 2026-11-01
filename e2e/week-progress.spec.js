@@ -4,6 +4,13 @@ test('weekly progress supports metrics, multiple players, grouping and week chan
   await page.goto('/?scenario=final&pool=week-01')
   await page.getByRole('button', { name: 'Charts', exact: true }).click()
   const card = page.locator('.chart-card-week-progress')
+  await expect(card.getByLabel('Week progress benchmark')).toHaveValue('weekly-leader')
+  for (const benchmark of ['season-leader', 'u1', 'model-fpi', 'model-moneyline', 'model-avg', 'absolute']) {
+    await card.getByLabel('Week progress benchmark').selectOption(benchmark)
+    await expect(card.locator('svg.chart polyline')).toHaveCount(4)
+  }
+  await card.getByLabel('Week progress include live games').check()
+  await card.getByLabel('Week progress include live games').uncheck()
   await expect(card.locator('svg.chart polyline')).toHaveCount(4)
   for (const metric of ['earned', 'lost', 'potential', 'net']) {
     await card.getByLabel('Week progress display mode').selectOption(metric)

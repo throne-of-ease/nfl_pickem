@@ -109,3 +109,50 @@ it('Dev ordering never depends on private future picks', () => {
   const changed = weekProgressData(players, future, { ...picks, a: picks.a.map(pick => ({ ...pick, confidence: 5 - pick.confidence, team: 'PRIVATE' })) }, { order: 'dev', metric: 'potential', viewerId: 'b' })
   expect(changed).toEqual(first)
 })
+
+
+it('subtracts one fixed weekly, season, individual or model benchmark at each step', () => {
+  const options = { viewerId: 'a', provisional: true, includeLive: true }
+  const absolute = weekProgressData(players, games, picks, options)
+  for (const benchmark of ['weekly-leader', 'season-leader', 'a', 'b']) {
+    const data = weekProgressData(players, games, picks, { ...options, benchmark, seasonTotals: new Map([['a', 100], ['b', 20]]) })
+    const base = absolute.series.find(player => player.name === data.benchmarkName)
+    data.series.forEach((player, i) => expect(player.values).toEqual(absolute.series[i].values.map((value, j) => value - base.values[j])))
+    expect(data.series.find(player => player.name === data.benchmarkName).values.every(value => value === 0)).toBe(true)
+  }
+  for (const benchmark of ['model-fpi', 'model-moneyline', 'model-avg']) {
+    const sample = games.map(game => ({ ...game, predictorHome: .8, homeMoneyline: -200, awayMoneyline: 180 }))
+    const relative = weekProgressData(players, sample, picks, { ...options, benchmark })
+    expect(relative.series).toHaveLength(players.length)
+    expect(relative.benchmarkName).toBeTruthy()
+    expect(relative.series[0].pointTitles[1]).toContain('Vs ')
+  }
+})
+
+it('removes live games when excluded and merges both Sunday late kickoffs only within the same day', () => {
+  const sample = [
+    { ...games[0], id: 'a', kickoff: '2026-11-01T21:05:00Z' },
+    { ...games[1], id: 'b', kickoff: '2026-11-01T21:25:00Z' },
+    { ...games[2], id: 'c', kickoff: '2026-11-08T21:05:00Z' },
+  ]
+  const included = weekProgressData(players, sample, {}, { groupKickoffs: true, includeLive: true })
+  expect(included.labels).toEqual(['Start', 'Sunday late window', 'Sunday late window'])
+  expect(included.details[1]).toContain('22:05 Berlin /')
+  expect(included.details[1]).toContain('22:25 Berlin')
+  const excluded = weekProgressData(players, sample, {}, { groupKickoffs: true, includeLive: false })
+  expect(excluded.details[1]).not.toContain('22:05')
+})
+
+it('defaults to weekly leader comparison and provides an independent live-game switch', () => {
+  render(<WeekProgressChart players={players} games={games} picksByUser={picks} weekLabel="Week 1" viewerId="a" />)
+  expect(screen.getByLabelText('Week progress benchmark')).toHaveValue('weekly-leader')
+  const live = screen.getByLabelText('Week progress include live games')
+  expect(live).not.toBeChecked()
+  const count = screen.getByRole('img').querySelectorAll('[data-x-label]').length
+  fireEvent.click(live)
+  expect(screen.getByRole('img').querySelectorAll('[data-x-label]')).toHaveLength(count + 1)
+  for (const benchmark of ['season-leader', 'a', 'model-fpi', 'model-moneyline', 'model-avg', 'absolute']) {
+    fireEvent.change(screen.getByLabelText('Week progress benchmark'), { target: { value: benchmark } })
+    expect(screen.getByLabelText('Week progress benchmark')).toHaveValue(benchmark)
+  }
+})
