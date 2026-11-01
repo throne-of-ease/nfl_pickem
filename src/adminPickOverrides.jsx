@@ -22,7 +22,7 @@ export default function AdminPickOverrides({ games, picks, playerId, playerName,
     if (!isLocked(game) || busy || saving) return
     setDraft((current) => {
       const previous = current.find((pick) => pick.gameId === game.id) ?? { gameId: game.id, team: null, confidence: null }
-      // A rank swap can only touch another visible, locked game.
+      // Mirror visible swaps locally. The backend also swaps ranks held by private upcoming picks without revealing them.
       const occupied = patch.confidence == null ? null : visibleOverridePicks(games, current).find((pick) => pick.gameId !== game.id && pick.confidence === patch.confidence)
       const next = current.filter((pick) => pick.gameId !== game.id).map((pick) => pick.gameId === occupied?.gameId ? { ...pick, confidence: previous.confidence } : pick)
       return [...next, { ...previous, ...patch }]
@@ -36,7 +36,7 @@ export default function AdminPickOverrides({ games, picks, playerId, playerName,
   }
   return <form className="override-sheet" onSubmit={submit}>
     <div className="section-title"><div><h3>{playerName ? `${playerName}'s picks` : 'Player picks'}</h3><p>Only locked picks are revealed and editable. Upcoming picks stay private.</p></div></div>
-    <p className="notice">Choose a team and confidence, then save. Reusing a locked game's confidence swaps those two ranks. A confidence used by an upcoming pick cannot be reassigned.</p>
+    <p className="notice">Choose a team and confidence, then save. Reusing any confidence swaps ranks automatically, including a rank held by a private upcoming pick; that pick stays hidden.</p>
     <div className="games" aria-label="Player pick overrides">
       {games.map((game) => {
         const locked = isLocked(game)

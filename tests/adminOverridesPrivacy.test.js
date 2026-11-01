@@ -31,6 +31,7 @@ beforeAll(async () => {
     insert into admin_audit(admin_id,action,target) values('${admin}','admin_replace_picks','{"userId":"${player}","poolKey":"week-01","picks":[{"gameId":"g1","team":"PIT","confidence":1},{"gameId":"g3","team":"KC","confidence":3}]}');
     select set_config('app.viewer','${admin}',false);`)
   await db.exec(readFileSync(new URL('../supabase/migrations/202610110001_private_locked_pick_overrides.sql', import.meta.url), 'utf8'))
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611010001_admin_override_confidence_swaps.sql', import.meta.url), 'utf8'))
 }, 30000)
 afterAll(async () => { await db?.close() })
 
@@ -49,16 +50,24 @@ describe('admin locked-pick privacy in PostgreSQL', () => {
     expect(result.picks.map((pick) => pick.gameId)).toEqual(['g1', 'g2'])
     expect((await snapshot()).filter((pick) => pick.game_id !== 'g1')).toEqual(before.filter((pick) => pick.game_id !== 'g1'))
   })
-  it('rejects changes to upcoming games and rank collisions atomically', async () => {
+  it('rejects direct changes to upcoming games atomically', async () => {
     const before = await snapshot()
     const revision = (await db.query('select revision from drafts')).rows[0].revision
     for (const picks of [
       [{ gameId: 'g3', team: 'DEN', confidence: 3 }],
       [{ gameId: 'g4', team: 'NE', confidence: 4 }],
     ]) await expect(call(picks)).rejects.toThrow('GAME_NOT_LOCKED')
-    await expect(call([{ gameId: 'g1', team: 'PIT', confidence: 3 }])).rejects.toThrow('CONFIDENCE_UNAVAILABLE')
     expect(await snapshot()).toEqual(before)
     expect((await db.query('select revision from drafts')).rows[0].revision).toBe(revision)
+  })
+  it('lets an admin claim a hidden confidence by swapping ranks without revealing the hidden pick', async () => {
+    const result = await call([{ gameId: 'g1', team: 'BUF', confidence: 3 }])
+    expect(result.picks.map((pick) => pick.gameId)).toEqual(['g1', 'g2'])
+    expect(result.picks.find((pick) => pick.gameId === 'g1')).toMatchObject({ team: 'BUF', confidence: 3 })
+    expect(result.picks.some((pick) => pick.gameId === 'g3')).toBe(false)
+    expect(await snapshot()).toEqual([
+      { game_id: 'g1', team: 'BUF', confidence: 3 }, { game_id: 'g2', team: 'DAL', confidence: 2 }, { game_id: 'g3', team: 'KC', confidence: 1 },
+    ])
   })
   it('swaps ranks of locked games without hitting the unique constraint', async () => {
     await call([{ gameId: 'g1', team: 'BUF', confidence: 2 }, { gameId: 'g2', team: 'PHI', confidence: 1 }])

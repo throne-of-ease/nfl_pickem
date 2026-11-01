@@ -29,7 +29,7 @@ describe('My Picks style admin overrides', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save override' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith([{ gameId: 'g1', team: 'BUF', confidence: 1 }]))
   })
-  it('swaps visible ranks without modifying a hidden game, and can discard', () => {
+  it('swaps visible ranks locally and can discard', () => {
     render(<AdminPickOverrides {...props} onSave={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('PIT at BUF override confidence'), { target: { value: '2' } })
     expect(screen.getByLabelText('DAL at PHI override confidence')).toHaveValue('1')
@@ -39,6 +39,15 @@ describe('My Picks style admin overrides', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
     expect(screen.getByLabelText('PIT at BUF override confidence')).toHaveValue('1')
     expect(screen.getByRole('button', { name: 'Save override' })).toBeDisabled()
+  })
+  it('can save a confidence held by a hidden upcoming pick without revealing it', async () => {
+    const onSave = vi.fn().mockResolvedValue({})
+    render(<AdminPickOverrides {...props} onSave={onSave} />)
+    fireEvent.change(screen.getByLabelText('PIT at BUF override confidence'), { target: { value: '3' } })
+    const future = within(screen.getByTestId('override-game-g3'))
+    expect(future.getByRole('combobox')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Save override' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith([{ gameId: 'g1', team: 'PIT', confidence: 3 }]))
   })
   it('isolates draft edits when switching players', () => {
     const { rerender } = render(<AdminPickOverrides {...props} onSave={vi.fn()} />)
