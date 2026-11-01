@@ -42,6 +42,15 @@ const dateRange = (games) => {
   return dates[0].toDateString() === dates.at(-1).toDateString() ? format(dates[0]) : `${format(dates[0])}–${format(dates.at(-1))}`;
 };
 
+const normalizedPicks = (picks = []) =>
+  [...picks]
+    .map(({ gameId, team = null, confidence = null }) => ({ gameId, team, confidence }))
+    .sort((a, b) => String(a.gameId).localeCompare(String(b.gameId)));
+
+const picksMatch = (left, right) => JSON.stringify(normalizedPicks(left)) === JSON.stringify(normalizedPicks(right));
+
+const saveVerificationError = () => Object.assign(new Error("SAVE_VERIFICATION_FAILED"), { code: "SAVE_VERIFICATION_FAILED" });
+
 const ModelPick = ({ pick, rank }) =>
   pick ? (
     <span className="model-pick" title={`${pick.team}, ${(pick.probability * 100).toFixed(1)}% win probability, rank ${rank ?? "—"}`}>
@@ -325,7 +334,8 @@ export default function App() {
   const [divisionStandingsStatus, setDivisionStandingsStatus] = useState(null);
   const [provisional, setProvisional] = useState(true);
   const [pickProbabilityKind, setPickProbabilityKind] = useState("aggregate");
-  const [message, setMessage] = useState(activeScenario === "validation-error" ? "INVALID CONFIDENCE SET" : "All changes saved");
+  const [message, setMessage] = useState(activeScenario === "validation-error" ? "INVALID CONFIDENCE SET" : useFixtures ? "All changes saved" : "Loading saved picks...");
+  const [saveState, setSaveState] = useState(activeScenario === "validation-error" ? "error" : useFixtures ? "saved" : "idle");
   const [showSetup, setShowSetup] = useState(false);
   const [playerNames, setPlayerNames] = useState(["", "", ""]);
   const [draggedGameId, setDraggedGameId] = useState(null);
@@ -344,6 +354,7 @@ export default function App() {
   const draftRevisions = useRef({});
   const savedPicks = useRef({});
   const saveQueue = useRef(Promise.resolve());
+  const saveSequence = useRef(0);
   const pool = POOLS.find((item) => item.key === poolKey);
   const baseGames = loadedGamesByPool[poolKey] ?? [];
   const currentWeek = isCurrentPool(baseGames);
@@ -535,12 +546,16 @@ export default function App() {
     const load = async () => {
       refreshActive.current = true;
       setIsRefreshing(true);
-      if (initial)
+      if (initial) {
+        saveSequence.current += 1;
+        setMessage("Loading saved picks...");
+        setSaveState("idle");
         setDataState((state) => ({
           ...state,
           loading: !loadedGamesByPool[poolKey],
           error: null,
         }));
+      }
       try {
         if (initial) {
           const result = await loadPool(poolKey, session.access_token, {
@@ -573,6 +588,8 @@ export default function App() {
               [poolKey]: result.ownPicks,
             },
           }));
+          setMessage("All changes saved");
+          setSaveState("saved");
           setDataState({
             loading: false,
             error: result.games.length ? null : "No games are currently available for this pool.",
@@ -598,12 +615,17 @@ export default function App() {
           }));
         }
       } catch {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          if (initial) {
+            setMessage("Unable to verify saved picks");
+            setSaveState("error");
+          }
           setDataState((state) => ({
             ...state,
             loading: false,
             error: initial ? "Shared pick data is temporarily unavailable." : "Live ESPN data is temporarily unavailable; showing the last update.",
           }));
+        }
       } finally {
         if (!controller.signal.aborted) {
           refreshActive.current = false;
@@ -654,11 +676,16 @@ export default function App() {
     if (useFixtures) localStorage.setItem(STORAGE_KEY, JSON.stringify({ users: appUsers, picksByUser }));
   }, [appUsers, picksByUser, useFixtures]);
 
+  const showPickError = (text) => {
+    setMessage(text);
+    setSaveState("error");
+  };
+
   const registerPlayers = (event) => {
     event.preventDefault();
     const names = playerNames.map((name) => name.trim());
     if (names.some((name) => !name) || new Set(names.map((name) => name.toLocaleLowerCase())).size !== 3) {
-      setMessage("ENTER 3 UNIQUE PLAYER NAMES");
+      showPickError("ENTER 3 UNIQUE PLAYER NAMES");
       return;
     }
     const players = names.map((name, index) => ({
@@ -670,6 +697,7 @@ export default function App() {
     setUserId(players[0].id);
     setShowSetup(false);
     setMessage("3 players registered · picks saved on this device");
+    setSaveState("saved");
   };
 
   const backupAccountKey = session?.user?.id ?? userId ?? "local-rehearsal";
@@ -692,14 +720,17 @@ export default function App() {
     const savingUser = userId;
     const savingGames = games;
     const acceptsLatePicks = pool.acceptsLatePicks;
+    const saveId = ++saveSequence.current;
     setMessage("Saving...");
+    setSaveState("saving");
     saveQueue.current = saveQueue.current
       .then(async () => {
         const safeDraft = preserveLockedPicks(savingGames, draft, savedPicks.current[savingPool] ?? [], new Date(), acceptsLatePicks);
         const result = await savePicks(savingPool, session.access_token, draftRevisions.current[savingPool] ?? 0, safeDraft);
+        if (result?.draftRevision == null || !picksMatch(result.picks, safeDraft)) throw saveVerificationError();
         draftRevisions.current[savingPool] = result.draftRevision;
-        savedPicks.current[savingPool] = safeDraft;
-        const safeByGame = new Map(safeDraft.map((pick) => [pick.gameId, pick]));
+        savedPicks.current[savingPool] = result.picks;
+        const safeByGame = new Map(result.picks.map((pick) => [pick.gameId, pick]));
         const gameById = new Map(savingGames.map((game) => [game.id, game]));
         setPicks((all) => {
           const current = all[savingUser]?.[savingPool] ?? [];
@@ -709,9 +740,18 @@ export default function App() {
           });
           return JSON.stringify(current) === JSON.stringify(next) ? all : { ...all, [savingUser]: { ...all[savingUser], [savingPool]: next } };
         });
+        if (saveId !== saveSequence.current) return;
+        const verification = await loadPool(savingPool, session.access_token, { fetchEspn: false });
+        if (String(verification.draftRevision) !== String(result.draftRevision) || !picksMatch(verification.ownPicks, safeDraft)) throw saveVerificationError();
+        if (saveId !== saveSequence.current) return;
+        draftRevisions.current[savingPool] = verification.draftRevision;
+        savedPicks.current[savingPool] = verification.ownPicks;
         setMessage("All changes saved");
+        setSaveState("saved");
       })
-      .catch((error) => setMessage((error.code ?? "SAVE_FAILED").replaceAll("_", " ")));
+      .catch((error) => {
+        if (saveId === saveSequence.current) showPickError((error.code ?? "SAVE_FAILED").replaceAll("_", " "));
+      });
   };
 
   const updatePick = (gameId, changes) => {
@@ -727,7 +767,7 @@ export default function App() {
         pool.acceptsLatePicks,
       )
     ) {
-      setMessage("LOCKED VALUE CANNOT BE REUSED");
+      showPickError("LOCKED VALUE CANNOT BE REUSED");
       return false;
     }
     const movesRank = Number.isInteger(changed?.confidence) && Number.isInteger(changes.confidence);
@@ -747,14 +787,17 @@ export default function App() {
       acceptsLatePicks: pool.acceptsLatePicks,
     });
     if (!result.ok) {
-      setMessage(result.code.replaceAll("_", " "));
+      showPickError(result.code.replaceAll("_", " "));
       return false;
     }
     setPicks((all) => ({
       ...all,
       [userId]: { ...all[userId], [poolKey]: nextDraft },
     }));
-    setMessage("All changes saved");
+    if (useFixtures) {
+      setMessage("All changes saved");
+      setSaveState("saved");
+    }
     persistDraft(nextDraft);
     return true;
   };
@@ -769,7 +812,7 @@ export default function App() {
       acceptsLatePicks: pool.acceptsLatePicks,
     });
     if (!result.ok) {
-      setMessage(result.code.replaceAll("_", " "));
+      showPickError(result.code.replaceAll("_", " "));
       return;
     }
     setHighlightedGameId(null);
@@ -779,7 +822,10 @@ export default function App() {
       ...all,
       [userId]: { ...all[userId], [poolKey]: nextDraft },
     }));
-    setMessage(`${label} picks applied`);
+    if (useFixtures) {
+      setMessage(`${label} picks applied`);
+      setSaveState("saved");
+    }
     persistDraft(nextDraft);
   };
 
@@ -790,7 +836,7 @@ export default function App() {
     const sourceGame = games.find((game) => game.id === sourceGameId);
     const targetGame = games.find((game) => game.id === targetGameId);
     if (!Number.isInteger(sourcePick?.confidence) || isLocked(sourceGame, new Date(), pool.acceptsLatePicks) || isLocked(targetGame, new Date(), pool.acceptsLatePicks)) {
-      setMessage("LOCKED VALUE CANNOT BE MOVED");
+      showPickError("LOCKED VALUE CANNOT BE MOVED");
       return;
     }
     const moved = Number.isInteger(targetPick?.confidence)
@@ -921,6 +967,8 @@ export default function App() {
         <p>Finding the current NFL week...</p>
       </main>
     );
+
+  const saveStateColor = saveState === "saved" ? "var(--success)" : saveState === "error" ? "var(--live)" : saveState === "saving" ? "var(--warning)" : "var(--muted)";
 
   return (
     <>
@@ -1060,7 +1108,7 @@ export default function App() {
                 </div>
                 {playerNames.map((name, index) => (
                   <label key={index}>
-                    Player {index + 1}
+                    Player {index + 1} name
                     <input aria-label={`Player ${index + 1} name`} value={name} onChange={(event) => setPlayerNames((all) => all.map((item, i) => (i === index ? event.target.value : item)))} autoComplete="off" />
                   </label>
                 ))}
@@ -1140,7 +1188,7 @@ export default function App() {
                     <p>Confidence is preset from AVG strength. Drag a row to reorder it; on touch, use its handle.</p>
                   </div>
                   <div className="pick-status">
-                    <span className="save-state" role="status">
+                    <span className="save-state" data-save-state={saveState} role={saveState === "error" ? "alert" : "status"} style={{ color: saveStateColor }}>
                       {message}
                     </span>
                     {(() => {
@@ -1468,4 +1516,3 @@ export default function App() {
     </>
   );
 }
-
