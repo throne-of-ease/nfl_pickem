@@ -76,9 +76,9 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await page.getByLabel('Week', { exact: true }).selectOption('week-02')
   await page.getByRole('button', { name: 'Charts' }).click()
   await expect(page.getByLabel('Current week display mode')).toHaveValue('vs_total_leader')
-  await expect(page.locator('svg.chart')).toHaveCount(7)
-  await expect(page.getByRole('button', { name: 'Download chart as PNG' })).toHaveCount(7)
-  await expect(page.getByRole('button', { name: 'Share chart as PNG' })).toHaveCount(7)
+  await expect(page.locator('svg.chart')).toHaveCount(8)
+  await expect(page.getByRole('button', { name: 'Download chart as PNG' })).toHaveCount(8)
+  await expect(page.getByRole('button', { name: 'Share chart as PNG' })).toHaveCount(8)
   await expect(page.getByLabel('Aggressiveness index model')).toHaveValue('aggregate')
   await expect(page.getByLabel('Aggressiveness index view')).toHaveValue('weekly')
   await expect(page.getByRole('img', { name: 'Aggressiveness index by week, aggregate' })).toBeVisible()
@@ -116,7 +116,7 @@ test('four users, charts, pools, and responsive states work', async ({ page }, t
   await expect(page.locator('[data-testid="standings-table"] tbody tr')).toHaveCount(4)
   await page.getByRole('checkbox', { name: 'Include model picks' }).check()
   await expect(page.locator('[data-testid="standings-table"] tbody tr')).toHaveCount(7)
-  await expect(page.locator('svg.chart')).toHaveCount(7)
+  await expect(page.locator('svg.chart')).toHaveCount(8)
   await expect(page.locator('.standings-card').locator('h3')).toContainText('Standings')
   await page.screenshot({ path: testInfo.outputPath('charts.png'), fullPage: true })
   await page.getByRole('button', { name: 'Win probs.' }).click()
@@ -480,6 +480,7 @@ test('live refresh reads ESPN directly without repeating the Supabase season req
 })
 
 test('future week stays cached until its manual refresh', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-29T12:00:00Z'))
   const session = { access_token: 'future-access', refresh_token: 'future-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'future-user', email: 'future@accounts.nfl-pickem.invalid' } }
   const kickoff = '2026-10-24T17:00:00Z'
   let scoreboardRequests = 0
@@ -739,3 +740,4 @@ for (const state of ['scheduled', 'live', 'final', 'playoff', 'missing-data', 's
     await page.screenshot({ path: testInfo.outputPath(`${state}.png`), fullPage: true })
   })
 }
+
