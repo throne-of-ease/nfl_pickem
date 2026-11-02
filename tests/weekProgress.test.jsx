@@ -186,3 +186,42 @@ it('does not invent future-game potential movements even against a public model'
     data.series.forEach(player => expect(player.values.slice(0, -1).every(value => value === 0)).toBe(true))
   }
 })
+
+it('hides upcoming steps without changing remaining potential or benchmark totals', () => {
+  for (const groupKickoffs of [false, true]) for (const includeLive of [false, true])
+    for (const order of ['kickoff', 'predictor', 'dev']) for (const benchmark of ['absolute', 'weekly-leader', 'model-fpi']) {
+      const options = { metric: 'potential', groupKickoffs, includeLive, order, benchmark }
+      const shown = weekProgressData(players, games, picks, options)
+      const hidden = weekProgressData(players, games, picks, { ...options, includeUpcoming: false })
+      expect(hidden.labels).not.toContain('A4 @ H4')
+      expect(hidden.labels.at(-1)).toBe('Remaining potential')
+      expect(hidden.series.map(s => s.values.at(-1))).toEqual(shown.series.map(s => s.values.at(-1)))
+      expect(hidden.statuses).not.toContain('UPCOMING')
+    }
+  const future = games.map(game => ({ ...game, kickoff: '2099-01-01T18:00:00Z', status: 'scheduled' }))
+  const options = { metric: 'potential', includeUpcoming: false }
+  const data = weekProgressData(players, future, picks, options)
+  expect(data.labels).toEqual(['Start', 'Remaining potential'])
+  expect(data).toEqual(weekProgressData(players, future, {}, options))
+  expect(weekProgressData(players, [], {}, options).labels).toEqual(['Start'])
+})
+
+it('labels mixed kickoff states accurately and renders independent upcoming/live controls', () => {
+  const mixed = games.map(game => ({ ...game, kickoff: '2026-01-01T18:00:00Z' }))
+  const data = weekProgressData(players, mixed, picks, { groupKickoffs: true })
+  expect(data.statuses[1]).toContain('LIVE')
+  expect(data.statuses[1]).toContain('FINAL')
+  expect(data.statuses[1]).toContain('PENDING')
+  render(<WeekProgressChart players={players} games={games} picksByUser={picks} weekLabel="Week 1" provisional />)
+  fireEvent.change(screen.getByLabelText('Week progress display mode'), { target: { value: 'potential' } })
+  const chart = screen.getByRole('img')
+  expect(chart.querySelector('[data-game-status="UPCOMING"]')).toBeTruthy()
+  expect(chart.querySelector('[data-game-status="LIVE"]')).toBeTruthy()
+  fireEvent.click(screen.getByLabelText('Week progress show upcoming games'))
+  expect(chart.querySelector('[data-game-status="UPCOMING"]')).toBeNull()
+  expect(chart.querySelector('[data-game-status="REMAINING"]')).toBeTruthy()
+  expect(chart.querySelector('[data-game-status="LIVE"]')).toBeTruthy()
+  fireEvent.click(screen.getByLabelText('Week progress include live games'))
+  expect(chart.querySelector('[data-game-status="LIVE"]')).toBeNull()
+  expect(chart.querySelector('[data-game-status="REMAINING"]')).toBeTruthy()
+})

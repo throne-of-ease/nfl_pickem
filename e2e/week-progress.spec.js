@@ -72,3 +72,22 @@ test('correlation legend follows the actual off-diagonal sample range', async ({
   }
   await matrix.screenshot({ path: testInfo.outputPath('correlation-heatmap.png') })
 })
+
+test('upcoming games can be hidden while remaining potential and live status stay visible', async ({ page }, testInfo) => {
+  await page.goto('/?scenario=live&pool=week-01')
+  await page.getByRole('button', { name: 'Charts', exact: true }).click()
+  const card = page.locator('.chart-card-week-progress')
+  await card.getByLabel('Week progress display mode').selectOption('potential')
+  await card.getByLabel('Week progress include live games').check()
+  await expect(card.locator('[data-game-status="UPCOMING"]')).toHaveCount(3)
+  await expect(card.locator('[data-game-status="LIVE"]')).toHaveCount(1)
+  const totals = await card.locator('[data-end-label] text').allTextContents()
+  await card.screenshot({ path: testInfo.outputPath('week-progress-statuses.png') })
+  await card.getByLabel('Week progress show upcoming games').uncheck()
+  await expect(card.locator('[data-game-status="UPCOMING"]')).toHaveCount(0)
+  await expect(card.locator('[data-game-status="REMAINING"]')).toHaveCount(1)
+  expect(await card.locator('[data-end-label] text').allTextContents()).toEqual(totals)
+  await card.getByLabel('Week progress include live games').uncheck()
+  await expect(card.locator('[data-game-status="LIVE"]')).toHaveCount(0)
+  await expect(card.locator('[data-game-status="REMAINING"]')).toHaveCount(1)
+})

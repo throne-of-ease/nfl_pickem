@@ -421,10 +421,10 @@ function spreadEndLabels(items, minY, maxY) {
 
 const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toFixed(1)
 
-export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false, stepped = false, verticalLabels = false }) {
+export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false, stepped = false, verticalLabels = false, statuses = [] }) {
   const compact = useCompactChart()
   const width = compact ? 360 : 800
-  const bottom = verticalLabels ? 155 : 32
+  const bottom = verticalLabels ? (statuses.length ? 215 : 155) : 32
   const height = (compact ? 310 : 330) + bottom - 32, left = compact ? 36 : 54, right = endValues ? (compact ? 52 : 74) : 24
   const legend = chartLegendLayout(series, left, width - left - 24)
   const top = 44 + (legend.at(-1)?.row ?? 0) * 22
@@ -451,7 +451,19 @@ export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false
     {series.map((item, index) => <g data-chart-legend key={`legend-${item.name}`} transform={`translate(${legend[index].x} ${legend[index].y})`}><line x2="22" stroke={COLORS[(item.colorIndex ?? index) % COLORS.length]} strokeWidth="4" /><SeriesMarker index={item.colorIndex ?? index} x={11} y={0} /><text x="29" y="4">{item.name}</text></g>)}
     {(ticks ?? [0, 1, 2, 3, 4].map((tick) => min + span * tick / 4)).map((value) => <g key={value} data-axis-tick={value}>{(!zeroReference || Math.abs(value) > Number.EPSILON) && <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#29415e" />}<text x={left - 8} y={y(value) + 4} textAnchor="end">{ticks || natural ? displayValue(value) : Math.round(value)}</text></g>)}
     {zeroReference && <line data-zero-reference x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#fff" strokeWidth="1" strokeDasharray="4,4" />}
-    {labels.map((label, index) => (!verticalLabels && compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={`${index}-${label}`} data-x-label x={x(index)} y={verticalLabels ? height - bottom + 12 : height - 10} transform={verticalLabels ? `rotate(90 ${x(index)} ${height - bottom + 12})` : undefined} textAnchor={verticalLabels ? "start" : "middle"} style={verticalLabels ? { fontSize: compact ? 8 : 11 } : undefined}>{label}</text>)}
+    {statuses.map((status, index) => {
+      if (!status) return null
+      const start = index === 0 ? left : (x(index - 1) + x(index)) / 2
+      const end = index === labels.length - 1 ? width - right : (x(index) + x(index + 1)) / 2
+      const color = status.includes('LIVE') ? '#fbbf24' : status.includes('UPCOMING') ? '#94a3b8' : status === 'FINAL' ? '#5eead4' : '#c4b5fd'
+      return <g key={index} data-game-status={status}>
+        <title>{labels[index]} · {status}</title>
+        <rect x={start} y={top} width={end - start} height={height - bottom - top} fill={color} opacity=".055" />
+        <line x1={start} x2={end} y1={height - bottom + 4} y2={height - bottom + 4} stroke={color} strokeWidth="3" strokeDasharray={status.includes('UPCOMING') ? '3,3' : status.includes('LIVE') ? '6,2' : undefined} />
+        <text x={x(index)} y={height - bottom + 12} transform={`rotate(90 ${x(index)} ${height - bottom + 12})`} style={{ fill: color, fontSize: compact ? 7 : 9 }}>{status.includes(' / ') ? 'MIXED' : status}</text>
+      </g>
+    })}
+    {labels.map((label, index) => (!verticalLabels && compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={`${index}-${label}`} data-x-label x={x(index)} y={verticalLabels ? height - bottom + (statuses.length ? 76 : 12) : height - 10} transform={verticalLabels ? `rotate(90 ${x(index)} ${height - bottom + (statuses.length ? 76 : 12)})` : undefined} textAnchor={verticalLabels ? "start" : "middle"} style={verticalLabels ? { fontSize: compact ? 8 : 11 } : undefined}>{label}</text>)}
     {series.map((item, seriesIndex) => <g key={item.name}>
       <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" points={linePoints(item.values)} />
       {item.potentialValues && <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={linePoints(item.potentialValues)} />}

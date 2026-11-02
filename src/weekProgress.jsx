@@ -41,14 +41,16 @@ export function kickoffGroupLabel(game) {
 
 // Future private picks must not influence another player's visible trajectory.
 // Allocate their public remaining confidence budget in kickoff order instead.
-export function weekProgressData(players, games, picksByUser, { metric = 'earned', groupKickoffs = false, provisional = false, viewerId, order = 'kickoff', ascending = false, includeLive = true, benchmark = 'absolute', seasonTotals = new Map() } = {}) {
+export function weekProgressData(players, games, picksByUser, { metric = 'earned', groupKickoffs = false, provisional = false, viewerId, order = 'kickoff', ascending = false, includeLive = true, includeUpcoming = true, benchmark = 'absolute', seasonTotals = new Map() } = {}) {
   // Use one public-only input for lines, leader selection, Dev and exports.
   // Even the viewer's future draft is excluded: shared charts must be safe.
   const publicModels = new Set(players.filter((player) => player.model).map((player) => player.id))
   picksByUser = Object.fromEntries(Object.entries(picksByUser).map(([id, picks]) => [id, picks.filter((pick) => games.some((game) => game.id === pick.gameId && (publicModels.has(id) || isLocked(game))))]))
   const ordered = [...games].sort((a, b) => kickoffTime(a) - kickoffTime(b) || String(a.id).localeCompare(String(b.id)))
+  const includedGames = ordered.filter((game) => includeLive || game.status !== 'live')
+  const futureGames = includedGames.filter((game) => !isLocked(game))
   const groups = []
-  for (const game of ordered.filter((game) => includeLive || game.status !== 'live')) {
+  for (const game of includedGames.filter((game) => includeUpcoming || isLocked(game))) {
     const time = kickoffTime(game)
     const previous = groups.at(-1)
     const lateWindow = kickoffGroupLabel(game) === 'Sunday late window'
@@ -68,10 +70,14 @@ export function weekProgressData(players, games, picksByUser, { metric = 'earned
     const av = groupValue(a), bv = groupValue(b)
     return (av === null && bv === null ? 0 : av === null ? 1 : bv === null ? -1 : (ascending ? av - bv : bv - av)) || a.time - b.time || String(a.games[0].id).localeCompare(String(b.games[0].id))
   })
+  const gameStatus = (game) => !isLocked(game) ? 'UPCOMING' : game.status === 'final' ? 'FINAL' : game.status === 'live' ? 'LIVE' : 'PENDING'
+  const statuses = ['', ...groups.map((group) => [...new Set(group.games.map(gameStatus))].join(' / '))]
   const labels = ['Start', ...groups.map((group) => groupKickoffs ? kickoffGroupLabel(group.games[0]) : `${group.games[0].away} @ ${group.games[0].home}`)]
   const details = ['Start of week', ...groups.map((group) => `${group.games.map((game) => `${game.away} @ ${game.home}`).join(', ')} · ${[...new Set(group.games.map(kickoffLabel))].join(' / ')}`)]
-  const aggregateFuture = metric === 'potential' && groups.some((group) => group.games.some((game) => !isLocked(game)))
+  details.forEach((detail, index) => { if (statuses[index]) details[index] = detail + ' · ' + statuses[index] })
+  const aggregateFuture = metric === 'potential' && futureGames.length > 0
   if (aggregateFuture) {
+    statuses.push('REMAINING')
     labels.push('Remaining potential')
     details.push('Remaining potential across unstarted games; confidence allocation hidden until kickoff')
   }
@@ -113,7 +119,7 @@ export function weekProgressData(players, games, picksByUser, { metric = 'earned
       pointTitles.push(`${player.name} · ${details[index + 1]} · Step: ${increment > 0 ? '+' : ''}${increment} · Cumulative: ${total}${estimate}`)
     }
     if (aggregateFuture) {
-      const remaining = groups.flatMap((group) => group.games).filter((game) => !isLocked(game)).reduce((sum, game) => sum + scores.get(game.id).potential + scores.get(game.id).points, 0)
+      const remaining = futureGames.reduce((sum, game) => sum + scores.get(game.id).potential + scores.get(game.id).points, 0)
       values.push(total + remaining)
       increments.push(remaining)
       pointTitles.push(`${player.name} · Remaining potential: ${remaining} · Cumulative: ${total + remaining} · Aggregate only; no per-game confidence allocation`)
@@ -130,22 +136,23 @@ export function weekProgressData(players, games, picksByUser, { metric = 'earned
     const increments = player.increments.map((value, index) => value - baseline.increments[index])
     return { ...player, values, increments, pointTitles: player.pointTitles.map((title, index) => `${title} · Vs ${baseline.name}: step ${increments[index]}, cumulative ${values[index]}`) }
   }) : visible
-  return { series: relativeSeries, labels, details, benchmarkName: baseline?.name }
+  return { series: relativeSeries, labels, details, statuses, benchmarkName: baseline?.name }
 
 }
 
 export function WeekProgressChart({ players, games, picksByUser, provisional = false, viewerId, weekLabel, seasonTotals = new Map(), seasonFinalTotals = seasonTotals }) {
   const [benchmark, setBenchmark] = useState('weekly-leader')
   const [includeLive, setIncludeLive] = useState(provisional)
+  const [includeUpcoming, setIncludeUpcoming] = useState(true)
   const [metric, setMetric] = useState('earned')
   const [groupKickoffs, setGroupKickoffs] = useState(false)
   const [order, setOrder] = useState('kickoff')
   const [ascending, setAscending] = useState(false)
   const [excluded, setExcluded] = useState([])
-  const data = weekProgressData(players, games, picksByUser, { metric, groupKickoffs, provisional: includeLive, viewerId, order, ascending, includeLive, benchmark, seasonTotals: includeLive ? seasonTotals : seasonFinalTotals })
+  const data = weekProgressData(players, games, picksByUser, { metric, groupKickoffs, provisional: includeLive, viewerId, order, ascending, includeLive, includeUpcoming, benchmark, seasonTotals: includeLive ? seasonTotals : seasonFinalTotals })
   const series = data.series.filter((player) => !excluded.includes(player.id))
   const metricLabel = METRICS.find((item) => item.value === metric).label
-  const description = `${weekLabel}: cumulative ${metricLabel.toLowerCase()} in ${order === 'kickoff' ? 'kickoff order' : `${ORDERS.find((item) => item.value === order).label} order (${ascending ? 'lowest first' : 'highest first'})`}, starting at zero. ${benchmark === 'absolute' ? 'Absolute totals.' : `Relative to ${data.benchmarkName ?? 'the selected benchmark'} at every step; the same benchmark is used throughout the week. Leaders are human players ranked by earned points.`} ${groupKickoffs ? 'Games sharing a kickoff stay together; Sunday late kickoffs (16:05 and 16:25 ET) merge into one window; sorting uses their mean confidence or Dev.' : 'Each step is one game.'} Dev measures disagreement among revealed human picks; unavailable values sort last. Slate labels use US Eastern time. ${metric === 'potential' ? 'Potential = earned plus remaining points. All human picks stay hidden until kickoff, including your own in shared charts. Unstarted games add no per-game movements. Their public remaining confidence budget and GOTW bonuses appear once in the final Remaining potential total, for both humans and models; no future confidence is assigned to a game in this chart.' : metric === 'lost' ? 'Losses accumulate as positive values.' : metric === 'net' ? 'Net = earned minus lost points.' : 'Only scored games add earned points.'} Includes GOTW bonuses. Live games ${includeLive ? 'included with provisional scores' : 'excluded from the chart'}. Hover a marker or view chart data for game details.${series.length ? '' : ' Select at least one player to show a line.'}`
+  const description = `${weekLabel}: cumulative ${metricLabel.toLowerCase()} in ${order === 'kickoff' ? 'kickoff order' : `${ORDERS.find((item) => item.value === order).label} order (${ascending ? 'lowest first' : 'highest first'})`}, starting at zero. ${benchmark === 'absolute' ? 'Absolute totals.' : `Relative to ${data.benchmarkName ?? 'the selected benchmark'} at every step; the same benchmark is used throughout the week. Leaders are human players ranked by earned points.`} ${groupKickoffs ? 'Games sharing a kickoff stay together; Sunday late kickoffs (16:05 and 16:25 ET) merge into one window; sorting uses their mean confidence or Dev.' : 'Each step is one game.'} Dev measures disagreement among revealed human picks; unavailable values sort last. Slate labels use US Eastern time. ${metric === 'potential' ? 'Potential = earned plus remaining points. All human picks stay hidden until kickoff, including your own in shared charts. Unstarted games add no per-game movements. Their public remaining confidence budget and GOTW bonuses appear once in the final Remaining potential total, for both humans and models; no future confidence is assigned to a game in this chart.' : metric === 'lost' ? 'Losses accumulate as positive values.' : metric === 'net' ? 'Net = earned minus lost points.' : 'Only scored games add earned points.'} Includes GOTW bonuses. Live games ${includeLive ? 'included with provisional scores' : 'excluded from the chart'}. Upcoming games ${includeUpcoming ? 'shown' : 'hidden'}; Remaining potential is retained in potential-total mode. Status strips distinguish FINAL, LIVE (provisional), UPCOMING and mixed kickoff groups; PENDING means kickoff passed but no live result is available. Hover a marker or view chart data for game details.${series.length ? '' : ' Select at least one player to show a line.'}`
   const controls = <>
     <label>Compare with <select aria-label="Week progress benchmark" value={benchmark} onChange={(event) => setBenchmark(event.target.value)}>
       <option value="weekly-leader">Weekly leader (default)</option><option value="season-leader">Season total leader</option><option value="absolute">Absolute points</option>
@@ -153,6 +160,7 @@ export function WeekProgressChart({ players, games, picksByUser, provisional = f
       <option value="model-fpi">FPI model</option><option value="model-moneyline">ML model</option><option value="model-avg">AVG model</option>
     </select></label>
     <label><input type="checkbox" aria-label="Week progress include live games" checked={includeLive} onChange={(event) => setIncludeLive(event.target.checked)} />Include live games</label>
+    <label><input type="checkbox" aria-label="Week progress show upcoming games" checked={includeUpcoming} onChange={(event) => setIncludeUpcoming(event.target.checked)} />Show upcoming games</label>
     <label>Order <select aria-label="Week progress order" value={order} onChange={(event) => setOrder(event.target.value)}>{ORDERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
     {order !== 'kickoff' && <label>Direction <select aria-label="Week progress sort direction" value={ascending ? 'ascending' : 'descending'} onChange={(event) => setAscending(event.target.value === 'ascending')}><option value="descending">Highest first</option><option value="ascending">Lowest first</option></select></label>}
     <label>Grouping <select aria-label="Week progress grouping" value={groupKickoffs ? 'kickoff' : 'game'} onChange={(event) => setGroupKickoffs(event.target.value === 'kickoff')}><option value="game">Individual games</option><option value="kickoff">Same kickoff time</option></select></label>
@@ -165,6 +173,6 @@ export function WeekProgressChart({ players, games, picksByUser, provisional = f
   </>
   return <ChartFrame id="week-progress" title="Week progress" description={description} modes={METRICS} mode={metric} onMode={setMetric} controls={controls}
     table={<AccessibleTable caption={`${weekLabel} — ${metricLabel}`} columns={['Step / games (Berlin time)', ...series.map((player) => player.name)]} rows={data.details.map((detail, index) => [`${data.labels[index]} · ${detail}`, ...series.map((player) => player.values[index])])} />}>
-    <LineSvg series={series} labels={data.labels} ariaLabel={`${weekLabel} cumulative ${metricLabel.toLowerCase()}`} stepped endValues zeroReference verticalLabels />
+    <LineSvg series={series} labels={data.labels} statuses={data.statuses} ariaLabel={`${weekLabel} cumulative ${metricLabel.toLowerCase()}`} stepped endValues zeroReference verticalLabels />
   </ChartFrame>
 }
