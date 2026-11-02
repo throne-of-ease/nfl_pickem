@@ -10,10 +10,11 @@ export const COLORS = ['#4477aa', '#ccbb44', '#228833', '#ee6677', '#66ccee', '#
 
 const MARKER_PATHS = [null, 'M-4-4H4V4H-4Z', 'M0-5 5 4H-5Z', 'M0-5 5 0 0 5-5 0Z', 'M-5-2H-2V-5H2V-2H5V2H2V5H-2V2H-5Z', 'M-5-3-3-5 0-2 3-5 5-3 2 0 5 3 3 5 0 2-3 5-5 3-2 0Z', 'M0-5 4-2.5 4 2.5 0 5-4 2.5-4-2.5Z']
 
-function SeriesMarker({ index, x, y, title }) {
+function SeriesMarker({ index, x, y, title, hollow = false }) {
   const markerIndex = index % COLORS.length
-  const style = { fill: `var(--chart-color-${markerIndex}, ${COLORS[markerIndex]})`, stroke: 'var(--chart-marker-outline, #0c192b)', strokeWidth: 1 }
-  return <g data-series-marker={markerIndex} transform={`translate(${x} ${y})`}>
+  const color = `var(--chart-color-${markerIndex}, ${COLORS[markerIndex]})`
+  const style = { fill: hollow ? 'var(--chart-marker-outline, #0c192b)' : color, stroke: hollow ? color : 'var(--chart-marker-outline, #0c192b)', strokeWidth: hollow ? 2 : 1 }
+  return <g data-hollow-marker={hollow || undefined} data-series-marker={markerIndex} transform={`translate(${x} ${y})`}>
     {title && <title>{title}</title>}
     {markerIndex === 0 ? <circle r="4.5" style={style} /> : <path d={MARKER_PATHS[markerIndex]} style={style} />}
   </g>
@@ -424,7 +425,7 @@ const displayValue = (value) => Number.isInteger(value) ? `${value}` : value.toF
 export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false, zeroReference = false, natural = false, stepped = false, verticalLabels = false, statuses = [] }) {
   const compact = useCompactChart()
   const width = compact ? 360 : 800
-  const bottom = verticalLabels ? (statuses.length ? 215 : 155) : 32
+  const bottom = verticalLabels ? 155 : 32
   const height = (compact ? 310 : 330) + bottom - 32, left = compact ? 36 : 54, right = endValues ? (compact ? 52 : 74) : 24
   const legend = chartLegendLayout(series, left, width - left - 24)
   const top = 44 + (legend.at(-1)?.row ?? 0) * 22
@@ -432,11 +433,23 @@ export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false
   const ticks = zeroReference ? leaderAxisTicks(values) : natural ? weeklyAxisTicks(values) : null
   const { min, max, span } = ticks ? { min: ticks[0], max: ticks.at(-1), span: ticks.at(-1) - ticks[0] } : natural ? naturalRange(values) : safeRange(values)
   const x = (index) => labels.length === 1 ? (width - right + left) / 2 : left + index * (width - left - right) / (labels.length - 1)
-  const linePoints = (values) => values.flatMap((value, index) => {
+  const linePoints = (values, offset = 0) => values.flatMap((value, localIndex) => {
+    const index = localIndex + offset
     if (!Number.isFinite(value)) return []
-    const corner = stepped && index > 0 && Number.isFinite(values[index - 1]) ? [`${x(index)},${y(values[index - 1])}`] : []
+    const corner = stepped && localIndex > 0 && Number.isFinite(values[localIndex - 1]) ? [`${x(index)},${y(values[localIndex - 1])}`] : []
     return [...corner, `${x(index)},${y(value)}`]
   }).join(' ')
+  const dashAt = (index) => statuses[index]?.includes('UPCOMING') || statuses[index] === 'REMAINING' ? '7,5' : statuses[index]?.includes('LIVE') || statuses[index]?.includes('PENDING') ? '3,3' : undefined
+  const lineSegments = (values) => {
+    if (!statuses.length || values.length < 2) return [{ start: 0, end: values.length - 1 }]
+    const runs = []
+    for (let index = 1; index < values.length; index++) {
+      const dash = dashAt(index)
+      if (runs.length && runs.at(-1).dash === dash) runs.at(-1).end = index
+      else runs.push({ start: index - 1, end: index, dash })
+    }
+    return runs
+  }
   const y = (value) => top + (max - value) * (height - top - bottom) / span
   const endLabels = endValues ? spreadEndLabels(series.flatMap((item, seriesIndex) => [
     { item, seriesIndex, kind: 'earned', values: item.values },
@@ -460,14 +473,13 @@ export function LineSvg({ series, labels, chartRef, ariaLabel, endValues = false
         <title>{labels[index]} · {status}</title>
         <rect x={start} y={top} width={end - start} height={height - bottom - top} fill={color} opacity=".055" />
         <line x1={start} x2={end} y1={height - bottom + 4} y2={height - bottom + 4} stroke={color} strokeWidth="3" strokeDasharray={status.includes('UPCOMING') ? '3,3' : status.includes('LIVE') ? '6,2' : undefined} />
-        <text x={x(index)} y={height - bottom + 12} transform={`rotate(90 ${x(index)} ${height - bottom + 12})`} style={{ fill: color, fontSize: compact ? 7 : 9 }}>{status.includes(' / ') ? 'MIXED' : status}</text>
       </g>
     })}
-    {labels.map((label, index) => (!verticalLabels && compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={`${index}-${label}`} data-x-label x={x(index)} y={verticalLabels ? height - bottom + (statuses.length ? 76 : 12) : height - 10} transform={verticalLabels ? `rotate(90 ${x(index)} ${height - bottom + (statuses.length ? 76 : 12)})` : undefined} textAnchor={verticalLabels ? "start" : "middle"} style={verticalLabels ? { fontSize: compact ? 8 : 11 } : undefined}>{label}</text>)}
-    {series.map((item, seriesIndex) => <g key={item.name}>
-      <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" points={linePoints(item.values)} />
+    {labels.map((label, index) => (!verticalLabels && compact && labels.length > 8 && index % Math.ceil(labels.length / 8) !== 0 && index !== labels.length - 1) ? null : <text key={`${index}-${label}`} data-x-label x={x(index)} y={verticalLabels ? height - bottom + 12 : height - 10} transform={verticalLabels ? `rotate(90 ${x(index)} ${height - bottom + 12})` : undefined} textAnchor={verticalLabels ? "start" : "middle"} style={verticalLabels ? { fontSize: compact ? 8 : 11 } : undefined}>{label}</text>)}
+    {series.map((item, seriesIndex) => <g key={item.name} data-series-line={item.name}>
+      {lineSegments(item.values).map(({ start, end, dash }, index) => <polyline key={index} data-line-state={dash === '7,5' ? 'upcoming' : dash ? 'provisional' : 'final'} fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" strokeDasharray={dash} points={linePoints(item.values.slice(start, end + 1), start)} />)}
       {item.potentialValues && <polyline fill="none" stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="4" strokeDasharray="5,5" points={linePoints(item.potentialValues)} />}
-      {item.values.map((value, index) => Number.isFinite(value) ? <SeriesMarker key={index} index={item.colorIndex ?? seriesIndex} x={x(index)} y={y(value)} title={item.pointTitles?.[index] ?? `${item.name}, ${labels[index]}: ${value.toFixed(1)}`} /> : null)}
+      {item.values.map((value, index) => Number.isFinite(value) ? <SeriesMarker key={index} index={item.colorIndex ?? seriesIndex} x={x(index)} y={y(value)} hollow={Boolean(dashAt(index))} title={item.pointTitles?.[index] ?? `${item.name}, ${labels[index]}: ${value.toFixed(1)}`} /> : null)}
     </g>)}
     {endLabels.map(({ item, seriesIndex, kind, value, targetX, targetY, labelY }) => <g key={`${item.name}-${kind}`} data-end-label={kind}>
       <line x1={targetX + 5} x2={width - right + 9} y1={targetY} y2={labelY} stroke={COLORS[(item.colorIndex ?? seriesIndex) % COLORS.length]} strokeWidth="1" strokeDasharray={kind === 'potential' ? '3,3' : undefined} />
