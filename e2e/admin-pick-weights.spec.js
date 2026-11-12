@@ -12,6 +12,9 @@ async function openPicks(page, admin) {
   // User metadata is deliberately untrusted; the server viewer role controls access.
   const session = { access_token: 'test-access', refresh_token: 'test-refresh', expires_in: 3600, user: { id: 'viewer', user_metadata: { isAdmin: true } } }
   await page.addInitScript(value => localStorage.setItem('nfl-pickem-session-v1', JSON.stringify(value)), session)
+  await page.addInitScript(value => localStorage.setItem('nfl-pickem-espn-cache-v2:week-02', JSON.stringify({
+    source: 'ESPN', games: value.map(game => ({ id: game.id, awayRecord: '10-2-1', homeRecord: '11-1-1' })),
+  })), games)
   await page.route('**/a.espncdn.com/**', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') }))
   await page.route('**/auth/v1/token*', route => route.fulfill({ json: session }))
   await page.route('**/rest/v1/rpc/get_season_data', route => route.fulfill({ json: { profiles: [{ id: 'viewer', name: 'Pat' }], games, revealedPicks: [], viewer: { id: 'viewer', name: 'Pat', isAdmin: admin } } }))
@@ -29,7 +32,7 @@ async function checkLayout(page) {
     const confidence = row.querySelector('.confidence').getBoundingClientRect()
     const weight = row.querySelector('.pick-weight').getBoundingClientRect()
     const bounds = row.getBoundingClientRect()
-    const elements = [...row.querySelectorAll('.pick-weight, .pick-weight span, .teams label, .confidence select')]
+    const elements = [...row.querySelectorAll('.pick-weight, .pick-weight span, .teams label, .team-record, .confidence select')]
     return { rightOfConfidence: weight.left >= confidence.right, contained: elements.every(element => {
       const rect = element.getBoundingClientRect()
       return rect.left >= bounds.left && rect.right <= bounds.right && rect.right <= innerWidth && element.scrollWidth <= element.clientWidth + 1
@@ -42,6 +45,7 @@ async function checkLayout(page) {
 
 test('admin comparisons follow model, team and confidence changes and fit iPhone widths', async ({ page }, testInfo) => {
   await openPicks(page, true)
+  await expect(page.locator('.teams .team-record')).toHaveCount(8)
   const first = page.getByTestId('pick-weight-g1')
   await expect(first).toHaveAttribute('aria-label', 'Overweight PIT by 2; underweight BUF by 2 versus AVG')
   await expect(page.getByTestId('pick-weight-g3')).toHaveAttribute('aria-label', 'Select a team to compare with the model')
