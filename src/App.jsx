@@ -1278,14 +1278,14 @@ export default function App() {
                             <label className={pick?.team === game.away ? "selected" : ""}>
                               <input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.away} onChange={() => updatePick(game.id, { team: game.away })} />
                               <TeamLogo team={game.away} />
-                              <span>{game.away}</span>
+                              <span>{game.away}{game.awayRecord && <small className="team-record" title="Overall win-loss record (ties shown when applicable)"> ({game.awayRecord})</small>}</span>
                               <b title={liveAway ? "ESPN real-time win probability" : `${pickProbabilityKind === "predictor" ? "FPI" : pickProbabilityKind === "moneyline" ? "ML" : "AVG"} pregame win probability`}>{liveAway ?? (game.status === "scheduled" ? (Number.isFinite(pregameHome) ? `${((1 - pregameHome) * 100).toFixed(0)}%` : "—") : game.awayScore)}</b>
                             </label>
                             <span className="at">@</span>
                             <label className={pick?.team === game.home ? "selected" : ""}>
                               <input type="radio" name={`${userId}-${game.id}`} checked={pick?.team === game.home} onChange={() => updatePick(game.id, { team: game.home })} />
                               <TeamLogo team={game.home} />
-                              <span>{game.home}</span>
+                              <span>{game.home}{game.homeRecord && <small className="team-record" title="Overall win-loss record (ties shown when applicable)"> ({game.homeRecord})</small>}</span>
                               <b title={liveHome ? "ESPN real-time win probability" : `${pickProbabilityKind === "predictor" ? "FPI" : pickProbabilityKind === "moneyline" ? "ML" : "AVG"} pregame win probability`}>{liveHome ?? (game.status === "scheduled" ? (Number.isFinite(pregameHome) ? `${(pregameHome * 100).toFixed(0)}%` : "—") : game.homeScore)}</b>
                             </label>
                           </div>

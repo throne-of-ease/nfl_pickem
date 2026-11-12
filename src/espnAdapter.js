@@ -14,6 +14,13 @@ const probability = (value) => {
 }
 const cacheBusted = (url) => `${url}&_nfl_pickem=${Date.now()}`
 
+const overallRecord = (competitor) => {
+  const records = competitor?.records ?? competitor?.record ?? []
+  if (!Array.isArray(records)) return null
+  const summary = records.find((record) => record?.type === 'total' || record?.name?.toLowerCase() === 'overall')?.summary
+  return typeof summary === 'string' && /^\d+-\d+(?:-\d+)?$/.test(summary) ? summary : null
+}
+
 export function currentPoolKeyFromScoreboard(payload) {
   const { season, week } = payload?.content?.sbData ?? {}
   return POOLS.find((pool) => pool.espnSeason === Number(season?.year) && pool.espnSeasonType === Number(season?.type) && pool.espnWeek === Number(week?.number))?.key ?? null
@@ -57,7 +64,7 @@ const isOlderGameState = (current, incoming) => {
 
 export function mergeLatestGame(current, incoming) {
   const merged = { ...current, ...incoming }
-  for (const key of ['predictorHome', 'homeMoneyline', 'awayMoneyline', 'matchupQuality']) {
+  for (const key of ['predictorHome', 'homeMoneyline', 'awayMoneyline', 'matchupQuality', 'homeRecord', 'awayRecord']) {
     if (incoming[key] == null && current?.[key] != null) merged[key] = current[key]
   }
   if (!isOlderGameState(current, incoming)) return merged
@@ -98,6 +105,8 @@ export function normalizeScoreboard(payload) {
       id: String(event.id),
       away: away.team.abbreviation,
       home: home.team.abbreviation,
+      awayRecord: overallRecord(away),
+      homeRecord: overallRecord(home),
       kickoff: new Date(event.date).toISOString(),
       status,
       awayScore: finite(away.score) ?? 0,
@@ -127,6 +136,8 @@ export function addPregameData(game, payload) {
   const summaryMatchesGame = home?.team?.abbreviation === game.home && away?.team?.abbreviation === game.away
   const updatedGame = summaryMatchesGame ? {
     ...game,
+    awayRecord: overallRecord(away) ?? game.awayRecord ?? null,
+    homeRecord: overallRecord(home) ?? game.homeRecord ?? null,
     ...(summaryStatus ? { status: summaryStatus } : {}),
     ...(Number.isFinite(finite(home.score)) ? { homeScore: finite(home.score) } : {}),
     ...(Number.isFinite(finite(away.score)) ? { awayScore: finite(away.score) } : {}),

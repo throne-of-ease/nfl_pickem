@@ -217,6 +217,7 @@ fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .team-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; background: transparent; border-radius: 3px; }
 .team-logo.large { width: 30px; height: 30px; }
 .teams span:not(.at) { overflow: hidden; text-overflow: ellipsis; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.team-record { font-size: .8em; font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .teams b { margin-left: .2rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .at { color: var(--muted); font-size: .65rem; text-align: center; text-transform: uppercase; }
 .confidence-cell { grid-area: confidence; min-height: 34px; display: contents; }
@@ -708,4 +709,13 @@ footer [data-testid="real-data-status"] { display: block; }
 
 @media (max-width: 430px) {
   header > nav { flex-wrap: nowrap; }
+  .game:not(.with-weights) { grid-template-columns: 1.9rem 3rem minmax(0, 1fr) 2rem; gap: .2rem; }
+  .game:not(.with-weights) .drag-handle { width: 30px; }
+  .game:not(.with-weights) .confidence select { width: 27px; }
+  .game .teams { column-gap: .1rem; grid-template-columns: minmax(0, 1fr) .55rem minmax(0, 1fr); }
+  .game.with-weights .teams { grid-template-columns: minmax(0, 1fr); }
+  .game .teams label { gap: .12rem; padding-inline: .12rem; }
+  .game .teams .team-logo { width: 16px; height: 16px; }
+  .game .teams span:not(.at) { font-size: .6rem; letter-spacing: 0; }
+  .game .teams b { font-size: .6rem; }
 }

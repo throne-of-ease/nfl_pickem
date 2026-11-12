@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { addPregameData, applyFpiRatings, applyLiveSample, currentPoolKeyFromScoreboard, espnGameUrl, fetchEspnCurrentPoolKey, fetchEspnPool, ingestEspnResponse, mergeLatestGame, normalizeEvent, normalizeFpiRatings, normalizeScoreboard } from '../src/espnAdapter.js'
 
 describe('ESPN fixture ingestion', () => {
+  it('reads overall records rather than home/road splits, including ties and unbeaten teams', () => {
+    const [game] = normalizeScoreboard({ content: { sbData: { events: [{
+      id: 'records', date: '2026-11-12T20:00Z', status: { type: { state: 'pre' } },
+      competitions: [{ competitors: [
+        { homeAway: 'home', team: { abbreviation: 'CAR' }, records: [{ type: 'home', summary: '3-1' }, { type: 'total', summary: '4-5' }] },
+        { homeAway: 'away', team: { abbreviation: 'BUF' }, records: [{ name: 'overall', summary: '5-2-1' }] },
+      ] }],
+    }] } } })
+    expect(game).toMatchObject({ homeRecord: '4-5', awayRecord: '5-2-1' })
+    const summary = { header: { competitions: [{ competitors: [
+      { homeAway: 'home', team: { abbreviation: 'CAR' }, record: [{ type: 'total', summary: '0-0' }] },
+      { homeAway: 'away', team: { abbreviation: 'BUF' }, record: [{ type: 'road', summary: '1-2' }] },
+    ] }] } }
+    expect(addPregameData(game, summary)).toMatchObject({ homeRecord: '0-0', awayRecord: '5-2-1' })
+    expect(mergeLatestGame(game, { homeRecord: null, awayRecord: null })).toMatchObject({ homeRecord: '4-5', awayRecord: '5-2-1' })
+  })
+
   it('builds the public ESPN game page URL from the event ID', () => {
     expect(espnGameUrl('401872933')).toBe('https://www.espn.com/nfl/game/_/gameId/401872933')
   })
