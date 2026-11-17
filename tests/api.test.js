@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deleteAdminOverride, isCurrentPool, loadAdminGotwData, loadChartData, mergeGames, refreshEspnPool, refreshLivePool, resetAdminPassword, saveDivisionWinnerPicks, updateDisplayName, updatePassword } from '../src/api.js'
+import { deleteAdminOverride, loadPool, savePicks, isCurrentPool, loadAdminGotwData, loadChartData, mergeGames, refreshEspnPool, refreshLivePool, resetAdminPassword, saveDivisionWinnerPicks, updateDisplayName, updatePassword } from '../src/api.js'
 import { buildSeasonHistory } from '../src/domain.js'
 
 afterEach(() => localStorage.clear())
@@ -193,5 +193,43 @@ describe('direct ESPN live refresh', () => {
     expect(result.cached).toBe(false)
     expect(requests.some((url) => url.includes('powerindex'))).toBe(true)
     expect(result.games[0]).toMatchObject({ id: 'g1', status: 'live', away: 'PIT', home: 'BUF' })
+  })
+})
+
+
+describe('future-week server initialization', () => {
+  it.each(['week-11', 'week-12', 'week-18', 'super-bowl'])('initializes %s before returning players and accepting picks', async (poolKey) => {
+    globalThis.__NFL_SUPABASE_URL = 'https://example.supabase.co'
+    globalThis.__NFL_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    let initialized = false
+    const game = { id: 'future', pool_key: poolKey, kickoff: '2099-11-20T18:00:00Z', away_team: 'BUF', home_team: 'MIA', status: 'scheduled' }
+    const fetcher = vi.fn(async (url, options) => {
+      let data
+      if (url.includes('sync-season')) {
+        expect(options.headers.authorization).toBe('Bearer player-access')
+        expect(JSON.parse(options.body)).toEqual({ pool: poolKey })
+        initialized = true
+        data = { synced: [{ key: poolKey, games: 1 }], failures: [] }
+      } else if (url.includes('get_season_data')) data = initialized ? { games: [game], profiles: [{ id: 'u1', name: 'Pat' }, { id: 'u2', name: 'Alex' }], revealedPicks: [] } : null
+      else if (url.includes('replace_picks')) {
+        expect(initialized).toBe(true)
+        data = { draftRevision: 1, picks: JSON.parse(options.body).p_picks }
+      } else data = { draftRevision: 0, picks: [] }
+      return { ok: true, json: async () => data }
+    })
+    vi.stubGlobal('fetch', fetcher)
+    const result = await loadPool(poolKey, 'player-access', { fetchEspn: false })
+    expect(result.users.map((user) => user.name)).toEqual(['Pat', 'Alex'])
+    expect(result.picksByUser).toEqual({ u1: [], u2: [] })
+    expect(result.games[0].id).toBe('future')
+    expect((await savePicks(poolKey, 'player-access', result.draftRevision, [{ gameId: 'future', team: 'BUF', confidence: 1 }])).draftRevision).toBe(1)
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('sync-season'))).toHaveLength(1)
+  })
+
+  it('does not hide server initialization failures behind browser-only fixtures', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({ ok: !url.includes('sync-season'), status: 503,
+      json: async () => url.includes('sync-season') ? { code: 'SYNC_FAILED' } : url.includes('get_season_data') ? { games: [], profiles: [] } : { picks: [] },
+    })))
+    await expect(loadPool('week-11', 'player-access')).rejects.toThrow('SYNC_FAILED')
   })
 })

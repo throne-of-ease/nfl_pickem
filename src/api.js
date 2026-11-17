@@ -184,7 +184,13 @@ export async function loadRegistrationStatus() {
 }
 
 export async function loadPool(poolKey, token, { forceRefresh = false, fetchEspn = true, signal } = {}) {
-  const [season, draft] = await Promise.all([loadSeason(poolKey, token), loadDraft(poolKey, token)])
+  let [season, draft] = await Promise.all([loadSeason(poolKey, token), loadDraft(poolKey, token)])
+  // Browser-only ESPN games cannot be saved: initialize the server slate first.
+  // This also recovers the roster when the pool has never been synchronized.
+  if (!season?.games?.length) {
+    await syncPool(poolKey, token)
+    ;[season, draft] = await Promise.all([loadSeason(poolKey, token), loadDraft(poolKey, token)])
+  }
   const mapped = mapSeason(season, draft)
   if (!fetchEspn) return mapped
   try {
