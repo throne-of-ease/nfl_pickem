@@ -25,6 +25,7 @@ export function adjustWatchWeights(weights, changedKey, percentage) {
 }
 
 const CACHE_VERSION = 'nfl-pickem-watch-v1'
+const RATING_VERSION = 2
 const QUARTER = 15 * 60
 const REGULATION = 4 * QUARTER
 const SCOREBOARD_MAX_AGE = 2 * 60 * 1000
@@ -32,6 +33,7 @@ const FPI_MAX_AGE = 60 * 60 * 1000
 const REQUEST_LIMIT = 3
 const newestFirst = (a, b) => b.kickoff.localeCompare(a.kickoff) || a.id.localeCompare(b.id)
 const completed = (type) => type?.state === 'post' && type.completed === true && /^STATUS_FINAL(?:_|$)/.test(type.name ?? '')
+const swingScore = (total) => -100 * Math.expm1(-total / 2.5)
 
 export function watchGame(game, poolKey) {
   const { id, away, home, kickoff } = game
@@ -116,7 +118,7 @@ export function calculateWatchComponents(payload, game) {
   }
   return {
     uncertainty: 100 * uncertainty / end,
-    swings: 100 * Math.min(1, swings / 2.5),
+    swings: swingScore(swings),
     suspense: 100 * suspense / (end - lateStart),
   }
 }
@@ -167,23 +169,34 @@ const ratingMemory = new Map()
 
 export function cacheWatchRating(season, row) {
   const key = ratingPrefix(season) + row.game.id
-  if (writeCache(key, row)) ratingMemory.delete(key)
-  else ratingMemory.set(key, row)
+  const rating = { ...row, version: RATING_VERSION }
+  if (writeCache(key, rating)) ratingMemory.delete(key)
+  else ratingMemory.set(key, rating)
+}
+
+function readWatchRating(key) {
+  const row = ratingMemory.get(key) ?? readCache(key)
+  if (!row?.game || !row?.components) return null
+  if (row.version === RATING_VERSION) return row
+  const { swings } = row.components
+  if (row.version !== undefined || !Number.isFinite(swings) || swings < 0 || swings >= 100) return null
+  // The old scale was linear below 100. Only capped games need their play data again.
+  return { ...row, components: { ...row.components, swings: swingScore(2.5 * (swings / 100)) } }
 }
 
 export function cachedWatchRatings(season, games) {
   const prefix = ratingPrefix(season)
   if (games) return games.flatMap(({ id }) => {
-    const row = ratingMemory.get(prefix + id) ?? readCache(prefix + id)
-    return row?.game && row?.components ? [row] : []
+    const row = readWatchRating(prefix + id)
+    return row ? [row] : []
   })
   const rows = new Map()
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (!key?.startsWith(prefix)) continue
-      const row = readCache(key)
-      if (row?.game && row?.components) rows.set(key, row)
+      const row = readWatchRating(key)
+      if (row) rows.set(key, row)
     }
   } catch { /* use the current session's ratings */ }
   for (const [key, row] of ratingMemory) if (key.startsWith(prefix)) rows.set(key, row)

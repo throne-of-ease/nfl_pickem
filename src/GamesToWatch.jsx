@@ -10,10 +10,22 @@ import './gamesToWatch.css'
 const SCORES = [{ key: 'overall', label: 'Excitement Score' }, ...WATCH_COMPONENTS]
 const SHORT_LABELS = { overall: 'Excitem.', uncertainty: 'Uncert.', swings: 'WP Swings', suspense: 'Late Susp.', quality: 'Team Qual.' }
 const SCORING_NOTES = {
-  uncertainty: 'Measures how close ESPN’s win probability stayed to 50% across the game, weighted by game-clock time. Games that stayed in doubt score higher.',
-  swings: 'Adds up the part of each play-to-play probability change beyond 1.5 percentage points. This rewards turning points and comebacks. The rating reaches 100 at 250 cumulative percentage points.',
-  suspense: 'Measures how close win probability stayed to 50% in the final five minutes of regulation and any overtime. Games that stayed in doubt near the end score higher.',
-  quality: 'Rewards matchups between stronger teams. The app averages both teams’ ESPN FPI ratings and maps the average to 0–100. An average of 0 scores 50, and each FPI point changes the score by 5, with a floor of 0 and a ceiling of 100. The latest available FPI for the season also applies to past games, so their ratings can change as ESPN updates FPI.',
+  uncertainty: {
+    formula: '100 × Σ(Cᵢ × Δtᵢ) / T',
+    description: 'Measures how long the game stayed in doubt. Δtᵢ is the duration of each interval and T is the total game-clock duration, including any overtime.',
+  },
+  swings: {
+    formula: 'S = Σ max(0, 100 × |pᵢ₊₁ − pᵢ| − 1.5). Score = 100 × (1 − exp(−S / 250)).',
+    description: 'Rewards turning points and comebacks. Each change contributes only the portion above 1.5 percentage points. A cumulative 250 points scores 63.2, and the scale approaches 100 gradually.',
+  },
+  suspense: {
+    formula: '100 × Σ(Cᵢ × Lᵢ) / (T − 55 min)',
+    description: 'Measures how long the ending stayed in doubt. Lᵢ is the portion of each interval after 55 minutes of game-clock time, covering the final five minutes of regulation and any overtime.',
+  },
+  quality: {
+    formula: 'max(0, min(100, 50 + 5 × (FPI home + FPI away) / 2))',
+    description: 'Rewards matchups between stronger teams. The latest ESPN FPI for the season also applies to past games, so this rating can change. Both teams need an FPI rating.',
+  },
 }
 const completedGames = (games, poolKey) => games.flatMap((game) => {
   const item = ['final', 'post'].includes(game.status) ? watchGame(game, poolKey) : null
@@ -221,11 +233,16 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
     <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights} {...rankingProps} />
     <section className="watch-notes" aria-labelledby="watch-scoring-title">
       <h3 id="watch-scoring-title">How the rankings work</h3>
-      <p>The Excitement Score helps you find completed games worth watching without seeing the result. It combines four ratings on a 0–100 scale using your weights. If a rating is unavailable, the score uses the remaining weighted ratings.</p>
+      <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>
+      <p>Both sums use components with available scores. The overall score is unavailable if their weights total zero.</p>
+      <p>For the win probability formulas, pᵢ is ESPN’s home win probability at the start of a game-clock interval, on a 0–1 scale. Closeness is <span className="watch-formula">Cᵢ = 1 − 2 × |pᵢ − 0.5|</span>. The opening probability applies from kickoff and each value carries forward until the next timed update. The clock ends at the later of 60 minutes or the last timed probability update.</p>
       <dl>
         {WATCH_COMPONENTS.map(({ key, label }) => <div key={key}>
           <dt>{label}</dt>
-          <dd>{SCORING_NOTES[key]}</dd>
+          <dd>
+            <div className="watch-formula">{SCORING_NOTES[key].formula}</div>
+            {SCORING_NOTES[key].description}
+          </dd>
         </div>)}
       </dl>
     </section>

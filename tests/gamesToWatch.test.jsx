@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GamesToWatch from '../src/GamesToWatch.jsx'
 import { POOLS } from '../src/domain.js'
+import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchTeamQuality } from '../src/watchRatings.js'
 
 const final = { state: 'post', completed: true, name: 'STATUS_FINAL' }
 const current = { id: '100', week: 11, day: 16, away: 'DAL', home: 'PHI', type: final }
@@ -62,6 +63,37 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('uses game-clock weights, a smooth swings score, and available components only', () => {
+    const scores = calculateWatchComponents(summary(current), current)
+    const { uncertainty, suspense, swings } = scores
+    expect(uncertainty).toBeCloseTo(100 * 2388 / 3600)
+    expect(suspense).toBeCloseTo(80)
+    expect(swings).toBeCloseTo(50.142, 2)
+    const overtime = summary(current)
+    overtime.winprobability.at(-1).homeWinPercentage = 0.5
+    overtime.drives.previous[0].plays.push({ id: '5', period: { number: 5 }, clock: { displayValue: '9:00' } })
+    overtime.winprobability.push({ playId: '5', homeWinPercentage: 1 })
+    expect(calculateWatchComponents(overtime, current).suspense).toBeCloseTo(100 * 300 / 360)
+    expect(watchTeamQuality(current, new Map([['DAL', 15], ['PHI', 10]]))).toBe(100)
+    expect(watchTeamQuality(current, new Map([['DAL', -15], ['PHI', -10]]))).toBe(0)
+    expect(excitementScore({ uncertainty: 40, swings: 80, suspense: 70, quality: null },
+      { uncertainty: 30, swings: 25, suspense: 35, quality: 10 })).toBeCloseTo(5650 / 90)
+  })
+
+  it('converts uncapped cached scores and queues capped games for recalculation', () => {
+    localStorage.setItem('nfl-pickem-watch-v1:rating:2026:180', JSON.stringify({
+      game: { id: '180' }, components: { swings: 40, uncertainty: 72, suspense: 80 },
+    }))
+    localStorage.setItem('nfl-pickem-watch-v1:rating:2026:181', JSON.stringify({
+      game: { id: '181' }, components: { swings: 100, uncertainty: 60, suspense: 90 },
+    }))
+    for (const rows of [cachedWatchRatings(2026), cachedWatchRatings(2026, [{ id: '180' }, { id: '181' }])]) {
+      expect(rows).toHaveLength(1)
+      expect(rows[0].components).toMatchObject({ uncertainty: 72, suspense: 80 })
+      expect(rows[0].components.swings).toBeCloseTo(32.968)
+    }
+  })
+
   it('starts with weekly finals, progressively ranks the selected season, and reuses cached ratings', async () => {
     const calls = []
     const aborted = []
