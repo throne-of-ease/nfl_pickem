@@ -13,6 +13,8 @@
 .watch-weight-grid label { display: grid; gap: .15rem; font-size: .75rem; }
 .watch-weight-grid label span { display: flex; justify-content: space-between; }
 .watch-weight-grid input { width: 100%; margin: 0; accent-color: var(--accent); }
+.watch-settings-actions { display: flex; align-items: center; gap: .3rem .75rem; flex-wrap: wrap; padding-bottom: .6rem; }
+.watch-settings-actions button { padding: .3rem .55rem; font-size: .75rem; }
 .watch-progress button { padding: .18rem .45rem; font-size: .72rem; }
 .watch-ranking { margin-top: .35rem; }
 .watch-ranking th, .watch-ranking td { padding: .35rem .45rem; text-align: center; font-variant-numeric: tabular-nums; }
@@ -21,6 +23,12 @@
 .watch-ranking .watch-week small { display: block; font-size: .8em; }
 .watch-ranking .watch-overall, .watch-sort-arrow { color: var(--accent); font-weight: 750; }
 .watch-short-label { display: none; }
+.watch-notes { margin-top: 1rem; padding-top: .65rem; border-top: 1px solid var(--line); font-size: .8rem; line-height: 1.45; }
+.watch-notes h3 { margin: 0; font-size: .94rem; }
+.watch-notes p { margin: .3rem 0 .65rem; }
+.watch-notes dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem 1rem; margin: 0; }
+.watch-notes dt { font-weight: 700; }
+.watch-notes dd { margin: 0; color: var(--muted); }
 
 @media (max-width: 620px) {
   .watch-wide-label { display: none; }
@@ -31,4 +39,5 @@
   .watch-ranking tbody td, .watch-ranking tbody th { font-size: .69rem; }
   .watch-ranking thead .watch-week { width: 11%; }
   .watch-ranking thead .watch-matchup { width: 25%; }
+  .watch-notes dl { grid-template-columns: minmax(0, 1fr); }
 }

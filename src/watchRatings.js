@@ -8,6 +8,22 @@ export const WATCH_COMPONENTS = [
   { key: 'quality', label: 'Team Quality', weight: 10 },
 ]
 
+export const DEFAULT_WATCH_WEIGHTS = Object.fromEntries(WATCH_COMPONENTS.map(({ key, weight }) => [key, weight]))
+
+export function adjustWatchWeights(weights, changedKey, percentage) {
+  const others = WATCH_COMPONENTS.map(({ key }) => key).filter((key) => key !== changedKey)
+  const basis = others.some((key) => weights[key] > 0) ? weights : DEFAULT_WATCH_WEIGHTS
+  const adjusted = Object.fromEntries(others.map((key) => [key, 0]))
+  // Allocate whole points proportionally. With a fixed basis, taking points
+  // away reverses the allocation order, so no other weight can increase.
+  const priority = (key) => basis[key] / (adjusted[key] + 0.5)
+  for (let total = percentage; total < 100; total += 1) {
+    const recipient = others.reduce((best, key) => priority(key) > priority(best) ? key : best)
+    adjusted[recipient] += 1
+  }
+  return { ...adjusted, [changedKey]: percentage }
+}
+
 const CACHE_VERSION = 'nfl-pickem-watch-v1'
 const QUARTER = 15 * 60
 const REGULATION = 4 * QUARTER

@@ -99,7 +99,16 @@ describe('Games to Watch', () => {
     const overall = () => [...screen.getByRole('table').querySelectorAll('.watch-overall')].map((cell) => Number(cell.textContent))
     const oldScores = overall()
     fireEvent.click(screen.getByText('Scoring Settings', { exact: true }))
-    fireEvent.change(screen.getByRole('slider', { name: 'Team Quality weight' }), { target: { value: '100' } })
+    const weights = () => screen.getAllByRole('slider').map((slider) => slider.valueAsNumber)
+    const setWeight = (component, value) => fireEvent.change(screen.getByRole('slider', { name: `${component} weight` }), { target: { value } })
+    setWeight('Uncertainty', '50')
+    expect(weights()).toEqual([50, 18, 25, 7])
+    setWeight('Uncertainty', '100')
+    expect(weights()).toEqual([100, 0, 0, 0])
+    setWeight('Uncertainty', '50')
+    expect(weights()).toEqual([50, 18, 25, 7])
+    setWeight('Team Quality', '100')
+    expect(weights()).toEqual([0, 0, 0, 100])
     expect(overall()).not.toEqual(oldScores)
     expect(calls).toHaveLength(5)
 
@@ -120,6 +129,10 @@ describe('Games to Watch', () => {
     expect(storage).not.toMatch(/winner|awayScore|homeScore|homeWinPercentage/i)
 
     const requestCount = calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to default weights' }))
+    expect(weights()).toEqual([30, 25, 35, 10])
+    expect(overall().some((score) => score !== 50)).toBe(true)
+    expect(calls).toHaveLength(requestCount)
     view.unmount()
     render(<Harness />)
     expect(screen.getByRole('button', { name: 'Current Week' })).toHaveAttribute('aria-pressed', 'true')

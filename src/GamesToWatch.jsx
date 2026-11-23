@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { POOLS } from './domain.js'
 import {
-  WATCH_COMPONENTS, analyzeWatchGames, cachedWatchRatings, cachedWatchSchedule, excitementScore,
-  fetchWatchSchedule, mergeWatchGames, queueWatchRun, watchGame,
+  DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, adjustWatchWeights, analyzeWatchGames, cachedWatchRatings,
+  cachedWatchSchedule, excitementScore, fetchWatchSchedule, mergeWatchGames, queueWatchRun, watchGame,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
 const SCORES = [{ key: 'overall', label: 'Excitement Score' }, ...WATCH_COMPONENTS]
 const SHORT_LABELS = { overall: 'Excitem.', uncertainty: 'Uncert.', swings: 'WP Swings', suspense: 'Late Susp.', quality: 'Team Qual.' }
-const DEFAULT_WEIGHTS = Object.fromEntries(WATCH_COMPONENTS.map(({ key, weight }) => [key, weight]))
+const SCORING_NOTES = {
+  uncertainty: 'Measures how close ESPN’s win probability stayed to 50% across the game, weighted by game-clock time. Games that stayed in doubt score higher.',
+  swings: 'Adds up the part of each play-to-play probability change beyond 1.5 percentage points. This rewards turning points and comebacks. The rating reaches 100 at 250 cumulative percentage points.',
+  suspense: 'Measures how close win probability stayed to 50% in the final five minutes of regulation and any overtime. Games that stayed in doubt near the end score higher.',
+  quality: 'Rewards matchups between stronger teams using their average pregame win rate. Ties count as half a win. A baseline of two wins and two losses reduces the influence of early results.',
+}
 const completedGames = (games, poolKey) => games.flatMap((game) => {
   const item = ['final', 'post'].includes(game.status) ? watchGame(game, poolKey) : null
   return item ? [item] : []
@@ -142,7 +147,17 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }
   </>
 }
 
-export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WEIGHTS, onWeights, ...rankingProps }) {
+export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, ...rankingProps }) {
+  const weightEdit = useRef(null)
+  const changeWeight = (key, percentage) => {
+    // Keep the earlier proportions while editing the same slider, even at 100%.
+    if (weightEdit.current?.key !== key) weightEdit.current = { key, weights }
+    onWeights(adjustWatchWeights(weightEdit.current.weights, key, percentage))
+  }
+  const resetWeights = () => {
+    weightEdit.current = null
+    onWeights(DEFAULT_WATCH_WEIGHTS)
+  }
   return <section className="watch-view" aria-labelledby="games-to-watch-title">
     <div className="section-title"><h2 id="games-to-watch-title">Games to Watch</h2></div>
     <div className="watch-controls">
@@ -159,13 +174,26 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
       <summary>Scoring Settings</summary>
       <div className="watch-weight-grid">
         {WATCH_COMPONENTS.map(({ key, label }) => <label key={key}>
-          <span>{label} <b>{weights[key]}</b></span>
-          <input type="range" aria-label={`${label} weight`} min="0" max="100" value={weights[key]}
-            onChange={(event) => onWeights({ ...weights, [key]: Number(event.target.value) })} />
+          <span>{label} <b>{weights[key]}%</b></span>
+          <input type="range" aria-label={`${label} weight`} aria-valuetext={`${weights[key]}%`} min="0" max="100" value={weights[key]}
+            onChange={(event) => changeWeight(key, event.target.valueAsNumber)} />
         </label>)}
       </div>
-      {!Object.values(weights).some(Boolean) && <p>Set at least one weight to calculate the Excitement Score.</p>}
+      <div className="watch-settings-actions">
+        <p>The other weights adjust proportionally to keep the total at 100%.</p>
+        <button type="button" onClick={resetWeights}>Reset to default weights</button>
+      </div>
     </details>
     <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights} {...rankingProps} />
+    <section className="watch-notes" aria-labelledby="watch-scoring-title">
+      <h3 id="watch-scoring-title">How the rankings work</h3>
+      <p>The Excitement Score helps you find completed games worth watching without seeing the result. It combines four ratings on a 0–100 scale using your weights. If a rating is unavailable, the score uses the remaining weighted ratings.</p>
+      <dl>
+        {WATCH_COMPONENTS.map(({ key, label }) => <div key={key}>
+          <dt>{label}</dt>
+          <dd>{SCORING_NOTES[key]}</dd>
+        </div>)}
+      </dl>
+    </section>
   </section>
 }
