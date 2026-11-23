@@ -10,9 +10,11 @@
 .watch-settings summary { padding: .45rem 0; font-size: .78rem; cursor: pointer; }
 .watch-settings p, .watch-progress p, .watch-empty { margin: .3rem 0; font-size: .76rem; }
 .watch-weight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .4rem 1rem; padding: .2rem 0 .6rem; }
-.watch-weight-grid label { display: grid; gap: .15rem; font-size: .75rem; }
-.watch-weight-grid label span { display: flex; justify-content: space-between; }
-.watch-weight-grid input { width: 100%; margin: 0; accent-color: var(--accent); }
+.watch-weight { display: grid; gap: .2rem; font-size: .75rem; }
+.watch-weight-heading, .watch-weight-entry { display: flex; align-items: center; gap: .2rem; }
+.watch-weight-heading { justify-content: space-between; }
+.watch-weight-entry input { width: 3.3rem; padding: .2rem .25rem; font: inherit; text-align: right; }
+.watch-weight input[type='range'] { width: 100%; margin: 0; accent-color: var(--accent); }
 .watch-settings-actions { display: flex; align-items: center; gap: .3rem .75rem; flex-wrap: wrap; padding-bottom: .6rem; }
 .watch-settings-actions button { padding: .3rem .55rem; font-size: .75rem; }
 .watch-progress button { padding: .18rem .45rem; font-size: .72rem; }

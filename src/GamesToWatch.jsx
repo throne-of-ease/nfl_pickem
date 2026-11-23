@@ -149,13 +149,16 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }
 
 export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, ...rankingProps }) {
   const weightEdit = useRef(null)
+  const [weightDraft, setWeightDraft] = useState(null)
   const changeWeight = (key, percentage) => {
-    // Keep the earlier proportions while editing the same slider, even at 100%.
+    if (percentage === weights[key]) return
+    // Keep the earlier proportions while editing the same weight, even at 100%.
     if (weightEdit.current?.key !== key) weightEdit.current = { key, weights }
     onWeights(adjustWatchWeights(weightEdit.current.weights, key, percentage))
   }
   const resetWeights = () => {
     weightEdit.current = null
+    setWeightDraft(null)
     onWeights(DEFAULT_WATCH_WEIGHTS)
   }
   return <section className="watch-view" aria-labelledby="games-to-watch-title">
@@ -173,11 +176,33 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
     <details className="watch-settings">
       <summary>Scoring Settings</summary>
       <div className="watch-weight-grid">
-        {WATCH_COMPONENTS.map(({ key, label }) => <label key={key}>
-          <span>{label} <b>{weights[key]}%</b></span>
+        {WATCH_COMPONENTS.map(({ key, label }) => <div className="watch-weight" key={key}>
+          <div className="watch-weight-heading">
+            <label htmlFor={`watch-weight-${key}`}>{label}</label>
+            <span className="watch-weight-entry">
+              <input id={`watch-weight-${key}`} type="number" aria-label={`${label} weight percentage`} min="0" max="100" step="1"
+                value={weightDraft?.key === key ? weightDraft.value : weights[key]}
+                onChange={(event) => setWeightDraft({ key, value: event.target.value })}
+                onBlur={(event) => {
+                  const value = event.currentTarget.valueAsNumber
+                  setWeightDraft(null)
+                  if (weightDraft?.key === key && Number.isFinite(value)) {
+                    changeWeight(key, Math.max(0, Math.min(100, Math.round(value))))
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setWeightDraft(null)
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    event.currentTarget.blur()
+                  }
+                }} />
+              <span aria-hidden="true">%</span>
+            </span>
+          </div>
           <input type="range" aria-label={`${label} weight`} aria-valuetext={`${weights[key]}%`} min="0" max="100" value={weights[key]}
             onChange={(event) => changeWeight(key, event.target.valueAsNumber)} />
-        </label>)}
+        </div>)}
       </div>
       <div className="watch-settings-actions">
         <p>The other weights adjust proportionally to keep the total at 100%.</p>
