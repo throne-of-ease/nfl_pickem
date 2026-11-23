@@ -4,8 +4,11 @@ const STATUS = { pre: 'scheduled', in: 'live', post: 'final', scheduled: 'schedu
 const SCOREBOARD = 'https://cdn.espn.com/core/nfl/scoreboard?xhr=1'
 const GAME = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event='
 const FPI = 'https://site.web.api.espn.com/apis/fitt/v3/sports/football/nfl/powerindex'
+const CALENDAR_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard'
 
 export const espnGameUrl = (gameId) => `https://www.espn.com/nfl/game/_/gameId/${encodeURIComponent(gameId)}`
+export const espnSummaryUrl = (gameId) => `${GAME}${encodeURIComponent(gameId)}`
+export const espnCalendarScoreboardUrl = (year) => `${CALENDAR_SCOREBOARD}?dates=${year}&limit=400`
 
 const finite = (value) => value === null || value === '' || typeof value === 'boolean' ? null : Number.isFinite(Number(value)) ? Number(value) : null
 const probability = (value) => {
@@ -203,7 +206,7 @@ export async function fetchEspnPool(pool, { fetcher = fetch, signal, includeFpi 
   const fpiPromise = includeFpi ? fetchFpiRatings({ fetcher, season: pool.espnSeason, signal }).catch(() => null) : Promise.resolve(null)
   const enriched = await Promise.all(games.map(async (game) => {
     try {
-      const response = await fetcher(cacheBusted(`${GAME}${game.id}`), { signal, cache: 'no-store' })
+      const response = await fetcher(cacheBusted(espnSummaryUrl(game.id)), { signal, cache: 'no-store' })
       return response.ok ? mergeLatestGame(game, addPregameData(game, await response.json())) : game
     } catch (error) {
       if (error.name === 'AbortError') throw error

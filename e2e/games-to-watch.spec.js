@@ -1,0 +1,21 @@
+import { expect, test } from '@playwright/test'
+
+test('Games to Watch fits the viewport and keeps weekly navigation available', async ({ page }) => {
+  await page.goto('/?scenario=stale-data&pool=week-02')
+  await page.getByRole('button', { name: 'Games to Watch', exact: true }).click()
+  const section = page.getByRole('region', { name: 'Games to Watch' })
+  const table = section.getByRole('table')
+  const week = page.getByLabel('Week', { exact: true })
+  await expect(section.getByRole('button', { name: 'Current Week' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(table.getByRole('row')).toHaveCount(2)
+  await week.selectOption('week-01')
+  await expect(table.getByRole('row')).toHaveCount(5)
+  await section.getByRole('button', { name: 'Full Season' }).click()
+  await expect(week).toHaveCount(0)
+  await expect(table.getByRole('row')).toHaveCount(6)
+  await expect(table.getByRole('columnheader', { name: 'Week', exact: true })).toBeVisible()
+  await expect(section).not.toContainText(/20.?27|17.?17/)
+  const scopeFits = await section.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
+  expect(scopeFits).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { POOLS, buildSeasonHistory, isLocked, modelAutopick, modelDisagreement, modelPicks, poolMetrics, presetConfidencePicks, preserveLockedPicks, relativeModelWeight, validateDraft } from "./domain.js";
 import { gamesByPool, picksByUser as seededPicks, users } from "./fixtures.js";
@@ -14,6 +14,7 @@ import { espnGameUrl, fetchEspnCurrentPoolKey } from "./espnAdapter.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const STORAGE_KEY = "nfl-pickem-rehearsal-v1";
+const GamesToWatch = lazy(() => import("./GamesToWatch.jsx"));
 
 const TEST_SCENARIOS = new Set(["scheduled", "live", "final", "playoff", "missing-data", "stale-data", "validation-error", "division-locked"]);
 
@@ -330,6 +331,8 @@ export default function App() {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
   const [tab, setTab] = useState("overview");
+  const [watchScope, setWatchScope] = useState("week");
+  const [watchWeights, setWatchWeights] = useState();
   const [divisionWinnersOpen, setDivisionWinnersOpen] = useState(false);
   const [divisionStandingsStatus, setDivisionStandingsStatus] = useState(null);
   const [provisional, setProvisional] = useState(true);
@@ -969,6 +972,7 @@ export default function App() {
     );
 
   const saveStateColor = saveState === "saved" ? "var(--success)" : saveState === "error" ? "var(--live)" : saveState === "saving" ? "var(--warning)" : "var(--muted)";
+  const watchingGames = tab === "watch";
 
   return (
     <>
@@ -977,7 +981,7 @@ export default function App() {
           <span>NFL</span> Pick'em '26
         </a>
         <nav aria-label="Main navigation">
-          {[["overview", "Overview"], ["games", "My picks"], ["charts", "Charts"], ["models", "Win probs."], ...(isAdmin ? [["admin", "Admin"]] : [])].map(([item, label]) => (
+          {[["overview", "Overview"], ["games", "My picks"], ["charts", "Charts"], ["models", "Win probs."], ["watch", "Games to Watch"], ...(isAdmin ? [["admin", "Admin"]] : [])].map(([item, label]) => (
             <button key={item} className={`${tab === item ? "active" : ""} ${item === "models" ? "models-tab" : item === "games" ? "picks-tab" : ""}`} onClick={() => { setTab(item); if (item !== "games") setDivisionWinnersOpen(false); }}>
               {item === "models" ? (
                 <>
@@ -1115,7 +1119,7 @@ export default function App() {
                 <button type="submit">Create players</button>
               </form>
             )}
-            {!divisionWinnersOpen && <section className="hero">
+            {!divisionWinnersOpen && (!watchingGames || watchScope === "week") && <section className="hero">
               <div className="hero-actions">
                 <label>
                   <span className="sr-only">Week</span>
@@ -1156,23 +1160,23 @@ export default function App() {
                 </button>
               </form>
             )}
-            {!divisionWinnersOpen && seasonError && <p role="alert">{seasonError}</p>}
-            {!divisionWinnersOpen && dataState.loading && (
+            {!divisionWinnersOpen && !watchingGames && seasonError && <p role="alert">{seasonError}</p>}
+            {!divisionWinnersOpen && !watchingGames && dataState.loading && (
               <p className="notice" role="status">
                 Loading the real ESPN schedule and pregame probabilities…
               </p>
             )}
-            {!divisionWinnersOpen && dataState.error && (
+            {!divisionWinnersOpen && (!watchingGames || watchScope === "week") && dataState.error && (
               <p className="notice error" role="alert">
                 {dataState.error}
               </p>
             )}
-            {!divisionWinnersOpen && activeScenario === "stale-data" && (
+            {!divisionWinnersOpen && !watchingGames && activeScenario === "stale-data" && (
               <p className="notice" role="status">
                 Showing last-good data · updated 24 hours ago
               </p>
             )}
-            {!divisionWinnersOpen && activeScenario === "missing-data" && (
+            {!divisionWinnersOpen && !watchingGames && activeScenario === "missing-data" && (
               <p className="notice" role="status">
                 Some model data is unavailable. Picks and scores remain available.
               </p>
@@ -1442,6 +1446,13 @@ export default function App() {
                 </div>
               </section>
             )}
+            {watchingGames && (
+              <Suspense fallback={<p role="status">Opening Games to Watch…</p>}>
+                <GamesToWatch pool={pool} weekGames={games} loadingWeek={dataState.loading}
+                  scope={watchScope} onScope={setWatchScope} weights={watchWeights} onWeights={setWatchWeights}
+                  fixturePools={useFixtures ? loadedGamesByPool : null} />
+              </Suspense>
+            )}
             {tab === "admin" && isAdmin && (
               <AdminPanel
                 poolKey={poolKey}
@@ -1499,7 +1510,7 @@ export default function App() {
           </>
         )}
       </main>
-      <footer>
+      {!watchingGames && <footer>
         {divisionWinnersOpen && divisionStandingsStatus ? (
           <span data-testid="real-data-status">{divisionStandingsStatus}</span>
         ) : useFixtures ? (
@@ -1512,7 +1523,7 @@ export default function App() {
         ) : (
           "Loading"
         )}{" "}
-      </footer>
+      </footer>}
     </>
   );
 }

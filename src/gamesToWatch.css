@@ -1,0 +1,34 @@
+.watch-view { max-width: 100%; }
+.watch-controls, .watch-scope, .watch-progress { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+.watch-scope > span, .watch-season { color: var(--muted); font-size: .78rem; }
+.watch-segment { display: inline-flex; border: 1px solid var(--line); border-radius: .45rem; overflow: hidden; }
+.watch-segment button { border: 0; border-radius: 0; background: var(--surface); padding: .37rem .65rem; color: var(--muted); font-size: .75rem; }
+.watch-segment button + button { border-left: 1px solid var(--line); }
+.watch-segment button[aria-pressed='true'] { color: var(--ink); background: color-mix(in srgb, var(--accent) 20%, var(--surface)); box-shadow: inset 0 -2px var(--accent); }
+.watch-segment button:focus-visible { outline-offset: -3px; }
+.watch-settings { border-block: 1px solid var(--line); margin-block: .65rem .35rem; }
+.watch-settings summary { padding: .45rem 0; font-size: .78rem; cursor: pointer; }
+.watch-settings p, .watch-progress p, .watch-empty { margin: .3rem 0; font-size: .76rem; }
+.watch-weight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .4rem 1rem; padding: .2rem 0 .6rem; }
+.watch-weight-grid label { display: grid; gap: .15rem; font-size: .75rem; }
+.watch-weight-grid label span { display: flex; justify-content: space-between; }
+.watch-weight-grid input { width: 100%; margin: 0; accent-color: var(--accent); }
+.watch-progress button { padding: .18rem .45rem; font-size: .72rem; }
+.watch-ranking { margin-top: .35rem; }
+.watch-ranking th, .watch-ranking td { padding: .35rem .45rem; text-align: center; font-variant-numeric: tabular-nums; }
+.watch-ranking .watch-matchup { text-align: left; white-space: nowrap; }
+.watch-ranking tbody th { color: var(--ink); font-size: inherit; letter-spacing: normal; }
+.watch-ranking .watch-week small { display: block; font-size: .8em; }
+.watch-ranking .watch-overall, .watch-sort-arrow { color: var(--accent); font-weight: 750; }
+.watch-short-label { display: none; }
+
+@media (max-width: 620px) {
+  .watch-wide-label { display: none; }
+  .watch-short-label { display: inline; }
+  .watch-ranking { table-layout: fixed; }
+  .watch-ranking th, .watch-ranking td { padding: .38rem .13rem; white-space: normal; letter-spacing: 0; }
+  .watch-ranking thead th, .watch-ranking thead button { font-size: .6rem; }
+  .watch-ranking tbody td, .watch-ranking tbody th { font-size: .69rem; }
+  .watch-ranking thead .watch-week { width: 11%; }
+  .watch-ranking thead .watch-matchup { width: 25%; }
+}
