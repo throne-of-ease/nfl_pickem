@@ -43,9 +43,10 @@ function Harness({ weekly = [current, live], poolKey = 'week-11' }) {
     weekGames={weekly.map((game) => ({ ...game, kickoff: date(game), status: game.type === final ? 'final' : 'live', homeScore: 78, awayScore: 19 }))} />
 }
 
-function mockEspn(getSchedule, getSummary) {
+function mockEspn(getSchedule, getSummary, getFpi = () => new Response(null, { status: 503 })) {
   vi.stubGlobal('fetch', vi.fn((url, { signal }) => {
     const query = new URL(url)
+    if (query.pathname.endsWith('/powerindex')) return getFpi(query.searchParams.get('season'))
     return query.pathname.endsWith('/scoreboard') ? getSchedule(query) : getSummary(query.searchParams.get('event'), signal)
   }))
 }
@@ -67,6 +68,11 @@ describe('Games to Watch', () => {
     let holding = true
     const events = [canceled, live, ...[current, previous, ...history].reverse()].map(scoreboard)
     const schedule = vi.fn(() => json({ events }))
+    const teamFpi = Object.fromEntries(history.flatMap(({ home, away }) => [[home, 0], [away, 0]]))
+    Object.assign(teamFpi, { DAL: 4, PHI: 2, DET: -4, GB: -2 })
+    const fpi = vi.fn(() => json({ teams: Object.entries(teamFpi).map(([abbreviation, rating]) => ({
+      team: { abbreviation }, categories: [{ name: 'fpi', values: [rating] }],
+    })) }))
     mockEspn(schedule, (id, signal) => {
       calls.push(id)
       const game = [current, previous, ...history].find((event) => event.id === id)
@@ -75,10 +81,12 @@ describe('Games to Watch', () => {
         aborted.push(id)
         reject(signal.reason)
       }, { once: true }))
-    })
+    }, fpi)
     const view = render(<Harness />)
     expect(screen.getByRole('button', { name: 'Current Week' })).toHaveAttribute('aria-pressed', 'true')
     await screen.findByText('DAL @ PHI')
+    expect(screen.getByText('DAL @ PHI').closest('tr').lastElementChild).toHaveTextContent('65.0')
+    expect(fpi).toHaveBeenCalledWith('2026')
     expect(calls).toEqual([current.id])
     expect(schedule).not.toHaveBeenCalled()
     expect(screen.queryByText('SEA @ ARI')).not.toBeInTheDocument()
@@ -89,6 +97,7 @@ describe('Games to Watch', () => {
     switchTo('Full Season')
     expect(screen.getByText('DAL @ PHI')).toBeInTheDocument()
     expect(screen.getByText('DET @ GB')).toBeInTheDocument()
+    expect(screen.getByText('DET @ GB').closest('tr').lastElementChild).toHaveTextContent('35.0')
     await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 2 of 7 games · Rankings provisional'))
     expect(calls).toEqual(['100', '101', '102', '103', '104'])
     const swings = ranking().getByRole('button', { name: 'WP Swings' })
@@ -141,6 +150,18 @@ describe('Games to Watch', () => {
     await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 7 of 7 games'))
     expect(calls).toHaveLength(requestCount)
     expect(schedule).toHaveBeenCalledOnce()
+    expect(fpi).toHaveBeenCalledOnce()
+
+    const fpiCacheKey = Object.keys(localStorage).find((key) => key.endsWith(':fpi:2026'))
+    const saved = JSON.parse(localStorage.getItem(fpiCacheKey))
+    localStorage.setItem(fpiCacheKey, JSON.stringify({ ...saved, fetchedAt: 0 }))
+    teamFpi.DET = 6
+    switchTo('Current Week')
+    await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 1 of 1 games'))
+    switchTo('Full Season')
+    await waitFor(() => expect(screen.getByText('DET @ GB').closest('tr').lastElementChild).toHaveTextContent('60.0'))
+    expect(fpi).toHaveBeenCalledTimes(2)
+    expect(calls).toHaveLength(requestCount)
   })
 
   it('keeps cached rows visible and retries a failed schedule, a rate limit, and missing WP data', async () => {
@@ -156,6 +177,7 @@ describe('Games to Watch', () => {
     mockEspn(schedule, (id) => id === prior.id ? historySummary() : json(summary(weekly)))
     render(<Harness weekly={[weekly]} />)
     await screen.findByText('DAL @ PHI')
+    expect(screen.getByText('DAL @ PHI').closest('tr').lastElementChild).toHaveTextContent('—')
     switchTo('Full Season')
     await waitFor(() => expect(progress()).toHaveTextContent('ESPN schedule unavailable'))
     expect(screen.getByText('DAL @ PHI')).toBeInTheDocument()

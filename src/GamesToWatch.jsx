@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { POOLS } from './domain.js'
 import {
   DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, adjustWatchWeights, analyzeWatchGames, cachedWatchRatings,
-  cachedWatchSchedule, excitementScore, fetchWatchSchedule, mergeWatchGames, queueWatchRun, watchGame,
+  cachedWatchFpi, cachedWatchSchedule, excitementScore, fetchWatchSchedule, loadWatchFpi, mergeWatchGames,
+  queueWatchRun, watchGame, watchTeamQuality,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
@@ -12,7 +13,7 @@ const SCORING_NOTES = {
   uncertainty: 'Measures how close ESPN’s win probability stayed to 50% across the game, weighted by game-clock time. Games that stayed in doubt score higher.',
   swings: 'Adds up the part of each play-to-play probability change beyond 1.5 percentage points. This rewards turning points and comebacks. The rating reaches 100 at 250 cumulative percentage points.',
   suspense: 'Measures how close win probability stayed to 50% in the final five minutes of regulation and any overtime. Games that stayed in doubt near the end score higher.',
-  quality: 'Rewards matchups between stronger teams using their average pregame win rate. Ties count as half a win. A baseline of two wins and two losses reduces the influence of early results.',
+  quality: 'Rewards matchups between stronger teams. The app averages both teams’ ESPN FPI ratings and maps the average to 0–100. An average of 0 scores 50, and each FPI point changes the score by 5, with a floor of 0 and a ceiling of 100. The latest available FPI for the season also applies to past games, so their ratings can change as ESPN updates FPI.',
 }
 const completedGames = (games, poolKey) => games.flatMap((game) => {
   const item = ['final', 'post'].includes(game.status) ? watchGame(game, poolKey) : null
@@ -24,6 +25,7 @@ function initialRankings(season, weeklyGames) {
   return {
     games: weeklyGames ?? mergeWatchGames(cachedWatchSchedule(season)?.games ?? [], cachedRows.map(({ game }) => game)),
     byId: new Map(cachedRows.map(({ game, components }) => [game.id, components])),
+    fpi: cachedWatchFpi(season),
     loading: true,
     unavailable: 0,
     scheduleError: false,
@@ -52,6 +54,11 @@ function useRankings(season, weeklyKey, fixtureKey) {
           ...state, games, scheduleError: Boolean(schedule.error), rateLimited: schedule.error?.message === 'ESPN_RATE_LIMIT',
         }))
       }
+      if (games.length) {
+        const fpi = await loadWatchFpi(season, signal)
+        if (signal.aborted) return
+        setRankings((state) => ({ ...state, fpi }))
+      }
       const missing = games.filter(({ id }) => !initial.byId.has(id))
       await analyzeWatchGames(season, missing, signal, (id, row, rateLimited) => {
         setRankings((state) => row
@@ -71,9 +78,10 @@ function useRankings(season, weeklyKey, fixtureKey) {
   const games = JSON.parse(fixtureKey)
   const byId = new Map(games.map(({ id }) => {
     const index = Number(id.at(-1))
-    return [id, { uncertainty: 76 - 11 * index, swings: 25 + 10 * index, suspense: 18 + 12 * index, quality: 48 + 5 * index }]
+    return [id, { uncertainty: 76 - 11 * index, swings: 25 + 10 * index, suspense: 18 + 12 * index }]
   }))
-  return { games, byId, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
+  const fpi = new Map(games.flatMap(({ away, home }, index) => [[away, index - 2], [home, index - 1]]))
+  return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
 }
 
 function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }) {
@@ -87,10 +95,11 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }
       .map(({ key }) => completedGames(key === pool.key ? weekGames : fixturePools[key] ?? [], key))))
   }
   const weeklyKey = JSON.stringify(weeklyGames)
-  const { games, byId, loading, unavailable, scheduleError, rateLimited, retry } = useRankings(pool.espnSeason, weeklyKey, fixtureKey)
+  const { games, byId, fpi, loading, unavailable, scheduleError, rateLimited, retry } = useRankings(pool.espnSeason, weeklyKey, fixtureKey)
   const rows = games.flatMap((game) => {
-    const components = byId.get(game.id)
-    return components ? [{ game, ...components, overall: excitementScore(components, weights) }] : []
+    if (!byId.has(game.id)) return []
+    const components = { ...byId.get(game.id), quality: watchTeamQuality(game, fpi) }
+    return [{ game, ...components, overall: excitementScore(components, weights) }]
   }).sort((a, b) => {
     const left = a[sort.key]
     const right = b[sort.key]

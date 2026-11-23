@@ -1,5 +1,5 @@
 import { POOLS } from './domain.js'
-import { espnCalendarScoreboardUrl, espnSummaryUrl } from './espnAdapter.js'
+import { espnCalendarScoreboardUrl, espnSummaryUrl, fetchFpiRatings } from './espnAdapter.js'
 
 export const WATCH_COMPONENTS = [
   { key: 'uncertainty', label: 'Uncertainty', weight: 30 },
@@ -28,6 +28,7 @@ const CACHE_VERSION = 'nfl-pickem-watch-v1'
 const QUARTER = 15 * 60
 const REGULATION = 4 * QUARTER
 const SCOREBOARD_MAX_AGE = 2 * 60 * 1000
+const FPI_MAX_AGE = 60 * 60 * 1000
 const REQUEST_LIMIT = 3
 const newestFirst = (a, b) => b.kickoff.localeCompare(a.kickoff) || a.id.localeCompare(b.id)
 const completed = (type) => type?.state === 'post' && type.completed === true && /^STATUS_FINAL(?:_|$)/.test(type.name ?? '')
@@ -74,17 +75,11 @@ function elapsedSeconds(play, overtimeLength) {
   return start + length - remaining
 }
 
-function pregameStrength(team, opponent) {
-  const records = team?.record ?? team?.records
-  const record = Array.isArray(records) ? records.find(({ type }) => type === 'total')?.summary : null
-  const match = /^(\d+)-(\d+)(?:-(\d+))?$/.exec(record ?? '')
-  if (!match || typeof team.winner !== 'boolean' || typeof opponent?.winner !== 'boolean' || (team.winner && opponent.winner)) return null
-  // Remove this game's result from ESPN's postgame record and anchor early weeks at .500.
-  const wins = Number(match[1]) - Number(team.winner)
-  const losses = Number(match[2]) - Number(opponent.winner)
-  const ties = Number(match[3] ?? 0) - Number(!team.winner && !opponent.winner)
-  if (Math.min(wins, losses, ties) < 0) return null
-  return (wins + 0.5 * ties + 2) / (wins + losses + ties + 4)
+export function watchTeamQuality(game, ratings) {
+  const home = ratings.get(game.home)
+  const away = ratings.get(game.away)
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return null
+  return Math.max(0, Math.min(100, 50 + 5 * ((home + away) / 2)))
 }
 
 export function calculateWatchComponents(payload, game) {
@@ -119,13 +114,10 @@ export function calculateWatchComponents(payload, game) {
     swings += Math.max(0, Math.abs(point.wp - previous.wp) - 0.015)
     previous = point
   }
-  const strengths = [pregameStrength(home, away), pregameStrength(away, home)]
-  const quality = strengths.every(Number.isFinite) ? 50 * (strengths[0] + strengths[1]) : null
   return {
     uncertainty: 100 * uncertainty / end,
     swings: 100 * Math.min(1, swings / 2.5),
     suspense: 100 * suspense / (end - lateStart),
-    quality,
   }
 }
 
@@ -151,6 +143,23 @@ function writeCache(key, value) {
   } catch {
     return false
   }
+}
+
+const watchFpiKey = (season) => `${CACHE_VERSION}:fpi:${season}`
+export const cachedWatchFpi = (season) => new Map(readCache(watchFpiKey(season))?.ratings ?? [])
+
+export async function loadWatchFpi(season, signal) {
+  const key = watchFpiKey(season)
+  const cached = readCache(key)
+  if (cached?.ratings?.length && Date.now() - cached.fetchedAt < FPI_MAX_AGE) return new Map(cached.ratings)
+  try {
+    const { ratings } = await fetchFpiRatings({ season, signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]) })
+    if (ratings.size) {
+      writeCache(key, { fetchedAt: Date.now(), ratings: [...ratings] })
+      return ratings
+    }
+  } catch { /* Reuse the latest saved FPI during an ESPN outage. */ }
+  return new Map(cached?.ratings ?? [])
 }
 
 const ratingPrefix = (season) => `${CACHE_VERSION}:rating:${season}:`
