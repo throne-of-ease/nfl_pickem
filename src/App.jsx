@@ -330,7 +330,7 @@ export default function App() {
   const [profileDraft, setProfileDraft] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(() => params.get("tab") === "watch" ? "watch" : "overview");
   const [watchScope, setWatchScope] = useState("week");
   const [watchWeights, setWatchWeights] = useState();
   const [divisionWinnersOpen, setDivisionWinnersOpen] = useState(false);

@@ -1,5 +1,18 @@
 import { expect, test } from '@playwright/test'
 
+test('a Games to Watch link opens without rendering results', async ({ page }) => {
+  await page.addInitScript(() => {
+    const check = () => {
+      if (document.querySelector('.overview-table')) window.overviewRendered = true
+    }
+    new MutationObserver(check).observe(document, { childList: true, subtree: true })
+  })
+  await page.goto('/?tab=watch&scenario=stale-data&pool=week-02')
+  await expect(page.getByRole('table', { name: 'Games to Watch rankings' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Game overview' })).toHaveCount(0)
+  expect(await page.evaluate(() => Boolean(window.overviewRendered))).toBe(false)
+})
+
 test('Games to Watch fits the viewport and keeps weekly navigation available', async ({ page }) => {
   await page.goto('/?scenario=stale-data&pool=week-02')
   await page.getByRole('button', { name: 'Games to Watch', exact: true }).click()
