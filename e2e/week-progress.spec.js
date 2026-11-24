@@ -77,7 +77,7 @@ test('upcoming games can be hidden while remaining potential and live status sta
   await page.goto('/?scenario=live&pool=week-01')
   await page.getByRole('button', { name: 'Charts', exact: true }).click()
   const card = page.locator('.chart-card-week-progress')
-  await card.getByLabel('Week progress display mode').selectOption('potential')
+  await expect(card.getByLabel('Week progress display mode')).toHaveValue('potential')
   await card.getByLabel('Week progress include live games').check()
   await expect(card.locator('[data-game-status="UPCOMING"]')).toHaveCount(3)
   await expect(card.locator('[data-game-status="LIVE"]')).toHaveCount(1)
