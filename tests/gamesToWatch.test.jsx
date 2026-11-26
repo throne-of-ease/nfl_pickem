@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GamesToWatch from '../src/GamesToWatch.jsx'
 import { POOLS } from '../src/domain.js'
-import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchRootingTeam, watchTeamQuality } from '../src/watchRatings.js'
+import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchRootingTeam, watchSeasonRival, watchTeamQuality } from '../src/watchRatings.js'
 
 const final = { state: 'post', completed: true, name: 'STATUS_FINAL' }
 const current = { id: '100', week: 11, day: 16, away: 'DAL', home: 'PHI', type: final }
@@ -63,6 +63,16 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('uses overall standings order and picks the runner-up when the viewer leads', () => {
+    const entry = (id, name, points, remaining) => ({ id, name, cumulative: [points], remaining: [remaining] })
+    const users = [entry('low', 'A', 20, 40), entry('second', 'C', 30, 5),
+      entry('first', 'B', 30, 5), entry('fpi', 'Model', 100, 0), entry('third', 'D', 30, 0)]
+    const players = users.filter(({ id }) => id !== 'fpi')
+    expect(watchSeasonRival({ users }, players, 'low')).toBe('first')
+    expect(watchSeasonRival({ users }, players, 'first')).toBe('second')
+    expect(watchSeasonRival(null, players, 'low')).toBeUndefined()
+  })
+
   it('chooses the outcome that maximizes the viewer’s margin over rivals', () => {
     const game = { home: 'PHI', away: 'DAL' }
     const viewer = { team: 'PHI', confidence: 1 }

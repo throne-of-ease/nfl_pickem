@@ -10,6 +10,17 @@ export const WATCH_COMPONENTS = [
 
 export const DEFAULT_WATCH_WEIGHTS = Object.fromEntries(WATCH_COMPONENTS.map(({ key, weight }) => [key, weight]))
 
+export function watchSeasonRival(seasonHistory, players, viewerId) {
+  const rivals = new Set(players.filter(({ id }) => id !== viewerId).map(({ id }) => id))
+  // Match Standings: earned season points, then potential total, then name.
+  return seasonHistory?.users.filter(({ id }) => rivals.has(id)).sort((a, b) => {
+    const pointsA = a.cumulative.at(-1) ?? 0
+    const pointsB = b.cumulative.at(-1) ?? 0
+    return pointsB - pointsA || (b.remaining.at(-1) ?? 0) - (a.remaining.at(-1) ?? 0) ||
+      a.name.localeCompare(b.name)
+  })[0]?.id
+}
+
 export function watchRootingTeam(game, playerPick, otherPicks, gotw) {
   if (!playerPick || !otherPicks.length) return null
   const signedStake = ({ team, confidence }) => (team === game.home ? 1 : -1) * (confidence + (gotw ? 5 : 0))

@@ -3,7 +3,7 @@ import { POOLS } from './domain.js'
 import {
   DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, adjustWatchWeights, analyzeWatchGames, cachedWatchRatings,
   cachedWatchFpi, cachedWatchSchedule, excitementScore, fetchWatchSchedule, loadWatchFpi, mergeWatchGames,
-  queueWatchRun, watchGame, watchRootingTeam, watchTeamQuality,
+  queueWatchRun, watchGame, watchRootingTeam, watchSeasonRival, watchTeamQuality,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
@@ -96,7 +96,7 @@ function useRankings(season, weeklyKey, fixtureKey) {
   return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
 }
 
-function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool }) {
+function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool, rootingRivalId, useSeasonLeader }) {
   const fullSeason = scope === 'season'
   const [sort, setSort] = useState({ key: 'overall', direction: 'descending' })
   const weeklyGames = fullSeason ? null : mergeWatchGames(completedGames(weekGames, pool.key))
@@ -137,6 +137,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
   }))
   const dense = showRooting || (showPicks && pickColumns.length > 0)
   const viewerIndex = pickColumns.findIndex(({ id }) => id === viewerId)
+  const rootingRivalIndex = pickColumns.findIndex(({ id }) => id === rootingRivalId)
   const now = Date.now()
   return <>
     <div className="watch-progress">
@@ -177,7 +178,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
                 Number.isInteger(pick.confidence) && pick.confidence > 0 ? pick : null
             })
             const rootingTeam = showRooting ? watchRootingTeam(game, picks[viewerIndex],
-              picks.filter((pick, index) => pick && index !== viewerIndex),
+              picks.filter((pick, index) => pick && index !== viewerIndex && (!useSeasonLeader || index === rootingRivalIndex)),
               gamesByPool[game.poolKey]?.find(({ id }) => id === game.id)?.gotw) : null
             return <tr key={row.game.id}>
               {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
@@ -201,11 +202,13 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
   </>
 }
 
-export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, viewerId, gamesByPool = {}, ...rankingProps }) {
+export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, viewerId, gamesByPool = {}, seasonHistory, ...rankingProps }) {
   const weightEdit = useRef(null)
   const [weightDraft, setWeightDraft] = useState(null)
   const [showPicks, setShowPicks] = useState(false)
   const [showRooting, setShowRooting] = useState(false)
+  const [useSeasonLeader, setUseSeasonLeader] = useState(false)
+  const rootingRivalId = showRooting && useSeasonLeader ? watchSeasonRival(seasonHistory, players, viewerId) : undefined
   const changeWeight = (key, percentage) => {
     if (percentage === weights[key]) return
     // Keep the earlier proportions while editing the same weight, even at 100%.
@@ -236,6 +239,10 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
         <input type="checkbox" checked={showRooting} onChange={(event) => setShowRooting(event.target.checked)} />
         Show rooting guide
       </label>
+      {showRooting && <label className="watch-show-picks">
+        <input type="checkbox" checked={useSeasonLeader} onChange={(event) => setUseSeasonLeader(event.target.checked)} />
+        Compare with season leader
+      </label>}
     </div>
     <details className="watch-settings">
       <summary>Scoring Settings</summary>
@@ -275,12 +282,15 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
     </details>
     <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights}
       players={showPicks || showRooting ? players : []} picksByPlayer={picksByPlayer}
-      showPicks={showPicks} showRooting={showRooting} viewerId={viewerId} gamesByPool={gamesByPool} {...rankingProps} />
+      showPicks={showPicks} showRooting={showRooting} viewerId={viewerId} gamesByPool={gamesByPool}
+      useSeasonLeader={useSeasonLeader} rootingRivalId={rootingRivalId} {...rankingProps} />
     <section className="watch-notes" aria-labelledby="watch-scoring-title">
       <h3 id="watch-scoring-title">How the rankings work</h3>
       <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>
       <p>Both sums use components with available scores. The overall score is unavailable if their weights total zero.</p>
-      {showRooting && <p><strong>Root for</strong> compares two hypothetical winners. It picks the team that gives you the better points margin over the average of other players with a pick. Stakes include the Game of the Week bonus. A dash means the margins are equal or there are too few picks to compare.</p>}
+      {showRooting && <p><strong>Root for</strong> compares two hypothetical winners and shows which gives you the better points margin. {useSeasonLeader
+        ? 'The benchmark is the highest-ranked other player in the current overall standings. If you lead, it uses the next player.'
+        : 'The benchmark is the average of other players with a pick.'} Stakes include the Game of the Week bonus. A dash means the margins are equal or a required pick or ranking is unavailable.</p>}
       <p>For the win probability formulas, pᵢ is ESPN’s home win probability at the start of a game-clock interval, on a 0–1 scale. Closeness is <span className="watch-formula">Cᵢ = 1 − 2 × |pᵢ − 0.5|</span>. The opening probability applies from kickoff and each value carries forward until the next timed update. The clock ends at the later of 60 minutes or the last timed probability update.</p>
       <dl>
         {WATCH_COMPONENTS.map(({ key, label }) => <div key={key}>

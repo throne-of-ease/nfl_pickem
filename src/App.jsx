@@ -1451,6 +1451,7 @@ export default function App() {
                 <GamesToWatch pool={pool} weekGames={games} loadingWeek={dataState.loading}
                   scope={watchScope} onScope={setWatchScope} weights={watchWeights} onWeights={setWatchWeights}
                   players={appUsers} picksByPlayer={normalPicksByUser} viewerId={userId} gamesByPool={chartGamesByPool}
+                  seasonHistory={useFixtures || chartData ? chartHistory : null}
                   fixturePools={useFixtures ? loadedGamesByPool : null} />
               </Suspense>
             )}
