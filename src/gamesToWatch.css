@@ -29,6 +29,7 @@ th.watch-pick-column { text-transform: none; letter-spacing: 0; }
 .watch-pick-column span, .watch-pick-column b { display: block; }
 .watch-ranking td.watch-root-column { color: var(--accent); font-weight: 750; }
 .watch-ranking .watch-matchup { text-align: left; white-space: nowrap; }
+.watch-ranking .watch-rank { width: 2rem; padding-inline: .1rem; white-space: nowrap; }
 .watch-ranking tbody th { color: var(--ink); font-size: inherit; letter-spacing: normal; }
 .watch-ranking .watch-week small { display: block; font-size: .8em; }
 .watch-live-label { display: block; color: var(--accent); font-size: .75em; }
@@ -50,6 +51,7 @@ th.watch-pick-column { text-transform: none; letter-spacing: 0; }
   .watch-ranking thead th, .watch-ranking thead button { font-size: .6rem; }
   .watch-ranking tbody td, .watch-ranking tbody th { font-size: .69rem; }
   .watch-ranking thead .watch-week { width: 11%; }
+  .watch-ranking .watch-rank { width: 1.25rem; font-size: .58rem; }
   .watch-ranking thead .watch-matchup { width: 25%; }
   .watch-ranking-dense thead .watch-week { width: 8%; }
   .watch-ranking-dense thead .watch-matchup { width: 13%; }

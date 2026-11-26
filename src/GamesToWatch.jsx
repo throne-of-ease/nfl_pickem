@@ -189,6 +189,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
       <table className={dense ? 'watch-ranking watch-ranking-dense' : 'watch-ranking'} aria-label="Games to Watch rankings">
         <thead>
           <tr>
+            <th scope="col" className="watch-rank" aria-label="Rank">#</th>
             {fullSeason && <th scope="col" className="watch-week">Week</th>}
             <th scope="col" className="watch-matchup">Matchup</th>
             {SCORES.map(({ key, label }) => <th key={key} scope="col" aria-sort={sort.key === key ? sort.direction : undefined}>
@@ -204,7 +205,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const { game } = row
             const gamePool = fullSeason ? POOLS.find(({ key }) => key === game.poolKey) : pool
             const picks = pickColumns.map((column) => {
@@ -216,6 +217,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
               picks.filter((pick, index) => pick && index !== viewerIndex && (!useSeasonLeader || index === rootingRivalIndex)),
               gamesByPool[game.poolKey]?.find(({ id }) => id === game.id)?.gotw) : null
             return <tr key={row.game.id}>
+              <td className="watch-rank">{index + 1}</td>
               {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
               <th scope="row" className="watch-matchup">{game.away} @ {game.home}{game.live && <small className="watch-live-label">Live</small>}</th>
               {SCORES.map(({ key }) => <td className={key === 'overall' ? 'watch-overall' : undefined} key={key}>{row[key]?.toFixed(1) ?? '—'}</td>)}
