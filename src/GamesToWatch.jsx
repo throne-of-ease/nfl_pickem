@@ -27,16 +27,19 @@ const SCORING_NOTES = {
     description: 'Rewards matchups between stronger teams. The latest ESPN FPI for the season also applies to past games, so this rating can change. Both teams need an FPI rating.',
   },
 }
-const completedGames = (games, poolKey) => games.flatMap((game) => {
-  const item = ['final', 'post'].includes(game.status) ? watchGame(game, poolKey) : null
+const LIVE_REFRESH_MS = 30_000
+const startedGames = (games, poolKey) => games.flatMap((game) => {
+  const item = ['final', 'post', 'live', 'in'].includes(game.status) ? watchGame(game, poolKey) : null
   return item ? [item] : []
 })
 
 function initialRankings(season, weeklyGames) {
   const cachedRows = cachedWatchRatings(season, weeklyGames)
+  const byId = new Map(cachedRows.map(({ game, components }) => [game.id, components]))
+  const games = weeklyGames ?? mergeWatchGames(cachedWatchSchedule(season)?.games ?? [], cachedRows.map(({ game }) => game))
   return {
-    games: weeklyGames ?? mergeWatchGames(cachedWatchSchedule(season)?.games ?? [], cachedRows.map(({ game }) => game)),
-    byId: new Map(cachedRows.map(({ game, components }) => [game.id, components])),
+    games: games.map((game) => game.live && byId.has(game.id) ? { ...game, live: false } : game),
+    byId,
     fpi: cachedWatchFpi(season),
     loading: true,
     unavailable: 0,
@@ -45,7 +48,7 @@ function initialRankings(season, weeklyGames) {
   }
 }
 
-function useRankings(season, weeklyKey, fixtureKey) {
+function useRankings(season, weeklyKey, liveKey, fixtureKey) {
   const [request, setRequest] = useState({ id: 0, refreshSchedule: false })
   const [rankings, setRankings] = useState(() => initialRankings(season, JSON.parse(weeklyKey)))
 
@@ -53,6 +56,8 @@ function useRankings(season, weeklyKey, fixtureKey) {
     if (fixtureKey) return
     const controller = new AbortController()
     const { signal } = controller
+    let liveTimer
+    let historyLoaded = false
     const weeklyGames = JSON.parse(weeklyKey)
     const initial = initialRankings(season, weeklyGames)
     setRankings(initial)
@@ -61,7 +66,8 @@ function useRankings(season, weeklyKey, fixtureKey) {
       if (weeklyGames === null) {
         const schedule = await fetchWatchSchedule(season, signal, request.refreshSchedule)
         if (signal.aborted) return
-        games = mergeWatchGames(initial.games, schedule.games)
+        games = mergeWatchGames(initial.games, JSON.parse(liveKey), schedule.games)
+          .map((game) => game.live && initial.byId.has(game.id) ? { ...game, live: false } : game)
         setRankings((state) => ({
           ...state, games, scheduleError: Boolean(schedule.error), rateLimited: schedule.error?.message === 'ESPN_RATE_LIMIT',
         }))
@@ -71,18 +77,42 @@ function useRankings(season, weeklyKey, fixtureKey) {
         if (signal.aborted) return
         setRankings((state) => ({ ...state, fpi }))
       }
-      const missing = games.filter(({ id }) => !initial.byId.has(id))
-      await analyzeWatchGames(season, missing, signal, (id, row, rateLimited) => {
+      let live = games.filter((game) => game.live && !initial.byId.has(game.id))
+      const updateLive = async () => {
+        if (signal.aborted || !live.length) return
+        if (historyLoaded) {
+          const fpi = await loadWatchFpi(season, signal)
+          if (signal.aborted) return
+          setRankings((state) => ({ ...state, fpi }))
+        }
+        await analyzeWatchGames(season, live, signal, (id, row) => {
+          if (!row) return
+          if (!row.game.live) live = live.filter((game) => game.id !== id)
+          setRankings((state) => ({
+            ...state,
+            games: row.game.live ? state.games : state.games.map((game) => game.id === id ? row.game : game),
+            byId: new Map(state.byId).set(id, row.components),
+          }))
+        }, 1)
+        if (!signal.aborted && live.length) liveTimer = setTimeout(updateLive, LIVE_REFRESH_MS)
+      }
+      const liveIds = new Set(live.map(({ id }) => id))
+      const missing = games.filter(({ id }) => !initial.byId.has(id) && !liveIds.has(id))
+      await Promise.all([updateLive(), analyzeWatchGames(season, missing, signal, (id, row, rateLimited) => {
         setRankings((state) => row
           ? { ...state, byId: new Map(state.byId).set(id, row.components) }
           : { ...state, unavailable: state.unavailable + 1, rateLimited: state.rateLimited || rateLimited })
-      })
+      }, live.length ? 2 : 3)])
+      historyLoaded = true
       if (!signal.aborted) setRankings((state) => ({ ...state, loading: false }))
     }).catch(() => {
       if (!signal.aborted) setRankings((state) => ({ ...state, loading: false, scheduleError: true }))
     })
-    return () => controller.abort()
-  }, [season, weeklyKey, request, fixtureKey])
+    return () => {
+      controller.abort()
+      clearTimeout(liveTimer)
+    }
+  }, [season, weeklyKey, liveKey, request, fixtureKey])
 
   const retry = () => setRequest(({ id }) => ({ id: id + 1, refreshSchedule: rankings.scheduleError }))
   if (!fixtureKey) return { ...rankings, retry }
@@ -99,19 +129,21 @@ function useRankings(season, weeklyKey, fixtureKey) {
 function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool, rootingRivalId, useSeasonLeader }) {
   const fullSeason = scope === 'season'
   const [sort, setSort] = useState({ key: 'overall', direction: 'descending' })
-  const weeklyGames = fullSeason ? null : mergeWatchGames(completedGames(weekGames, pool.key))
+  const weeklyGames = fullSeason ? null : mergeWatchGames(startedGames(weekGames, pool.key))
+  const liveKey = JSON.stringify(fullSeason ? Object.entries(gamesByPool)
+    .flatMap(([key, games]) => startedGames(games, key).filter((game) => game.live)) : [])
   let fixtureKey = null
   if (fixturePools) {
     const seasonPools = POOLS.filter((item) => item.espnSeason === pool.espnSeason && item.countsTowardSeason)
     fixtureKey = JSON.stringify(weeklyGames ?? mergeWatchGames(...seasonPools
-      .map(({ key }) => completedGames(key === pool.key ? weekGames : fixturePools[key] ?? [], key))))
+      .map(({ key }) => startedGames(key === pool.key ? weekGames : fixturePools[key] ?? [], key))))
   }
   const weeklyKey = JSON.stringify(weeklyGames)
-  const { games, byId, fpi, loading, unavailable, scheduleError, rateLimited, retry } = useRankings(pool.espnSeason, weeklyKey, fixtureKey)
+  const { games, byId, fpi, loading, unavailable, scheduleError, rateLimited, retry } = useRankings(pool.espnSeason, weeklyKey, liveKey, fixtureKey)
   const rows = games.flatMap((game) => {
-    if (!byId.has(game.id)) return []
+    if (!byId.has(game.id) && !game.live) return []
     const components = { ...byId.get(game.id), quality: watchTeamQuality(game, fpi) }
-    return [{ game, ...components, overall: excitementScore(components, weights) }]
+    return [{ game, ...components, overall: byId.has(game.id) ? excitementScore(components, weights) : null }]
   }).sort((a, b) => {
     const left = a[sort.key]
     const right = b[sort.key]
@@ -122,10 +154,12 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
   })
 
   const waiting = loading || (!fullSeason && loadingWeek)
-  const provisional = waiting || scheduleError || rows.length < games.length
+  const analyzed = games.filter(({ id }) => byId.has(id)).length
+  const liveCount = games.filter((game) => game.live).length
+  const provisional = waiting || scheduleError || analyzed < games.length || liveCount > 0
   const progress = fullSeason && (waiting || scheduleError) && !games.length
-    ? 'Checking completed games…'
-    : `Analyzed ${rows.length} of ${games.length} games`
+    ? 'Checking games…'
+    : `Analyzed ${analyzed} of ${games.length} games`
   const changeSort = (key) => setSort((current) => ({
     key, direction: current.key === key && current.direction === 'descending' ? 'ascending' : 'descending',
   }))
@@ -143,6 +177,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
     <div className="watch-progress">
       <p role="status">
         {progress}
+        {liveCount > 0 && ` · ${liveCount} live`}
         {provisional && ' · Rankings provisional'}
         {scheduleError && ' · ESPN schedule unavailable'}
         {unavailable > 0 && ` · ${unavailable} unavailable`}
@@ -182,7 +217,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
               gamesByPool[game.poolKey]?.find(({ id }) => id === game.id)?.gotw) : null
             return <tr key={row.game.id}>
               {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
-              <th scope="row" className="watch-matchup">{game.away} @ {game.home}</th>
+              <th scope="row" className="watch-matchup">{game.away} @ {game.home}{game.live && <small className="watch-live-label">Live</small>}</th>
               {SCORES.map(({ key }) => <td className={key === 'overall' ? 'watch-overall' : undefined} key={key}>{row[key]?.toFixed(1) ?? '—'}</td>)}
               {showRooting && <td className="watch-root-column" aria-label={rootingTeam ? `Root for ${rootingTeam}` : 'No rooting edge'}>
                 {rootingTeam ?? '—'}
@@ -198,7 +233,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
           })}
         </tbody>
       </table>
-    </div> : !waiting && !scheduleError && <p className="watch-empty">{games.length ? 'No ratings are currently available.' : 'No completed games yet.'}</p>}
+    </div> : !waiting && !scheduleError && <p className="watch-empty">{games.length ? 'No ratings are currently available.' : 'No games in progress or completed yet.'}</p>}
   </>
 }
 
@@ -288,10 +323,11 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
       <h3 id="watch-scoring-title">How the rankings work</h3>
       <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>
       <p>Both sums use components with available scores. The overall score is unavailable if their weights total zero.</p>
+      <p>Live ratings refresh about every 30 seconds as ESPN publishes win probabilities. They use the game clock through the latest timed update. Late-Game Suspense becomes available once there is win probability data inside the last five minutes. Team Quality uses the latest available season FPI.</p>
       {showRooting && <p><strong>Root for</strong> compares two hypothetical winners and shows which gives you the better points margin. {useSeasonLeader
         ? 'The benchmark is the highest-ranked other player in the current overall standings. If you lead, it uses the next player.'
         : 'The benchmark is the average of other players with a pick.'} Stakes include the Game of the Week bonus. A dash means the margins are equal or a required pick or ranking is unavailable.</p>}
-      <p>For the win probability formulas, pᵢ is ESPN’s home win probability at the start of a game-clock interval, on a 0–1 scale. Closeness is <span className="watch-formula">Cᵢ = 1 − 2 × |pᵢ − 0.5|</span>. The opening probability applies from kickoff and each value carries forward until the next timed update. The clock ends at the later of 60 minutes or the last timed probability update.</p>
+      <p>For the win probability formulas, pᵢ is ESPN’s home win probability at the start of a game-clock interval, on a 0–1 scale. Closeness is <span className="watch-formula">Cᵢ = 1 − 2 × |pᵢ − 0.5|</span>. The opening probability applies from kickoff and each value carries forward until the next timed update. For completed games, the clock ends at the later of 60 minutes or the last timed probability update.</p>
       <dl>
         {WATCH_COMPONENTS.map(({ key, label }) => <div key={key}>
           <dt>{label}</dt>

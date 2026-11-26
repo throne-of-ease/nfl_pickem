@@ -52,12 +52,13 @@ const FPI_MAX_AGE = 60 * 60 * 1000
 const REQUEST_LIMIT = 3
 const newestFirst = (a, b) => b.kickoff.localeCompare(a.kickoff) || a.id.localeCompare(b.id)
 const completed = (type) => type?.state === 'post' && type.completed === true && /^STATUS_FINAL(?:_|$)/.test(type.name ?? '')
+const active = (type) => type?.state === 'in' && !type.completed && !/SUSPEND|DELAY|POSTPON/.test(type.name ?? '')
 const swingScore = (total) => -100 * Math.expm1(-total / 2.5)
 
 export function watchGame(game, poolKey) {
-  const { id, away, home, kickoff } = game
+  const { id, away, home, kickoff, status } = game
   if (!id || !away || !home || !Number.isFinite(Date.parse(kickoff))) return null
-  return { id: String(id), away, home, kickoff: new Date(kickoff).toISOString(), poolKey }
+  return { id: String(id), away, home, kickoff: new Date(kickoff).toISOString(), poolKey, live: ['live', 'in'].includes(status) }
 }
 
 export function mergeWatchGames(...lists) {
@@ -67,7 +68,8 @@ export function mergeWatchGames(...lists) {
 function seasonGames(payload, season) {
   if (!Array.isArray(payload?.events)) throw new Error('Invalid ESPN scoreboard')
   return payload.events.flatMap((event) => {
-    if (event.season?.year !== season || !completed(event.status?.type)) return []
+    const type = event.status?.type
+    if (event.season?.year !== season || (!completed(type) && !active(type))) return []
     const competition = event.competitions?.[0]
     // ESPN also lists the Super Bowl as postseason week 4 on its calendar scoreboard.
     const isSuperBowl = event.season.type === 3 && competition?.notes?.some(({ headline }) => /^super bowl\b/i.test(headline ?? ''))
@@ -78,6 +80,7 @@ function seasonGames(payload, season) {
     const game = watchGame({
       id: event.id,
       kickoff: event.date,
+      status: active(type) ? 'live' : 'final',
       away: teams.find(({ homeAway }) => homeAway === 'away')?.team?.abbreviation,
       home: teams.find(({ homeAway }) => homeAway === 'home')?.team?.abbreviation,
     }, pool.key)
@@ -109,20 +112,23 @@ export function calculateWatchComponents(payload, game) {
   const teams = competition?.competitors ?? []
   const home = teams.find(({ homeAway }) => homeAway === 'home')
   const away = teams.find(({ homeAway }) => homeAway === 'away')
-  if (!completed(competition?.status?.type) || home?.team?.abbreviation !== game.home || away?.team?.abbreviation !== game.away) return null
-  if (!Array.isArray(data.winprobability) || !Array.isArray(data.drives?.previous)) return null
+  const type = competition?.status?.type
+  const isFinal = completed(type)
+  if ((!isFinal && !active(type)) || home?.team?.abbreviation !== game.home || away?.team?.abbreviation !== game.away) return null
+  if (!Array.isArray(data.winprobability)) return null
 
   const overtimeLength = POOLS.find(({ key }) => key === game.poolKey)?.phase === 'postseason' ? QUARTER : 10 * 60
-  const clockByPlay = new Map(data.drives.previous.flatMap(({ plays }) => plays ?? []).map((play) => [String(play.id), elapsedSeconds(play, overtimeLength)]))
+  const drives = [...(data.drives?.previous ?? []), data.drives?.current]
+  const clockByPlay = new Map(drives.flatMap((drive) => drive?.plays ?? []).map((play) => [String(play.id), elapsedSeconds(play, overtimeLength)]))
   const opening = data.winprobability[0]?.homeWinPercentage
   const points = data.winprobability.flatMap(({ playId, homeWinPercentage: wp }) => {
     const time = clockByPlay.get(String(playId))
     return time != null && Number.isFinite(wp) && wp >= 0 && wp <= 1 ? [{ time, wp }] : []
   }).sort((a, b) => a.time - b.time)
-  if (points.length < 2 || points[0].time > QUARTER || points.at(-1).time < REGULATION - 120) return null
+  if (!points.length || points[0].time > QUARTER || (isFinal && (points.length < 2 || points.at(-1).time < REGULATION - 120))) return null
 
   const first = Number.isFinite(opening) && opening >= 0 && opening <= 1 ? opening : points[0].wp
-  const end = Math.max(REGULATION, points.at(-1).time)
+  const end = isFinal ? Math.max(REGULATION, points.at(-1).time) : points.at(-1).time
   const lateStart = REGULATION - 5 * 60
   let previous = { time: 0, wp: first }
   let uncertainty = 0
@@ -136,9 +142,9 @@ export function calculateWatchComponents(payload, game) {
     previous = point
   }
   return {
-    uncertainty: 100 * uncertainty / end,
+    uncertainty: end > 0 ? 100 * uncertainty / end : null,
     swings: swingScore(swings),
-    suspense: 100 * suspense / (end - lateStart),
+    suspense: end > lateStart ? 100 * suspense / (end - lateStart) : null,
   }
 }
 
@@ -248,7 +254,7 @@ async function espnJson(url, signal) {
   for (let attempt = 0; attempt < 2; attempt++) {
     await waitForEspn(signal)
     signal.throwIfAborted()
-    const response = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]) })
+    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]) })
     if (response.ok) return response.json()
     if (response.status !== 429) throw new Error(`ESPN_HTTP_${response.status}`)
     const header = response.headers.get('Retry-After')
@@ -279,7 +285,7 @@ export function queueWatchRun(signal, run) {
   return activeRun
 }
 
-export async function analyzeWatchGames(season, games, signal, onResult) {
+export async function analyzeWatchGames(season, games, signal, onResult, concurrency = REQUEST_LIMIT) {
   let next = 0
   async function worker() {
     while (!signal.aborted && next < games.length) {
@@ -287,15 +293,17 @@ export async function analyzeWatchGames(season, games, signal, onResult) {
       let row = null
       let rateLimited = false
       try {
-        const components = calculateWatchComponents(await espnJson(espnSummaryUrl(game.id), signal), game)
-        if (components) row = { game, components }
+        const payload = await espnJson(espnSummaryUrl(game.id), signal)
+        const components = calculateWatchComponents(payload, game)
+        const type = (payload?.gamepackageJSON ?? payload)?.header?.competitions?.[0]?.status?.type
+        if (components) row = { game: { ...game, live: active(type) }, components }
       } catch (error) {
         rateLimited = error.message === 'ESPN_RATE_LIMIT'
       }
       if (signal.aborted) return
-      if (row) cacheWatchRating(season, row)
+      if (row && !row.game.live) cacheWatchRating(season, row)
       onResult(game.id, row, rateLimited)
     }
   }
-  await Promise.all(Array.from({ length: Math.min(REQUEST_LIMIT, games.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(concurrency, games.length) }, worker))
 }

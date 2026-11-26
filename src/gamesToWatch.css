@@ -31,6 +31,7 @@ th.watch-pick-column { text-transform: none; letter-spacing: 0; }
 .watch-ranking .watch-matchup { text-align: left; white-space: nowrap; }
 .watch-ranking tbody th { color: var(--ink); font-size: inherit; letter-spacing: normal; }
 .watch-ranking .watch-week small { display: block; font-size: .8em; }
+.watch-live-label { display: block; color: var(--accent); font-size: .75em; }
 .watch-ranking .watch-overall, .watch-sort-arrow { color: var(--accent); font-weight: 750; }
 .watch-short-label { display: none; }
 .watch-notes { margin-top: 1rem; padding-top: .65rem; border-top: 1px solid var(--line); font-size: .8rem; line-height: 1.45; }

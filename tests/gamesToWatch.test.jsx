@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GamesToWatch from '../src/GamesToWatch.jsx'
 import { POOLS } from '../src/domain.js'
@@ -37,7 +37,7 @@ const summary = (game) => {
   }
 }
 
-function Harness({ weekly = [current, live], poolKey = 'week-11' }) {
+function Harness({ weekly = [current], poolKey = 'week-11' }) {
   const [scope, setScope] = useState('week')
   const [weights, setWeights] = useState()
   return <GamesToWatch pool={POOLS.find(({ key }) => key === poolKey)} scope={scope} onScope={setScope} weights={weights} onWeights={setWeights}
@@ -63,6 +63,44 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('refreshes live ratings through completion and only caches the final', async () => {
+    const timers = vi.spyOn(globalThis, 'setTimeout')
+    const early = summary(live)
+    early.drives.current = { plays: early.drives.previous[0].plays.slice(0, 2) }
+    early.drives.previous = []
+    early.winprobability = early.winprobability.slice(0, 2)
+    const later = summary(live)
+    later.drives.previous[0].plays.pop()
+    later.winprobability.pop()
+    const fetchSummary = vi.fn()
+      .mockImplementationOnce(() => json(early))
+      .mockImplementationOnce(() => json(later))
+      .mockImplementation(() => json(summary({ ...live, type: final })))
+    mockEspn(() => json({ events: [scoreboard(live)] }), fetchSummary)
+    const view = render(<Harness weekly={[live]} />)
+    const cell = (index) => screen.getByText('SEA @ ARI').closest('tr').cells[index].textContent
+    await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 1 of 1 games · 1 live'))
+    expect(cell(4)).toBe('—')
+    const earlySwings = cell(3)
+    expect(cachedWatchRatings(2026, [live])).toEqual([])
+    const tick = async () => {
+      const [refresh] = timers.mock.calls.filter(([, delay]) => delay === 30_000).at(-1)
+      await act(async () => { await refresh() })
+    }
+    await tick()
+    expect(cell(3)).not.toBe(earlySwings)
+    expect(cell(4)).not.toBe('—')
+    await tick()
+    expect(screen.queryByText('Live', { exact: true })).not.toBeInTheDocument()
+    expect(cachedWatchRatings(2026, [live])).toHaveLength(1)
+    view.unmount()
+    render(<Harness weekly={[]} />)
+    switchTo('Full Season')
+    await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 1 of 1 games'))
+    expect(screen.queryByText('Live', { exact: true })).not.toBeInTheDocument()
+    expect(fetchSummary).toHaveBeenCalledTimes(3)
+  })
+
   it('uses overall standings order and picks the runner-up when the viewer leads', () => {
     const entry = (id, name, points, remaining) => ({ id, name, cumulative: [points], remaining: [remaining] })
     const users = [entry('low', 'A', 20, 40), entry('second', 'C', 30, 5),
@@ -119,7 +157,7 @@ describe('Games to Watch', () => {
     const calls = []
     const aborted = []
     let holding = true
-    const events = [canceled, live, ...[current, previous, ...history].reverse()].map(scoreboard)
+    const events = [canceled, ...[current, previous, ...history].reverse()].map(scoreboard)
     const schedule = vi.fn(() => json({ events }))
     const teamFpi = Object.fromEntries(history.flatMap(({ home, away }) => [[home, 0], [away, 0]]))
     Object.assign(teamFpi, { DAL: 4, PHI: 2, DET: -4, GB: -2 })
