@@ -96,7 +96,7 @@ function useRankings(season, weeklyKey, fixtureKey) {
   return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
 }
 
-function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }) {
+function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer }) {
   const fullSeason = scope === 'season'
   const [sort, setSort] = useState({ key: 'overall', direction: 'descending' })
   const weeklyGames = fullSeason ? null : mergeWatchGames(completedGames(weekGames, pool.key))
@@ -130,6 +130,13 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }
     key, direction: current.key === key && current.direction === 'descending' ? 'ascending' : 'descending',
   }))
 
+  const pickColumns = players.map((player) => ({
+    ...player,
+    picks: new Map(Object.entries(picksByPlayer[player.id] ?? {}).flatMap(([poolKey, picks]) =>
+      picks.map((pick) => [`${poolKey}:${pick.gameId}`, pick]))),
+  }))
+  const hasPicks = pickColumns.length > 0
+  const now = Date.now()
   return <>
     <div className="watch-progress">
       <p role="status">
@@ -141,36 +148,53 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools }
       </p>
       {!waiting && (scheduleError || unavailable > 0) && <button type="button" onClick={retry}>Retry</button>}
     </div>
-    {rows.length ? <table className="watch-ranking" aria-label="Games to Watch rankings">
-      <thead>
-        <tr>
-          {fullSeason && <th scope="col" className="watch-week">Week</th>}
-          <th scope="col" className="watch-matchup">Matchup</th>
-          {SCORES.map(({ key, label }) => <th key={key} scope="col" aria-sort={sort.key === key ? sort.direction : undefined}>
-            <button type="button" className="table-sort-button" aria-label={label} onClick={() => changeSort(key)}>
-              <span className="watch-wide-label">{label}</span><span className="watch-short-label">{SHORT_LABELS[key]}</span>
-              {sort.key === key && <span className="watch-sort-arrow" aria-hidden="true">{sort.direction === 'descending' ? ' ↓' : ' ↑'}</span>}
-            </button>
-          </th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => {
-          const gamePool = fullSeason ? POOLS.find(({ key }) => key === row.game.poolKey) : pool
-          return <tr key={row.game.id}>
-            {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
-            <th scope="row" className="watch-matchup">{row.game.away} @ {row.game.home}</th>
-            {SCORES.map(({ key }) => <td className={key === 'overall' ? 'watch-overall' : undefined} key={key}>{row[key]?.toFixed(1) ?? '—'}</td>)}
+    {rows.length ? <div className={hasPicks ? 'watch-table-scroll' : undefined} role={hasPicks ? 'region' : undefined}
+      aria-label={hasPicks ? 'Scrollable rankings and player picks' : undefined} tabIndex={hasPicks ? 0 : undefined}>
+      <table className={hasPicks ? 'watch-ranking watch-ranking-with-picks' : 'watch-ranking'} aria-label="Games to Watch rankings">
+        <thead>
+          <tr>
+            {fullSeason && <th scope="col" className="watch-week">Week</th>}
+            <th scope="col" className="watch-matchup">Matchup</th>
+            {SCORES.map(({ key, label }) => <th key={key} scope="col" aria-sort={sort.key === key ? sort.direction : undefined}>
+              <button type="button" className="table-sort-button" aria-label={label} onClick={() => changeSort(key)}>
+                <span className="watch-wide-label">{label}</span><span className="watch-short-label">{SHORT_LABELS[key]}</span>
+                {sort.key === key && <span className="watch-sort-arrow" aria-hidden="true">{sort.direction === 'descending' ? ' ↓' : ' ↑'}</span>}
+              </button>
+            </th>)}
+            {pickColumns.map(({ id, name }) => <th key={id} scope="col" className="watch-pick-column" title={name}>
+              <span>{name}</span>
+            </th>)}
           </tr>
-        })}
-      </tbody>
-    </table> : !waiting && !scheduleError && <p className="watch-empty">{games.length ? 'No ratings are currently available.' : 'No completed games yet.'}</p>}
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const gamePool = fullSeason ? POOLS.find(({ key }) => key === row.game.poolKey) : pool
+            return <tr key={row.game.id}>
+              {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
+              <th scope="row" className="watch-matchup">{row.game.away} @ {row.game.home}</th>
+              {SCORES.map(({ key }) => <td className={key === 'overall' ? 'watch-overall' : undefined} key={key}>{row[key]?.toFixed(1) ?? '—'}</td>)}
+              {pickColumns.map(({ id, picks }) => {
+                const { game } = row
+                const pick = Date.parse(game.kickoff) <= now ? picks.get(`${game.poolKey}:${game.id}`) : null
+                const valid = (pick?.team === game.home || pick?.team === game.away) &&
+                  Number.isInteger(pick.confidence) && pick.confidence > 0
+                return <td key={id} className="watch-pick-column"
+                  aria-label={valid ? `${pick.team}, confidence ${pick.confidence}` : 'No pick available'}>
+                  {valid ? <><span>{pick.team}</span><b>{pick.confidence}</b></> : '—'}
+                </td>
+              })}
+            </tr>
+          })}
+        </tbody>
+      </table>
+    </div> : !waiting && !scheduleError && <p className="watch-empty">{games.length ? 'No ratings are currently available.' : 'No completed games yet.'}</p>}
   </>
 }
 
-export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, ...rankingProps }) {
+export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, ...rankingProps }) {
   const weightEdit = useRef(null)
   const [weightDraft, setWeightDraft] = useState(null)
+  const [showPicks, setShowPicks] = useState(false)
   const changeWeight = (key, percentage) => {
     if (percentage === weights[key]) return
     // Keep the earlier proportions while editing the same weight, even at 100%.
@@ -193,6 +217,10 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
         </div>
       </div>
       {scope === 'season' && <span className="watch-season">{pool.espnSeason} season</span>}
+      <label className="watch-show-picks">
+        <input type="checkbox" checked={showPicks} onChange={(event) => setShowPicks(event.target.checked)} />
+        Show player picks
+      </label>
     </div>
     <details className="watch-settings">
       <summary>Scoring Settings</summary>
@@ -230,7 +258,8 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
         <button type="button" onClick={resetWeights}>Reset to default weights</button>
       </div>
     </details>
-    <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights} {...rankingProps} />
+    <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights}
+      players={showPicks ? players : []} picksByPlayer={picksByPlayer} {...rankingProps} />
     <section className="watch-notes" aria-labelledby="watch-scoring-title">
       <h3 id="watch-scoring-title">How the rankings work</h3>
       <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>

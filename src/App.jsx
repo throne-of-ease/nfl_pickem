@@ -1450,6 +1450,7 @@ export default function App() {
               <Suspense fallback={<p role="status">Opening Games to Watch…</p>}>
                 <GamesToWatch pool={pool} weekGames={games} loadingWeek={dataState.loading}
                   scope={watchScope} onScope={setWatchScope} weights={watchWeights} onWeights={setWatchWeights}
+                  players={appUsers} picksByPlayer={normalPicksByUser}
                   fixturePools={useFixtures ? loadedGamesByPool : null} />
               </Suspense>
             )}
