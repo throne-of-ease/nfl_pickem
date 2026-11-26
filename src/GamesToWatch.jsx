@@ -3,7 +3,7 @@ import { POOLS } from './domain.js'
 import {
   DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, adjustWatchWeights, analyzeWatchGames, cachedWatchRatings,
   cachedWatchFpi, cachedWatchSchedule, excitementScore, fetchWatchSchedule, loadWatchFpi, mergeWatchGames,
-  queueWatchRun, watchGame, watchTeamQuality,
+  queueWatchRun, watchGame, watchRootingTeam, watchTeamQuality,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
@@ -96,7 +96,7 @@ function useRankings(season, weeklyKey, fixtureKey) {
   return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
 }
 
-function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer }) {
+function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool }) {
   const fullSeason = scope === 'season'
   const [sort, setSort] = useState({ key: 'overall', direction: 'descending' })
   const weeklyGames = fullSeason ? null : mergeWatchGames(completedGames(weekGames, pool.key))
@@ -135,7 +135,8 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
     picks: new Map(Object.entries(picksByPlayer[player.id] ?? {}).flatMap(([poolKey, picks]) =>
       picks.map((pick) => [`${poolKey}:${pick.gameId}`, pick]))),
   }))
-  const hasPicks = pickColumns.length > 0
+  const dense = showRooting || (showPicks && pickColumns.length > 0)
+  const viewerIndex = pickColumns.findIndex(({ id }) => id === viewerId)
   const now = Date.now()
   return <>
     <div className="watch-progress">
@@ -148,9 +149,8 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
       </p>
       {!waiting && (scheduleError || unavailable > 0) && <button type="button" onClick={retry}>Retry</button>}
     </div>
-    {rows.length ? <div className={hasPicks ? 'watch-table-scroll' : undefined} role={hasPicks ? 'region' : undefined}
-      aria-label={hasPicks ? 'Scrollable rankings and player picks' : undefined} tabIndex={hasPicks ? 0 : undefined}>
-      <table className={hasPicks ? 'watch-ranking watch-ranking-with-picks' : 'watch-ranking'} aria-label="Games to Watch rankings">
+    {rows.length ? <div>
+      <table className={dense ? 'watch-ranking watch-ranking-dense' : 'watch-ranking'} aria-label="Games to Watch rankings">
         <thead>
           <tr>
             {fullSeason && <th scope="col" className="watch-week">Week</th>}
@@ -161,26 +161,36 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
                 {sort.key === key && <span className="watch-sort-arrow" aria-hidden="true">{sort.direction === 'descending' ? ' ↓' : ' ↑'}</span>}
               </button>
             </th>)}
-            {pickColumns.map(({ id, name }) => <th key={id} scope="col" className="watch-pick-column" title={name}>
+            {showRooting && <th scope="col" className="watch-root-column" aria-label="Root for">Root for</th>}
+            {showPicks && pickColumns.map(({ id, name }) => <th key={id} scope="col" className="watch-pick-column">
               <span>{name}</span>
             </th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const gamePool = fullSeason ? POOLS.find(({ key }) => key === row.game.poolKey) : pool
+            const { game } = row
+            const gamePool = fullSeason ? POOLS.find(({ key }) => key === game.poolKey) : pool
+            const picks = pickColumns.map((column) => {
+              const pick = Date.parse(game.kickoff) <= now ? column.picks.get(`${game.poolKey}:${game.id}`) : null
+              return pick && (pick.team === game.home || pick.team === game.away) &&
+                Number.isInteger(pick.confidence) && pick.confidence > 0 ? pick : null
+            })
+            const rootingTeam = showRooting ? watchRootingTeam(game, picks[viewerIndex],
+              picks.filter((pick, index) => pick && index !== viewerIndex),
+              gamesByPool[game.poolKey]?.find(({ id }) => id === game.id)?.gotw) : null
             return <tr key={row.game.id}>
               {fullSeason && <td className="watch-week">{gamePool?.espnWeek}{gamePool?.phase === 'postseason' && <small>{gamePool.label}</small>}</td>}
-              <th scope="row" className="watch-matchup">{row.game.away} @ {row.game.home}</th>
+              <th scope="row" className="watch-matchup">{game.away} @ {game.home}</th>
               {SCORES.map(({ key }) => <td className={key === 'overall' ? 'watch-overall' : undefined} key={key}>{row[key]?.toFixed(1) ?? '—'}</td>)}
-              {pickColumns.map(({ id, picks }) => {
-                const { game } = row
-                const pick = Date.parse(game.kickoff) <= now ? picks.get(`${game.poolKey}:${game.id}`) : null
-                const valid = (pick?.team === game.home || pick?.team === game.away) &&
-                  Number.isInteger(pick.confidence) && pick.confidence > 0
+              {showRooting && <td className="watch-root-column" aria-label={rootingTeam ? `Root for ${rootingTeam}` : 'No rooting edge'}>
+                {rootingTeam ?? '—'}
+              </td>}
+              {showPicks && pickColumns.map(({ id }, index) => {
+                const pick = picks[index]
                 return <td key={id} className="watch-pick-column"
-                  aria-label={valid ? `${pick.team}, confidence ${pick.confidence}` : 'No pick available'}>
-                  {valid ? <><span>{pick.team}</span><b>{pick.confidence}</b></> : '—'}
+                  aria-label={pick ? `${pick.team}, confidence ${pick.confidence}` : 'No pick available'}>
+                  {pick ? <><span>{pick.team}</span><b>{pick.confidence}</b></> : '—'}
                 </td>
               })}
             </tr>
@@ -191,10 +201,11 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
   </>
 }
 
-export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, ...rankingProps }) {
+export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, viewerId, gamesByPool = {}, ...rankingProps }) {
   const weightEdit = useRef(null)
   const [weightDraft, setWeightDraft] = useState(null)
   const [showPicks, setShowPicks] = useState(false)
+  const [showRooting, setShowRooting] = useState(false)
   const changeWeight = (key, percentage) => {
     if (percentage === weights[key]) return
     // Keep the earlier proportions while editing the same weight, even at 100%.
@@ -220,6 +231,10 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
       <label className="watch-show-picks">
         <input type="checkbox" checked={showPicks} onChange={(event) => setShowPicks(event.target.checked)} />
         Show player picks
+      </label>
+      <label className="watch-show-picks">
+        <input type="checkbox" checked={showRooting} onChange={(event) => setShowRooting(event.target.checked)} />
+        Show rooting guide
       </label>
     </div>
     <details className="watch-settings">
@@ -259,11 +274,13 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
       </div>
     </details>
     <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights}
-      players={showPicks ? players : []} picksByPlayer={picksByPlayer} {...rankingProps} />
+      players={showPicks || showRooting ? players : []} picksByPlayer={picksByPlayer}
+      showPicks={showPicks} showRooting={showRooting} viewerId={viewerId} gamesByPool={gamesByPool} {...rankingProps} />
     <section className="watch-notes" aria-labelledby="watch-scoring-title">
       <h3 id="watch-scoring-title">How the rankings work</h3>
       <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>
       <p>Both sums use components with available scores. The overall score is unavailable if their weights total zero.</p>
+      {showRooting && <p><strong>Root for</strong> compares two hypothetical winners. It picks the team that gives you the better points margin over the average of other players with a pick. Stakes include the Game of the Week bonus. A dash means the margins are equal or there are too few picks to compare.</p>}
       <p>For the win probability formulas, pᵢ is ESPN’s home win probability at the start of a game-clock interval, on a 0–1 scale. Closeness is <span className="watch-formula">Cᵢ = 1 − 2 × |pᵢ − 0.5|</span>. The opening probability applies from kickoff and each value carries forward until the next timed update. The clock ends at the later of 60 minutes or the last timed probability update.</p>
       <dl>
         {WATCH_COMPONENTS.map(({ key, label }) => <div key={key}>

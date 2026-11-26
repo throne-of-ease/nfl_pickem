@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GamesToWatch from '../src/GamesToWatch.jsx'
 import { POOLS } from '../src/domain.js'
-import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchTeamQuality } from '../src/watchRatings.js'
+import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchRootingTeam, watchTeamQuality } from '../src/watchRatings.js'
 
 const final = { state: 'post', completed: true, name: 'STATUS_FINAL' }
 const current = { id: '100', week: 11, day: 16, away: 'DAL', home: 'PHI', type: final }
@@ -63,6 +63,17 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('chooses the outcome that maximizes the viewer’s margin over rivals', () => {
+    const game = { home: 'PHI', away: 'DAL' }
+    const viewer = { team: 'PHI', confidence: 1 }
+    const rivals = [{ team: 'PHI', confidence: 4 }, { team: 'DAL', confidence: 1 }]
+    expect(watchRootingTeam(game, viewer, rivals, false)).toBe('DAL')
+    expect(watchRootingTeam(game, viewer, rivals, true)).toBe('PHI')
+    expect(watchRootingTeam(game, viewer, [viewer], false)).toBeNull()
+    expect(watchRootingTeam(game, viewer, [], false)).toBeNull()
+    expect(watchRootingTeam(game, null, rivals, false)).toBeNull()
+  })
+
   it('uses game-clock weights, a smooth swings score, and available components only', () => {
     const scores = calculateWatchComponents(summary(current), current)
     const { uncertainty, suspense, swings } = scores

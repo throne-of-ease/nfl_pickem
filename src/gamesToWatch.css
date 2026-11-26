@@ -22,11 +22,12 @@
 .watch-progress button { padding: .18rem .45rem; font-size: .72rem; }
 .watch-ranking { margin-top: .35rem; }
 .watch-ranking th, .watch-ranking td { padding: .35rem .45rem; text-align: center; font-variant-numeric: tabular-nums; }
-.watch-table-scroll { max-width: 100%; overflow-x: auto; }
-.watch-ranking-with-picks { table-layout: auto; }
-.watch-ranking .watch-pick-column { width: 2.5rem; min-width: 2.5rem; padding: .22rem .12rem; font-size: .67rem; line-height: 1.12; }
+.watch-ranking-dense { width: 100%; table-layout: fixed; }
+.watch-ranking-dense th, .watch-ranking-dense td { overflow-wrap: anywhere; white-space: normal; }
+.watch-ranking .watch-pick-column, .watch-ranking .watch-root-column { padding: .22rem .12rem; font-size: .67rem; line-height: 1.12; }
+th.watch-pick-column { text-transform: none; letter-spacing: 0; }
 .watch-pick-column span, .watch-pick-column b { display: block; }
-.watch-pick-column span { max-width: 2.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-inline: auto; }
+.watch-ranking td.watch-root-column { color: var(--accent); font-weight: 750; }
 .watch-ranking .watch-matchup { text-align: left; white-space: nowrap; }
 .watch-ranking tbody th { color: var(--ink); font-size: inherit; letter-spacing: normal; }
 .watch-ranking .watch-week small { display: block; font-size: .8em; }
@@ -47,9 +48,13 @@
   .watch-ranking th, .watch-ranking td { padding: .38rem .13rem; white-space: normal; letter-spacing: 0; }
   .watch-ranking thead th, .watch-ranking thead button { font-size: .6rem; }
   .watch-ranking tbody td, .watch-ranking tbody th { font-size: .69rem; }
-  .watch-ranking-with-picks { table-layout: auto; }
-  .watch-ranking-with-picks thead th:not(.watch-week):not(.watch-pick-column) { min-width: 2.6rem; }
   .watch-ranking thead .watch-week { width: 11%; }
   .watch-ranking thead .watch-matchup { width: 25%; }
+  .watch-ranking-dense thead .watch-week { width: 8%; }
+  .watch-ranking-dense thead .watch-matchup { width: 13%; }
+  .watch-ranking-dense th, .watch-ranking-dense td { padding: .24rem .06rem; line-height: 1.15; }
+  .watch-ranking-dense tbody .watch-matchup { text-align: center; white-space: normal; }
+  .watch-ranking-dense thead th, .watch-ranking-dense thead button { font-size: .55rem; white-space: normal; overflow-wrap: anywhere; }
+  .watch-ranking-dense tbody td, .watch-ranking-dense .watch-pick-column, .watch-ranking-dense .watch-root-column { font-size: .60rem; }
   .watch-notes dl { grid-template-columns: minmax(0, 1fr); }
 }

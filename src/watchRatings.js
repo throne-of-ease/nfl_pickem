@@ -10,6 +10,14 @@ export const WATCH_COMPONENTS = [
 
 export const DEFAULT_WATCH_WEIGHTS = Object.fromEntries(WATCH_COMPONENTS.map(({ key, weight }) => [key, weight]))
 
+export function watchRootingTeam(game, playerPick, otherPicks, gotw) {
+  if (!playerPick || !otherPicks.length) return null
+  const signedStake = ({ team, confidence }) => (team === game.home ? 1 : -1) * (confidence + (gotw ? 5 : 0))
+  const edge = signedStake(playerPick) * otherPicks.length -
+    otherPicks.reduce((total, pick) => total + signedStake(pick), 0)
+  return edge > 0 ? game.home : edge < 0 ? game.away : null
+}
+
 export function adjustWatchWeights(weights, changedKey, percentage) {
   const others = WATCH_COMPONENTS.map(({ key }) => key).filter((key) => key !== changedKey)
   const basis = others.some((key) => weights[key] > 0) ? weights : DEFAULT_WATCH_WEIGHTS
