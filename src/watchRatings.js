@@ -31,7 +31,7 @@ export function watchRootingTeam(game, playerPick, otherPicks, gotw) {
 }
 
 const CACHE_VERSION = 'nfl-pickem-watch-v1'
-const RATING_VERSION = 2
+const RATING_VERSION = 3
 const QUARTER = 15 * 60
 const REGULATION = 4 * QUARTER
 const SCOREBOARD_MAX_AGE = 2 * 60 * 1000
@@ -42,6 +42,7 @@ const completed = (type) => type?.state === 'post' && type.completed === true &&
 const active = (type) => type?.state === 'in' && !type.completed && !/SUSPEND|DELAY|POSTPON/.test(type.name ?? '')
 const swingScore = (total) => -100 * Math.expm1(-total / 2.5)
 const unit = (value) => Math.max(0, Math.min(1, value))
+const scoringActionRating = (effectivePoints) => -100 * Math.expm1(-effectivePoints / 34)
 
 function scoringAction(scoringPlays, points, opening, end, isFinal) {
   if (!Array.isArray(scoringPlays)) return null
@@ -71,7 +72,7 @@ function scoringAction(scoringPlays, points, opening, end, isFinal) {
   }
   if (scoring.size) return null
   const elapsed = isFinal ? 1 : unit(end / REGULATION)
-  return elapsed ? 50 * (1 - elapsed) + 100 * elapsed * unit(effective / (45 * elapsed)) : 50
+  return elapsed ? 50 * (1 - elapsed) + elapsed * scoringActionRating(effective / elapsed) : 50
 }
 
 export function watchGame(game, poolKey) {
@@ -224,6 +225,15 @@ function readWatchRating(key) {
   const row = ratingMemory.get(key) ?? readCache(key)
   if (!row?.game || !row?.components) return null
   if (row.version === RATING_VERSION) return row
+  if (row.version === 2) {
+    const { scoring, ...components } = row.components
+    if (scoring === null) return row
+    // The former scale was linear up to 45 effective points. Re-fetch capped games.
+    if (Number.isFinite(scoring) && scoring >= 0 && scoring < 100) {
+      return { ...row, components: { ...components, scoring: scoringActionRating(scoring * .45) } }
+    }
+    return { ...row, components }
+  }
   const { swings } = row.components
   if (row.version !== undefined || !Number.isFinite(swings) || swings < 0 || swings >= 100) return null
   // The old scale was linear below 100. Only capped games need their play data again.

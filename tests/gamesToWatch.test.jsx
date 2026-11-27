@@ -73,7 +73,7 @@ describe('Games to Watch', () => {
       { id: '2', homeScore: 7, awayScore: 7 },
       { id: '3', homeScore: 14, awayScore: 7 },
     ]
-    expect(calculateWatchComponents(match, current).scoring).toBeCloseTo(100 * (7 + 5.6 + 3.15) / 45)
+    expect(calculateWatchComponents(match, current).scoring).toBeCloseTo(100 * (1 - Math.exp(-(7 + 5.6 + 3.15) / 34)))
     match.scoringPlays.push({ id: 'missing', homeScore: 17, awayScore: 7 })
     expect(calculateWatchComponents(match, current).scoring).toBeNull()
   })
@@ -84,6 +84,7 @@ describe('Games to Watch', () => {
     early.drives.current = { plays: early.drives.previous[0].plays.slice(0, 2) }
     early.drives.previous = []
     early.winprobability = early.winprobability.slice(0, 2)
+    early.scoringPlays = []
     const later = summary(live)
     later.drives.previous[0].plays.pop()
     later.winprobability.pop()
@@ -96,6 +97,7 @@ describe('Games to Watch', () => {
     const cell = (index) => screen.getByText('SEA @ ARI').closest('tr').cells[index].textContent
     await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 1 of 1 games · 1 live'))
     expect(cell(5)).toBe('—')
+    expect(cell(6)).toBe('30.8')
     const earlySwings = cell(4)
     expect(cachedWatchRatings(2026, [live])).toEqual([])
     const tick = async () => {
@@ -166,6 +168,26 @@ describe('Games to Watch', () => {
       expect(rows[0].components).toMatchObject({ uncertainty: 72, suspense: 80 })
       expect(rows[0].components.swings).toBeCloseTo(32.968)
     }
+  })
+
+  it('converts old Scoring Action values and only reloads games that hit the old cap', async () => {
+    for (const [game, scoring] of [[current, 50], [previous, 100]]) {
+      localStorage.setItem(`nfl-pickem-watch-v1:rating:2026:${game.id}`, JSON.stringify({
+        version: 2,
+        game: { ...game, poolKey: 'week-11', kickoff: date(game) },
+        components: { swings: 40, uncertainty: 72, suspense: 80, scoring },
+      }))
+    }
+    const match = summary(previous)
+    match.scoringPlays = [{ id: '1', homeScore: 7, awayScore: 0 }]
+    const fetchSummary = vi.fn(() => json(match))
+    mockEspn(() => json({ events: [] }), fetchSummary)
+    render(<Harness weekly={[current, previous]} />)
+    expect(screen.getByText('DAL @ PHI').closest('tr').cells[6]).toHaveTextContent('48.4')
+    expect(screen.getByText('DET @ GB').closest('tr').cells[6]).toHaveTextContent('—')
+    await waitFor(() => expect(screen.getByText('DET @ GB').closest('tr').cells[6]).toHaveTextContent('18.6'))
+    expect(fetchSummary).toHaveBeenCalledTimes(1)
+    expect(fetchSummary.mock.calls[0][0]).toBe(previous.id)
   })
 
   it('starts with weekly finals, progressively ranks the selected season, and reuses cached ratings', async () => {

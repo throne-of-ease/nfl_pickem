@@ -23,7 +23,7 @@ const SCORING_NOTES = {
     description: 'Measures how long the ending stayed in doubt. Lᵢ is the portion of each interval after 55 minutes of game-clock time, covering the final five minutes of regulation and any overtime.',
   },
   scoring: {
-    formula: 'E = Σ(points added × max(closeness credit, comeback credit)). Final rating = 100 × min(1, E / 45).',
+    formula: 'E = Σ(points added × max(closeness credit, comeback credit)). Final rating = 100 × (1 − exp(−E / 34)).',
     description: 'Closeness credit rises from zero at 0% or 100% pre-play win probability to full credit at 40–60%. If the scoring team was trailing, comeback credit is its positive win-probability gain divided by 20 percentage points, capped at 1. For live games, the rating blends a neutral 50 with the rating at the current scoring pace, weighted by the share of regulation elapsed.',
   },
   quality: {
