@@ -63,6 +63,21 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('credits a close score and a comeback more than a score that extends a big lead', () => {
+    const match = summary(current)
+    match.winprobability.forEach((point, index) => {
+      point.homeWinPercentage = [.5, .98, .82, .8, 1][index]
+    })
+    match.scoringPlays = [
+      { id: '1', homeScore: 7, awayScore: 0 },
+      { id: '2', homeScore: 7, awayScore: 7 },
+      { id: '3', homeScore: 14, awayScore: 7 },
+    ]
+    expect(calculateWatchComponents(match, current).scoring).toBeCloseTo(100 * (7 + 5.6 + 3.15) / 45)
+    match.scoringPlays.push({ id: 'missing', homeScore: 17, awayScore: 7 })
+    expect(calculateWatchComponents(match, current).scoring).toBeNull()
+  })
+
   it('refreshes live ratings through completion and only caches the final', async () => {
     const timers = vi.spyOn(globalThis, 'setTimeout')
     const early = summary(live)
@@ -202,13 +217,14 @@ describe('Games to Watch', () => {
     const weights = () => screen.getAllByRole('slider').map((slider) => slider.valueAsNumber)
     const setWeight = (component, value) => fireEvent.change(screen.getByRole('slider', { name: `${component} weight` }), { target: { value } })
     setWeight('Uncertainty', '50')
-    expect(weights()).toEqual([50, 18, 25, 7])
+    expect(weights()).toEqual([50, 22, 32, 10, 9])
+    expect(screen.getByText(/Weights total 123%/)).toBeInTheDocument()
     setWeight('Uncertainty', '100')
-    expect(weights()).toEqual([100, 0, 0, 0])
+    expect(weights()).toEqual([100, 22, 32, 10, 9])
     setWeight('Uncertainty', '50')
-    expect(weights()).toEqual([50, 18, 25, 7])
+    expect(weights()).toEqual([50, 22, 32, 10, 9])
     setWeight('Team Quality', '100')
-    expect(weights()).toEqual([0, 0, 0, 100])
+    expect(weights()).toEqual([50, 22, 32, 10, 100])
     expect(overall()).not.toEqual(oldScores)
     expect(calls).toHaveLength(5)
 
@@ -230,7 +246,8 @@ describe('Games to Watch', () => {
 
     const requestCount = calls.length
     fireEvent.click(screen.getByRole('button', { name: 'Reset to default weights' }))
-    expect(weights()).toEqual([30, 25, 35, 10])
+    expect(weights()).toEqual([27, 22, 32, 10, 9])
+    expect(screen.queryByText(/Weights total/)).not.toBeInTheDocument()
     expect(overall().some((score) => score !== 50)).toBe(true)
     expect(calls).toHaveLength(requestCount)
     view.unmount()

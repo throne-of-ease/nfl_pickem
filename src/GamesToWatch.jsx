@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { POOLS } from './domain.js'
 import {
-  DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, adjustWatchWeights, analyzeWatchGames, cachedWatchRatings,
+  DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, analyzeWatchGames, cachedWatchRatings,
   cachedWatchFpi, cachedWatchSchedule, excitementScore, fetchWatchSchedule, loadWatchFpi, mergeWatchGames,
   queueWatchRun, watchGame, watchRootingTeam, watchSeasonRival, watchTeamQuality,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
 const SCORES = [{ key: 'overall', label: 'Excitement Score' }, ...WATCH_COMPONENTS]
-const SHORT_LABELS = { overall: 'Excitem.', uncertainty: 'Uncert.', swings: 'WP Swings', suspense: 'Late Susp.', quality: 'Team Qual.' }
+const SHORT_LABELS = { overall: 'Excitem.', uncertainty: 'Uncert.', swings: 'WP Swings', suspense: 'Late Susp.', scoring: 'Scoring', quality: 'Team Qual.' }
 const SCORING_NOTES = {
   uncertainty: {
     formula: '100 × Σ(Cᵢ × Δtᵢ) / T',
@@ -21,6 +21,10 @@ const SCORING_NOTES = {
   suspense: {
     formula: '100 × Σ(Cᵢ × Lᵢ) / (T − 55 min)',
     description: 'Measures how long the ending stayed in doubt. Lᵢ is the portion of each interval after 55 minutes of game-clock time, covering the final five minutes of regulation and any overtime.',
+  },
+  scoring: {
+    formula: 'E = Σ(points added × max(closeness credit, comeback credit)). Final rating = 100 × min(1, E / 45).',
+    description: 'Closeness credit rises from zero at 0% or 100% pre-play win probability to full credit at 40–60%. If the scoring team was trailing, comeback credit is its positive win-probability gain divided by 20 percentage points, capped at 1. For live games, the rating blends a neutral 50 with the rating at the current scoring pace, weighted by the share of regulation elapsed.',
   },
   quality: {
     formula: 'max(0, min(100, 50 + 5 × (FPI home + FPI away) / 2))',
@@ -97,7 +101,7 @@ function useRankings(season, weeklyKey, liveKey, fixtureKey) {
         if (!signal.aborted && live.length) liveTimer = setTimeout(updateLive, LIVE_REFRESH_MS)
       }
       const liveIds = new Set(live.map(({ id }) => id))
-      const missing = games.filter(({ id }) => !initial.byId.has(id) && !liveIds.has(id))
+      const missing = games.filter(({ id }) => initial.byId.get(id)?.scoring === undefined && !liveIds.has(id))
       await Promise.all([updateLive(), analyzeWatchGames(season, missing, signal, (id, row, rateLimited) => {
         setRankings((state) => row
           ? { ...state, byId: new Map(state.byId).set(id, row.components) }
@@ -120,7 +124,7 @@ function useRankings(season, weeklyKey, liveKey, fixtureKey) {
   const games = JSON.parse(fixtureKey)
   const byId = new Map(games.map(({ id }) => {
     const index = Number(id.at(-1))
-    return [id, { uncertainty: 76 - 11 * index, swings: 25 + 10 * index, suspense: 18 + 12 * index }]
+    return [id, { uncertainty: 76 - 11 * index, swings: 25 + 10 * index, suspense: 18 + 12 * index, scoring: 25 + 8 * index }]
   }))
   const fpi = new Map(games.flatMap(({ away, home }, index) => [[away, index - 2], [home, index - 1]]))
   return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
@@ -240,7 +244,6 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
 }
 
 export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_WATCH_WEIGHTS, onWeights, players = [], picksByPlayer = {}, viewerId, gamesByPool = {}, seasonHistory, ...rankingProps }) {
-  const weightEdit = useRef(null)
   const [weightDraft, setWeightDraft] = useState(null)
   const [showPicks, setShowPicks] = useState(false)
   const [showRooting, setShowRooting] = useState(false)
@@ -248,15 +251,13 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
   const rootingRivalId = showRooting && useSeasonLeader ? watchSeasonRival(seasonHistory, players, viewerId) : undefined
   const changeWeight = (key, percentage) => {
     if (percentage === weights[key]) return
-    // Keep the earlier proportions while editing the same weight, even at 100%.
-    if (weightEdit.current?.key !== key) weightEdit.current = { key, weights }
-    onWeights(adjustWatchWeights(weightEdit.current.weights, key, percentage))
+    onWeights({ ...weights, [key]: percentage })
   }
   const resetWeights = () => {
-    weightEdit.current = null
     setWeightDraft(null)
     onWeights(DEFAULT_WATCH_WEIGHTS)
   }
+  const weightTotal = WATCH_COMPONENTS.reduce((sum, { key }) => sum + weights[key], 0)
   return <section className="watch-view" aria-labelledby="games-to-watch-title">
     <div className="section-title"><h2 id="games-to-watch-title">Games to Watch</h2></div>
     <div className="watch-controls">
@@ -313,7 +314,9 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
         </div>)}
       </div>
       <div className="watch-settings-actions">
-        <p>The other weights adjust proportionally to keep the total at 100%.</p>
+        {weightTotal !== 100 && <p className="watch-weight-warning" aria-live="polite">
+          Weights total {weightTotal}%. {weightTotal === 0 ? 'Set a positive weight to calculate the score.' : 'The score uses their relative proportions.'}
+        </p>}
         <button type="button" onClick={resetWeights}>Reset to default weights</button>
       </div>
     </details>

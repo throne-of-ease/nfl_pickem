@@ -2,10 +2,11 @@ import { POOLS } from './domain.js'
 import { espnCalendarScoreboardUrl, espnSummaryUrl, fetchFpiRatings } from './espnAdapter.js'
 
 export const WATCH_COMPONENTS = [
-  { key: 'uncertainty', label: 'Uncertainty', weight: 30 },
-  { key: 'swings', label: 'WP Swings', weight: 25 },
-  { key: 'suspense', label: 'Late-Game Suspense', weight: 35 },
-  { key: 'quality', label: 'Team Quality', weight: 10 },
+  { key: 'uncertainty', label: 'Uncertainty', weight: 27 },
+  { key: 'swings', label: 'WP Swings', weight: 22 },
+  { key: 'suspense', label: 'Late-Game Suspense', weight: 32 },
+  { key: 'scoring', label: 'Scoring Action', weight: 10 },
+  { key: 'quality', label: 'Team Quality', weight: 9 },
 ]
 
 export const DEFAULT_WATCH_WEIGHTS = Object.fromEntries(WATCH_COMPONENTS.map(({ key, weight }) => [key, weight]))
@@ -29,20 +30,6 @@ export function watchRootingTeam(game, playerPick, otherPicks, gotw) {
   return edge > 0 ? game.home : edge < 0 ? game.away : null
 }
 
-export function adjustWatchWeights(weights, changedKey, percentage) {
-  const others = WATCH_COMPONENTS.map(({ key }) => key).filter((key) => key !== changedKey)
-  const basis = others.some((key) => weights[key] > 0) ? weights : DEFAULT_WATCH_WEIGHTS
-  const adjusted = Object.fromEntries(others.map((key) => [key, 0]))
-  // Allocate whole points proportionally. With a fixed basis, taking points
-  // away reverses the allocation order, so no other weight can increase.
-  const priority = (key) => basis[key] / (adjusted[key] + 0.5)
-  for (let total = percentage; total < 100; total += 1) {
-    const recipient = others.reduce((best, key) => priority(key) > priority(best) ? key : best)
-    adjusted[recipient] += 1
-  }
-  return { ...adjusted, [changedKey]: percentage }
-}
-
 const CACHE_VERSION = 'nfl-pickem-watch-v1'
 const RATING_VERSION = 2
 const QUARTER = 15 * 60
@@ -54,6 +41,38 @@ const newestFirst = (a, b) => b.kickoff.localeCompare(a.kickoff) || a.id.localeC
 const completed = (type) => type?.state === 'post' && type.completed === true && /^STATUS_FINAL(?:_|$)/.test(type.name ?? '')
 const active = (type) => type?.state === 'in' && !type.completed && !/SUSPEND|DELAY|POSTPON/.test(type.name ?? '')
 const swingScore = (total) => -100 * Math.expm1(-total / 2.5)
+const unit = (value) => Math.max(0, Math.min(1, value))
+
+function scoringAction(scoringPlays, points, opening, end, isFinal) {
+  if (!Array.isArray(scoringPlays)) return null
+  const scoring = new Map(scoringPlays.map((play) => [String(play.id), play]))
+  let home = 0
+  let away = 0
+  let previousWp = opening
+  let effective = 0
+  for (const { id, wp } of points) {
+    const play = scoring.get(id)
+    if (play) {
+      const { homeScore, awayScore } = play
+      if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) return null
+      const homeGain = homeScore - home
+      const awayGain = awayScore - away
+      if (homeGain < 0 || awayGain < 0) return null
+      const close = unit((.5 - Math.abs(previousWp - .5)) / .4)
+      const wpGain = wp - previousWp
+      const homeComeback = home < away ? unit(wpGain / .2) : 0
+      const awayComeback = away < home ? unit(-wpGain / .2) : 0
+      effective += homeGain * Math.max(close, homeComeback) + awayGain * Math.max(close, awayComeback)
+      home = homeScore
+      away = awayScore
+      scoring.delete(id)
+    }
+    previousWp = wp
+  }
+  if (scoring.size) return null
+  const elapsed = isFinal ? 1 : unit(end / REGULATION)
+  return elapsed ? 50 * (1 - elapsed) + 100 * elapsed * unit(effective / (45 * elapsed)) : 50
+}
 
 export function watchGame(game, poolKey) {
   const { id, away, home, kickoff, status } = game
@@ -123,7 +142,7 @@ export function calculateWatchComponents(payload, game) {
   const opening = data.winprobability[0]?.homeWinPercentage
   const points = data.winprobability.flatMap(({ playId, homeWinPercentage: wp }) => {
     const time = clockByPlay.get(String(playId))
-    return time != null && Number.isFinite(wp) && wp >= 0 && wp <= 1 ? [{ time, wp }] : []
+    return time != null && Number.isFinite(wp) && wp >= 0 && wp <= 1 ? [{ id: String(playId), time, wp }] : []
   }).sort((a, b) => a.time - b.time)
   if (!points.length || points[0].time > QUARTER || (isFinal && (points.length < 2 || points.at(-1).time < REGULATION - 120))) return null
 
@@ -145,6 +164,7 @@ export function calculateWatchComponents(payload, game) {
     uncertainty: end > 0 ? 100 * uncertainty / end : null,
     swings: swingScore(swings),
     suspense: end > lateStart ? 100 * suspense / (end - lateStart) : null,
+    scoring: scoringAction(data.scoringPlays, points, first, end, isFinal),
   }
 }
 
@@ -153,8 +173,9 @@ export function excitementScore(components, weights) {
   let total = 0
   for (const { key } of WATCH_COMPONENTS) {
     if (!Number.isFinite(components[key])) continue
-    weighted += components[key] * weights[key]
-    total += weights[key]
+    const weight = weights[key] ?? 0
+    weighted += components[key] * weight
+    total += weight
   }
   return total ? weighted / total : null
 }
