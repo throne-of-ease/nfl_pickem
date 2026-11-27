@@ -181,6 +181,16 @@ export function excitementScore(components, weights) {
   return total ? weighted / total : null
 }
 
+export function watchSeasonPercentile(value, reference) {
+  if (!Number.isFinite(value) || !reference.length) return null
+  let rank = 0
+  for (const sample of reference) {
+    if (sample < value) rank += 1
+    else if (sample === value) rank += .5
+  }
+  return 100 * rank / reference.length
+}
+
 function readCache(key) {
   try { return JSON.parse(localStorage.getItem(key)) } catch { return null }
 }

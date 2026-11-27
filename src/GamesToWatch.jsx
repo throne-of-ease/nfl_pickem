@@ -3,7 +3,7 @@ import { POOLS } from './domain.js'
 import {
   DEFAULT_WATCH_WEIGHTS, WATCH_COMPONENTS, analyzeWatchGames, cachedWatchRatings,
   cachedWatchFpi, cachedWatchSchedule, excitementScore, fetchWatchSchedule, loadWatchFpi, mergeWatchGames,
-  queueWatchRun, watchGame, watchRootingTeam, watchSeasonRival, watchTeamQuality,
+  queueWatchRun, watchGame, watchRootingTeam, watchSeasonPercentile, watchSeasonRival, watchTeamQuality,
 } from './watchRatings.js'
 import './gamesToWatch.css'
 
@@ -130,23 +130,36 @@ function useRankings(season, weeklyKey, liveKey, fixtureKey) {
   return { games, byId, fpi, loading: false, unavailable: 0, scheduleError: false, rateLimited: false, retry }
 }
 
-function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool, rootingRivalId, useSeasonLeader }) {
+function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, players, picksByPlayer, showPicks, showRooting, viewerId, gamesByPool, rootingRivalId, useSeasonLeader, usePercentiles }) {
   const fullSeason = scope === 'season'
+  const loadSeason = fullSeason || usePercentiles
   const [sort, setSort] = useState({ key: 'overall', direction: 'descending' })
-  const weeklyGames = fullSeason ? null : mergeWatchGames(startedGames(weekGames, pool.key))
-  const liveKey = JSON.stringify(fullSeason ? Object.entries(gamesByPool)
-    .flatMap(([key, games]) => startedGames(games, key).filter((game) => game.live)) : [])
+  const weeklyGames = startedGames(weekGames, pool.key)
+  const weeklyKey = JSON.stringify(loadSeason ? null : mergeWatchGames(weeklyGames))
+  const liveKey = JSON.stringify(loadSeason ? mergeWatchGames(
+    Object.entries(gamesByPool).flatMap(([key, games]) => startedGames(games, key).filter((game) => game.live)),
+    usePercentiles && !fullSeason ? weeklyGames : [],
+  ) : [])
   let fixtureKey = null
   if (fixturePools) {
     const seasonPools = POOLS.filter((item) => item.espnSeason === pool.espnSeason && item.countsTowardSeason)
-    fixtureKey = JSON.stringify(weeklyGames ?? mergeWatchGames(...seasonPools
-      .map(({ key }) => startedGames(key === pool.key ? weekGames : fixturePools[key] ?? [], key))))
+    fixtureKey = JSON.stringify(loadSeason ? mergeWatchGames(...seasonPools
+      .map(({ key }) => startedGames(key === pool.key ? weekGames : fixturePools[key] ?? [], key))) : mergeWatchGames(weeklyGames))
   }
-  const weeklyKey = JSON.stringify(weeklyGames)
   const { games, byId, fpi, loading, unavailable, scheduleError, rateLimited, retry } = useRankings(pool.espnSeason, weeklyKey, liveKey, fixtureKey)
+  const rawScores = (game) => ({ ...byId.get(game.id), quality: watchTeamQuality(game, fpi) })
+  const completedScores = usePercentiles ? games.filter((game) => !game.live).map(rawScores)
+    .filter((components) => Object.values(components).some(Number.isFinite)) : []
+  const references = usePercentiles ? WATCH_COMPONENTS.map(({ key }) => [
+    key, completedScores.map((components) => components[key]).filter(Number.isFinite),
+  ]) : []
   const rows = games.flatMap((game) => {
+    if (!fullSeason && game.poolKey !== pool.key) return []
     if (!byId.has(game.id) && !game.live) return []
-    const components = { ...byId.get(game.id), quality: watchTeamQuality(game, fpi) }
+    const raw = rawScores(game)
+    const components = usePercentiles
+      ? Object.fromEntries(references.map(([key, reference]) => [key, watchSeasonPercentile(raw[key], reference)]))
+      : raw
     return [{ game, ...components, overall: byId.has(game.id) ? excitementScore(components, weights) : null }]
   }).sort((a, b) => {
     const left = a[sort.key]
@@ -161,7 +174,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
   const analyzed = games.filter(({ id }) => byId.has(id)).length
   const liveCount = games.filter((game) => game.live).length
   const provisional = waiting || scheduleError || analyzed < games.length || liveCount > 0
-  const progress = fullSeason && (waiting || scheduleError) && !games.length
+  const progress = loadSeason && (waiting || scheduleError) && !games.length
     ? 'Checking games…'
     : `Analyzed ${analyzed} of ${games.length} games`
   const changeSort = (key) => setSort((current) => ({
@@ -181,6 +194,7 @@ function Rankings({ pool, weekGames, loadingWeek, scope, weights, fixturePools, 
     <div className="watch-progress">
       <p role="status">
         {progress}
+        {usePercentiles && ` · Season percentiles · ${completedScores.length} completed in reference`}
         {liveCount > 0 && ` · ${liveCount} live`}
         {provisional && ' · Rankings provisional'}
         {scheduleError && ' · ESPN schedule unavailable'}
@@ -248,6 +262,7 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
   const [showPicks, setShowPicks] = useState(false)
   const [showRooting, setShowRooting] = useState(false)
   const [useSeasonLeader, setUseSeasonLeader] = useState(false)
+  const [usePercentiles, setUsePercentiles] = useState(false)
   const rootingRivalId = showRooting && useSeasonLeader ? watchSeasonRival(seasonHistory, players, viewerId) : undefined
   const changeWeight = (key, percentage) => {
     if (percentage === weights[key]) return
@@ -269,6 +284,10 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
         </div>
       </div>
       {scope === 'season' && <span className="watch-season">{pool.espnSeason} season</span>}
+      <label className="watch-show-picks">
+        <input type="checkbox" checked={usePercentiles} onChange={(event) => setUsePercentiles(event.target.checked)} />
+        Use season percentiles
+      </label>
       <label className="watch-show-picks">
         <input type="checkbox" checked={showPicks} onChange={(event) => setShowPicks(event.target.checked)} />
         Show player picks
@@ -323,11 +342,12 @@ export default function GamesToWatch({ pool, scope, onScope, weights = DEFAULT_W
     <Rankings key={scope === 'week' ? pool.key : pool.espnSeason} pool={pool} scope={scope} weights={weights}
       players={showPicks || showRooting ? players : []} picksByPlayer={picksByPlayer}
       showPicks={showPicks} showRooting={showRooting} viewerId={viewerId} gamesByPool={gamesByPool}
-      useSeasonLeader={useSeasonLeader} rootingRivalId={rootingRivalId} {...rankingProps} />
+      useSeasonLeader={useSeasonLeader} rootingRivalId={rootingRivalId} usePercentiles={usePercentiles} {...rankingProps} />
     <section className="watch-notes" aria-labelledby="watch-scoring-title">
       <h3 id="watch-scoring-title">How the rankings work</h3>
       <p className="watch-formula">Excitement Score = Σ(weight × component score) / Σ(weight)</p>
       <p>Both sums use components with available scores. The overall score is unavailable if their weights total zero.</p>
+      {usePercentiles && <p>Each component uses its own reference of completed games with a rating for that component. The percentile counts the percentage of those games below the rating plus half the percentage tied with it. Your weights are applied after conversion. Live games are compared with this reference and enter it when final. Percentiles can shift as more games are rated.</p>}
       <p>Live ratings refresh about every 30 seconds as ESPN publishes win probabilities. They use the game clock through the latest timed update. Late-Game Suspense becomes available once there is win probability data inside the last five minutes. Team Quality uses the latest available season FPI.</p>
       {showRooting && <p><strong>Root for</strong> compares two hypothetical winners and shows which gives you the better points margin. {useSeasonLeader
         ? 'The benchmark is the highest-ranked other player in the current overall standings. If you lead, it uses the next player.'

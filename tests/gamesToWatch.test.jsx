@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GamesToWatch from '../src/GamesToWatch.jsx'
 import { POOLS } from '../src/domain.js'
-import { cachedWatchRatings, calculateWatchComponents, excitementScore, watchRootingTeam, watchSeasonRival, watchTeamQuality } from '../src/watchRatings.js'
+import { cachedWatchRatings, cacheWatchRating, calculateWatchComponents, excitementScore, watchRootingTeam, watchSeasonRival, watchTeamQuality } from '../src/watchRatings.js'
 
 const final = { state: 'post', completed: true, name: 'STATUS_FINAL' }
 const current = { id: '100', week: 11, day: 16, away: 'DAL', home: 'PHI', type: final }
@@ -63,6 +63,35 @@ afterEach(() => {
 })
 
 describe('Games to Watch', () => {
+  it('uses completed season games for each component percentile while showing only the selected week', async () => {
+    cacheWatchRating(2026, { game: { ...current, poolKey: 'week-11', kickoff: date(current) },
+      components: { uncertainty: 40, swings: 80, suspense: 60, scoring: 20 } })
+    cacheWatchRating(2026, { game: { ...previous, poolKey: 'week-10', kickoff: date(previous) },
+      components: { uncertainty: 80, swings: 40, suspense: 60, scoring: null } })
+    const schedule = vi.fn(() => json({ events: [scoreboard(current), scoreboard(previous)] }))
+    const fetchSummary = vi.fn((id) => json(summary(id === live.id ? live : current)))
+    mockEspn(schedule, fetchSummary)
+    render(<Harness />)
+    const percentiles = screen.getByRole('checkbox', { name: 'Use season percentiles' })
+    const scores = () => [...ranking().getByText('DAL @ PHI').closest('tr').cells].slice(2).map((cell) => cell.textContent)
+    await waitFor(() => expect(progress()).toHaveTextContent('Analyzed 1 of 1 games'))
+    expect(percentiles).not.toBeChecked()
+    expect(scores()).toEqual(['54.5', '40.0', '80.0', '60.0', '20.0', '—'])
+    expect(schedule).not.toHaveBeenCalled()
+
+    fireEvent.click(percentiles)
+    await waitFor(() => expect(progress()).toHaveTextContent('2 completed in reference'))
+    await waitFor(() => expect(schedule).toHaveBeenCalled())
+    expect(ranking().queryByText('DET @ GB')).not.toBeInTheDocument()
+    expect(scores()).toEqual(['48.6', '25.0', '75.0', '50.0', '50.0', '—'])
+    fireEvent.change(screen.getByRole('slider', { name: 'Uncertainty weight' }), { target: { value: '0' } })
+    expect(scores()[0]).toBe('58.6')
+    expect(fetchSummary).not.toHaveBeenCalled()
+
+    fireEvent.click(percentiles)
+    expect(scores()).toEqual(['60.6', '40.0', '80.0', '60.0', '20.0', '—'])
+  })
+
   it('credits a close score and a comeback more than a score that extends a big lead', () => {
     const match = summary(current)
     match.winprobability.forEach((point, index) => {
